@@ -1,36 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { CableMapView } from "@/components/cable-map/cable-map-view";
+import { canEditProgress } from "@/lib/auth/shared";
+import { getDashboardData } from "@/lib/cable-map/functions";
 
 export const Route = createFileRoute("/app/")({
+	loader: async () => getDashboardData(),
 	component: AppHomePage,
 });
 
 function AppHomePage() {
+	const data = Route.useLoaderData();
+	const { auth } = Route.useRouteContext();
+
+	if (!auth) {
+		return null;
+	}
+
 	return (
-		<div className="flex flex-1 flex-col gap-4">
-			<Card>
-				<CardHeader>
-					<CardTitle>Главная страница</CardTitle>
-					<CardDescription>
-						Базовая защищённая зона приложения для дальнейшей разработки
-						функционала.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="flex flex-col gap-2">
-					<p>
-						Авторизация через форму подключена и работает через cookie-сессию.
-					</p>
-					<p>
-						Роли пользователей уже заведены: пользователь, админ и супер-админ.
-					</p>
-				</CardContent>
-			</Card>
-		</div>
+		<CableMapView
+			data={data}
+			canEdit={canEditProgress(auth.role)}
+			role={auth.role}
+		/>
 	);
 }

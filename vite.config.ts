@@ -11,6 +11,9 @@ const config = defineConfig({
 	resolve: {
 		tsconfigPaths: true,
 	},
+	server: {
+		host: true,
+	},
 });
 
 export default config;

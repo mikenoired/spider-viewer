@@ -34,5 +34,17 @@ export const roleLabels: Record<UserRole, string> = {
 	"super-admin": "Супер-админ",
 };
 
+export function canEditProgress(role: UserRole) {
+	return role === "admin" || role === "super-admin";
+}
+
+export function canUploadSnapshot(role: UserRole) {
+	return role === "super-admin";
+}
+
+export function canViewAudit(role: UserRole) {
+	return role === "super-admin";
+}
+
 export const TEST_USERS_PASSWORD = "Password123!";
 export const AUTH_COOKIE_NAME = "spider_viewer_session";

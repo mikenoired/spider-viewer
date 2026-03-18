@@ -13,6 +13,9 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteRouteImport } from './routes/app/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppImportRouteImport } from './routes/app/import'
+import { Route as AppHistoryRouteImport } from './routes/app/history'
+import { Route as AppBackdatedRouteImport } from './routes/app/backdated'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -34,16 +37,37 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppImportRoute = AppImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppHistoryRoute = AppHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBackdatedRoute = AppBackdatedRouteImport.update({
+  id: '/backdated',
+  path: '/backdated',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/backdated': typeof AppBackdatedRoute
+  '/app/history': typeof AppHistoryRoute
+  '/app/import': typeof AppImportRoute
   '/app/': typeof AppIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/app/backdated': typeof AppBackdatedRoute
+  '/app/history': typeof AppHistoryRoute
+  '/app/import': typeof AppImportRoute
   '/app': typeof AppIndexRoute
 }
 export interface FileRoutesById {
@@ -51,14 +75,38 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/backdated': typeof AppBackdatedRoute
+  '/app/history': typeof AppHistoryRoute
+  '/app/import': typeof AppImportRoute
   '/app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/app' | '/login' | '/app/'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/login'
+    | '/app/backdated'
+    | '/app/history'
+    | '/app/import'
+    | '/app/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/app'
-  id: '__root__' | '/' | '/app' | '/login' | '/app/'
+  to:
+    | '/'
+    | '/login'
+    | '/app/backdated'
+    | '/app/history'
+    | '/app/import'
+    | '/app'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/login'
+    | '/app/backdated'
+    | '/app/history'
+    | '/app/import'
+    | '/app/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -97,14 +145,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/import': {
+      id: '/app/import'
+      path: '/import'
+      fullPath: '/app/import'
+      preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/history': {
+      id: '/app/history'
+      path: '/history'
+      fullPath: '/app/history'
+      preLoaderRoute: typeof AppHistoryRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/backdated': {
+      id: '/app/backdated'
+      path: '/backdated'
+      fullPath: '/app/backdated'
+      preLoaderRoute: typeof AppBackdatedRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
   }
 }
 
 interface AppRouteRouteChildren {
+  AppBackdatedRoute: typeof AppBackdatedRoute
+  AppHistoryRoute: typeof AppHistoryRoute
+  AppImportRoute: typeof AppImportRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppBackdatedRoute: AppBackdatedRoute,
+  AppHistoryRoute: AppHistoryRoute,
+  AppImportRoute: AppImportRoute,
   AppIndexRoute: AppIndexRoute,
 }
 
