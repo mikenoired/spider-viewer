@@ -1,7 +1,12 @@
 "use client";
 
 import { Link, useRouterState } from "@tanstack/react-router";
-import { HomeIcon } from "lucide-react";
+import {
+	FileClockIcon,
+	FileSpreadsheetIcon,
+	HistoryIcon,
+	MapIcon,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -21,7 +26,12 @@ import {
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
 import type { AuthSession } from "@/lib/auth/shared";
-import { PROJECT_NAME, roleLabels } from "@/lib/auth/shared";
+import {
+	canUploadSnapshot,
+	canViewAudit,
+	PROJECT_NAME,
+	roleLabels,
+} from "@/lib/auth/shared";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
 import { ThemeToggle } from "./theme-toggle";
@@ -44,7 +54,7 @@ export function AppShell({
 				<header className="flex h-14 items-center gap-3 border-b px-4">
 					<SidebarTrigger />
 					<Separator orientation="vertical" className="h-4" />
-					<div className="text-sm font-medium">Главная страница</div>
+					<div className="text-sm font-medium">{getPageTitle(pathname)}</div>
 				</header>
 				<div className="flex flex-1 flex-col p-4">{children}</div>
 			</SidebarInset>
@@ -59,6 +69,8 @@ function AppSidebar({
 	pathname: string;
 	user: AuthSession;
 }) {
+	const items = getNavigationItems(user.role);
+
 	return (
 		<Sidebar collapsible="icon">
 			<SidebarHeader className="border-b p-2">
@@ -85,18 +97,24 @@ function AppSidebar({
 					<SidebarGroupLabel>Навигация</SidebarGroupLabel>
 					<SidebarGroupContent>
 						<SidebarMenu>
-							<SidebarMenuItem>
-								<SidebarMenuButton
-									asChild
-									isActive={pathname.startsWith("/app")}
-									tooltip="Главная страница"
-								>
-									<Link to="/app">
-										<HomeIcon />
-										<span>Главная страница</span>
-									</Link>
-								</SidebarMenuButton>
-							</SidebarMenuItem>
+							{items.map((item) => (
+								<SidebarMenuItem key={item.to}>
+									<SidebarMenuButton
+										asChild
+										isActive={
+											item.to === "/app"
+												? pathname === "/app"
+												: pathname.startsWith(item.to)
+										}
+										tooltip={item.label}
+									>
+										<Link to={item.to}>
+											<item.icon />
+											<span>{item.label}</span>
+										</Link>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							))}
 						</SidebarMenu>
 					</SidebarGroupContent>
 				</SidebarGroup>
@@ -133,4 +151,59 @@ function AppSidebar({
 
 function getInitials(value: string) {
 	return value.slice(0, 2).toUpperCase();
+}
+
+function getNavigationItems(role: AuthSession["role"]) {
+	const items: Array<{
+		to: "/app" | "/app/import" | "/app/history" | "/app/backdated";
+		label: string;
+		icon: typeof MapIcon;
+	}> = [
+		{
+			to: "/app" as const,
+			label: "Карта демонтажа",
+			icon: MapIcon,
+		},
+	];
+
+	if (canUploadSnapshot(role)) {
+		items.push({
+			to: "/app/import" as const,
+			label: "Загрузка данных",
+			icon: FileSpreadsheetIcon,
+		});
+	}
+
+	if (canViewAudit(role)) {
+		items.push(
+			{
+				to: "/app/history" as const,
+				label: "История",
+				icon: HistoryIcon,
+			},
+			{
+				to: "/app/backdated" as const,
+				label: "Задним числом",
+				icon: FileClockIcon,
+			},
+		);
+	}
+
+	return items;
+}
+
+function getPageTitle(pathname: string) {
+	if (pathname.startsWith("/app/import")) {
+		return "Загрузка данных";
+	}
+
+	if (pathname.startsWith("/app/history")) {
+		return "История изменений";
+	}
+
+	if (pathname.startsWith("/app/backdated")) {
+		return "Изменения задним числом";
+	}
+
+	return "Карта демонтажа";
 }
