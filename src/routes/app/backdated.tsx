@@ -1,18 +1,26 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { format } from "date-fns";
 import { HistoryPanel } from "@/components/cable-map/history-panel";
 import { getBackdatedHistory } from "@/lib/cable-map/functions";
+
+function getTodayIso() {
+	return format(new Date(), "yyyy-MM-dd");
+}
 
 export const Route = createFileRoute("/app/backdated")({
 	beforeLoad: ({ context }) => {
 		if (context.auth?.role !== "super-admin") throw redirect({ to: "/app" });
 	},
-	loader: async () =>
-		getBackdatedHistory({
+	loader: async () => {
+		const today = getTodayIso();
+
+		return getBackdatedHistory({
 			data: {
-				from: null,
-				to: null,
+				from: today,
+				to: today,
 			},
-		}),
+		});
+	},
 	component: BackdatedPage,
 });
 
