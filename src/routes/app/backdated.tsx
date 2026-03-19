@@ -23,7 +23,6 @@ function BackdatedPage() {
 
 	return (
 		<HistoryPanel
-			title="Изменения задним числом"
 			description="Отдельный журнал записей, где дата действия не совпадает с фактическим моментом изменения."
 			initialEntries={entries}
 			backdatedOnly

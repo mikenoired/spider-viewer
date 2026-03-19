@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CableMapView } from "@/components/cable-map/cable-map-view";
-import { canEditProgress } from "@/lib/auth/shared";
+import { canEditProgress, canManageManualRooms } from "@/lib/auth/shared";
 import { getDashboardData } from "@/lib/cable-map/functions";
 
 export const Route = createFileRoute("/app/")({
@@ -19,7 +19,8 @@ function AppHomePage() {
 	return (
 		<CableMapView
 			data={data}
-			canEdit={canEditProgress(auth.role)}
+			canEditProgress={canEditProgress(auth.role)}
+			canManageManualRooms={canManageManualRooms(auth.role)}
 			role={auth.role}
 		/>
 	);

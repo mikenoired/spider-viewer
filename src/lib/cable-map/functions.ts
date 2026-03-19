@@ -2,7 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireRole } from "@/lib/auth/guards";
 import { canEditProgress, canViewAudit } from "@/lib/auth/shared";
 import {
+	createManualRoomSchema,
 	dateRangeSchema,
+	deleteManualRoomSchema,
 	exportBackdatedSchema,
 	saveRoomProgressSchema,
 } from "./shared";
@@ -33,6 +35,22 @@ export const saveRoomProgress = createServerFn({ method: "POST" })
 
 		const { saveRoomProgressChanges } = await import("./history.server");
 		return saveRoomProgressChanges(data, session);
+	});
+
+export const createManualRoom = createServerFn({ method: "POST" })
+	.inputValidator(createManualRoomSchema)
+	.handler(async ({ data }) => {
+		const session = await requireRole(["super-admin"]);
+		const { createManualGroupRoom } = await import("./manual-rooms.server");
+		return createManualGroupRoom(data, session);
+	});
+
+export const deleteManualRoom = createServerFn({ method: "POST" })
+	.inputValidator(deleteManualRoomSchema)
+	.handler(async ({ data }) => {
+		const session = await requireRole(["super-admin"]);
+		const { deleteManualGroupRoom } = await import("./manual-rooms.server");
+		return deleteManualGroupRoom(data, session);
 	});
 
 export const getHistory = createServerFn({ method: "GET" })

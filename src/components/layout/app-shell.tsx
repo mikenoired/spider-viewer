@@ -50,13 +50,15 @@ export function AppShell({
 	return (
 		<SidebarProvider>
 			<AppSidebar pathname={pathname} user={user} />
-			<SidebarInset>
-				<header className="flex h-14 items-center gap-3 border-b px-4">
+			<SidebarInset className="[--app-shell-content-padding:1rem] [--app-shell-header-height:3.5rem] [--app-shell-sidebar-offset:0px] md:peer-data-[state=collapsed]:[--app-shell-sidebar-offset:var(--sidebar-width-icon)] md:peer-data-[state=expanded]:[--app-shell-sidebar-offset:var(--sidebar-width)]">
+				<header className="fixed top-0 right-0 left-0 z-50 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur-sm md:left-(--app-shell-sidebar-offset)">
 					<SidebarTrigger />
 					<Separator orientation="vertical" className="h-4" />
 					<div className="text-sm font-medium">{getPageTitle(pathname)}</div>
 				</header>
-				<div className="flex flex-1 flex-col p-4">{children}</div>
+				<div className="flex flex-1 flex-col pb-(--app-shell-content-padding) pt-[calc(var(--app-shell-header-height)+var(--app-shell-content-padding))]">
+					{children}
+				</div>
 			</SidebarInset>
 		</SidebarProvider>
 	);
@@ -72,13 +74,13 @@ function AppSidebar({
 	const items = getNavigationItems(user.role);
 
 	return (
-		<Sidebar collapsible="icon">
+		<Sidebar collapsible="icon" className="z-50">
 			<SidebarHeader className="border-b p-2">
 				<Link
 					to="/app"
 					className={cn(
-						"flex items-center gap-3 rounded-lg border bg-background px-2.5 py-2 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-						"group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0",
+						"flex items-center gap-3 rounded-lg transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+						"group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center",
 					)}
 				>
 					<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
@@ -121,27 +123,27 @@ function AppSidebar({
 			</SidebarContent>
 			<SidebarFooter className="border-t p-2">
 				<div className="flex flex-col gap-2">
-					<div
-						className={cn(
-							"flex items-center gap-3 rounded-lg border bg-background px-2.5 py-2",
-							"group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0",
-						)}
-					>
-						<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold">
-							{getInitials(user.login)}
+					<div className="flex items-center justify-between">
+						<div
+							className={cn(
+								"flex items-center gap-3",
+								"group-data-[collapsible=icon]:justify-center",
+							)}
+						>
+							<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold">
+								{getInitials(user.login)}
+							</div>
+							<div className="min-w-0 group-data-[collapsible=icon]:hidden">
+								<div className="truncate text-sm font-medium">{user.login}</div>
+								<Badge variant="secondary">{roleLabels[user.role]}</Badge>
+							</div>
 						</div>
-						<div className="min-w-0 group-data-[collapsible=icon]:hidden">
-							<div className="truncate text-sm font-medium">{user.login}</div>
-							<Badge variant="secondary">{roleLabels[user.role]}</Badge>
-						</div>
-					</div>
-					<div className="flex items-center gap-2 group-data-[collapsible=icon]:flex-col">
 						<LogoutButton
-							className="justify-start group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+							className="justify-start group-data-[collapsible=icon]:hidden"
 							labelClassName="group-data-[collapsible=icon]:hidden"
 						/>
-						<ThemeToggle className="group-data-[collapsible=icon]:size-8" />
 					</div>
+					<ThemeToggle className="group-data-[collapsible=icon]:size-8" />
 				</div>
 			</SidebarFooter>
 			<SidebarRail />

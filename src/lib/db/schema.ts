@@ -197,6 +197,32 @@ export const graphGroupRooms = pgTable(
 	],
 );
 
+export const manualGraphRooms = pgTable(
+	"manual_graph_rooms",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		roomName: text("room_name").notNull(),
+		sourceZone: text("source_zone").notNull(),
+		level: text("level").notNull(),
+		createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [
+		uniqueIndex("manual_graph_rooms_unique").on(
+			table.sourceZone,
+			table.level,
+			table.roomName,
+		),
+	],
+);
+
 export const changeAuditLogs = pgTable("change_audit_logs", {
 	id: uuid("id").defaultRandom().primaryKey(),
 	snapshotId: uuid("snapshot_id").references(() => importSnapshots.id, {
@@ -229,4 +255,5 @@ export type ImportSnapshot = typeof importSnapshots.$inferSelect;
 export type ImportedCableRow = typeof importedCableRows.$inferSelect;
 export type GraphGroup = typeof graphGroups.$inferSelect;
 export type GraphGroupRoom = typeof graphGroupRooms.$inferSelect;
+export type ManualGraphRoom = typeof manualGraphRooms.$inferSelect;
 export type ChangeAuditLog = typeof changeAuditLogs.$inferSelect;

@@ -19,7 +19,6 @@ import {
 	CardContent,
 	CardDescription,
 	CardHeader,
-	CardTitle,
 } from "@/components/ui/card";
 import {
 	Popover,
@@ -72,7 +71,6 @@ function formatTimestamp(value: string) {
 }
 
 export function HistoryPanel({
-	title,
 	description,
 	initialEntries,
 	backdatedOnly,
@@ -155,10 +153,9 @@ export function HistoryPanel({
 	}
 
 	return (
-		<Card>
+		<Card className="border-none rounded-none ring-0 px-0">
 			<CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 				<div className="flex flex-col gap-1">
-					<CardTitle>{title}</CardTitle>
 					<CardDescription>{description}</CardDescription>
 				</div>
 

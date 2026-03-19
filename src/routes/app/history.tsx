@@ -23,7 +23,6 @@ function HistoryPage() {
 
 	return (
 		<HistoryPanel
-			title="История изменений"
 			description="Все зафиксированные изменения прогресса по помещениям."
 			initialEntries={entries}
 		/>

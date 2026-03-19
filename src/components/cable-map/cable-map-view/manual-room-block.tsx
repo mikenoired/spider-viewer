@@ -1,0 +1,322 @@
+"use client";
+
+import { useRouter } from "@tanstack/react-router";
+import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { type MouseEvent, useEffect, useState } from "react";
+import { toast } from "sonner";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogMedia,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { createManualRoom, deleteManualRoom } from "@/lib/cable-map/functions";
+import type {
+	GraphGroupView,
+	GraphManualRoomView,
+} from "@/lib/cable-map/shared";
+import { cn } from "@/lib/utils";
+
+function openContextMenuOnClick(event: MouseEvent<HTMLElement>) {
+	const target = event.currentTarget;
+	const rect = target.getBoundingClientRect();
+
+	target.dispatchEvent(
+		new MouseEvent("contextmenu", {
+			bubbles: true,
+			cancelable: true,
+			clientX: rect.left + rect.width / 2,
+			clientY: rect.top + rect.height / 2,
+			button: 2,
+		}),
+	);
+}
+
+export function ManualRoomBlock({
+	group,
+	canManage,
+	className,
+}: {
+	group: GraphGroupView;
+	canManage: boolean;
+	className?: string;
+}) {
+	const router = useRouter();
+	const [addDialogOpen, setAddDialogOpen] = useState(false);
+	const [pendingAction, setPendingAction] = useState<
+		"create" | "delete" | null
+	>(null);
+	const [draftRoomName, setDraftRoomName] = useState("");
+	const [deleteCandidate, setDeleteCandidate] =
+		useState<GraphManualRoomView | null>(null);
+	const hasRooms = group.manualRooms.length > 0;
+	const canSave = draftRoomName.trim().length > 0 && pendingAction !== "create";
+
+	useEffect(() => {
+		if (!addDialogOpen) {
+			setDraftRoomName("");
+		}
+	}, [addDialogOpen]);
+
+	async function handleCreateRoom() {
+		if (!canManage || !draftRoomName.trim()) {
+			return;
+		}
+
+		setPendingAction("create");
+
+		try {
+			await createManualRoom({
+				data: {
+					groupId: group.id,
+					roomName: draftRoomName,
+				},
+			});
+			toast.success("Помещение добавлено в ручной жёлтый блок.");
+			setAddDialogOpen(false);
+			await router.invalidate();
+		} catch (error) {
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Не удалось добавить ручное помещение.",
+			);
+		} finally {
+			setPendingAction(null);
+		}
+	}
+
+	async function handleDeleteRoom() {
+		if (!canManage || !deleteCandidate) {
+			return;
+		}
+
+		setPendingAction("delete");
+
+		try {
+			await deleteManualRoom({
+				data: {
+					roomId: deleteCandidate.id,
+				},
+			});
+			toast.success("Ручное помещение удалено.");
+			setDeleteCandidate(null);
+			await router.invalidate();
+		} catch (error) {
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Не удалось удалить ручное помещение.",
+			);
+		} finally {
+			setPendingAction(null);
+		}
+	}
+
+	return (
+		<>
+			<div className={cn("flex h-full items-center justify-center", className)}>
+				{hasRooms ? (
+					<div className="flex w-full flex-col gap-2 rounded-[8px] border border-[#d2b55a] bg-amber-200 dark:bg-amber-700 px-2 py-2 text-amber-950 dark:text-amber-100 shadow-sm">
+						<div className="flex flex-col gap-1">
+							{group.manualRooms.map((room) => (
+								<ContextMenu key={room.id}>
+									<ContextMenuTrigger asChild>
+										<button
+											type="button"
+											className={cn(
+												"rounded-[6px] border border-[#b89124]/40 bg-white/40 px-2 py-1 text-left text-xs font-semibold leading-4 break-keep transition",
+												canManage
+													? "cursor-pointer hover:bg-white/60"
+													: "cursor-default",
+											)}
+											onClick={(event) => {
+												if (!canManage) {
+													return;
+												}
+
+												event.preventDefault();
+												openContextMenuOnClick(event);
+											}}
+										>
+											{room.roomName}
+										</button>
+									</ContextMenuTrigger>
+									{canManage ? (
+										<ContextMenuContent>
+											<ContextMenuItem
+												variant="destructive"
+												onSelect={() => setDeleteCandidate(room)}
+											>
+												<Trash2Icon />
+												Удалить
+											</ContextMenuItem>
+										</ContextMenuContent>
+									) : null}
+								</ContextMenu>
+							))}
+						</div>
+
+						{canManage ? (
+							<button
+								type="button"
+								onClick={() => setAddDialogOpen(true)}
+								className="rounded-[6px] border border-dashed border-amber-800 dark:border-amber-200 px-2 py-1 text-amber-950 dark:text-amber-100 transition hover:bg-white/35"
+							>
+								<PlusIcon className="mx-auto mb-1" />
+							</button>
+						) : null}
+					</div>
+				) : (
+					<ContextMenu>
+						<ContextMenuTrigger asChild>
+							<button
+								type="button"
+								disabled={!canManage}
+								onClick={(event) => {
+									if (!canManage) {
+										return;
+									}
+
+									event.preventDefault();
+									openContextMenuOnClick(event);
+								}}
+								className={cn(
+									"flex h-full min-h-[140px] w-full flex-col items-center justify-center gap-3 rounded-[10px] border-2 border-dashed px-3 py-4 text-center shadow-sm transition border-[#c6a643] bg-amber-200/50 dark:bg-amber-600/50 text-amber-950 dark:text-amber-100",
+									canManage && "cursor-pointer dark:hover:bg-amber-700",
+								)}
+							>
+								<PlusIcon />
+								{!canManage && (
+									<div className="text-xs font-semibold">
+										Ручные помещения не заданы
+									</div>
+								)}
+							</button>
+						</ContextMenuTrigger>
+
+						{canManage ? (
+							<ContextMenuContent>
+								<ContextMenuItem onSelect={() => setAddDialogOpen(true)}>
+									<PlusIcon />
+									Создать помещение
+								</ContextMenuItem>
+							</ContextMenuContent>
+						) : null}
+					</ContextMenu>
+				)}
+			</div>
+
+			<Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Новое ручное помещение</DialogTitle>
+						<DialogDescription>
+							Помещение будет привязано к зоне {group.sourceZone || "Без зоны"}{" "}
+							и отметке {group.level}.
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="flex flex-col gap-3">
+						<Input
+							autoFocus
+							placeholder="Например, АВ1107/1"
+							value={draftRoomName}
+							onChange={(event) => setDraftRoomName(event.target.value)}
+							disabled={pendingAction === "create"}
+						/>
+					</div>
+
+					<DialogFooter>
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => setAddDialogOpen(false)}
+							disabled={pendingAction === "create"}
+						>
+							Отмена
+						</Button>
+						<Button
+							type="button"
+							onClick={handleCreateRoom}
+							disabled={!canSave}
+						>
+							{pendingAction === "create" ? (
+								<LoaderCircleIcon
+									data-icon="inline-start"
+									className="animate-spin"
+								/>
+							) : (
+								<PlusIcon data-icon="inline-start" />
+							)}
+							Сохранить
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<AlertDialog
+				open={deleteCandidate !== null}
+				onOpenChange={(open) => {
+					if (!open && pendingAction !== "delete") {
+						setDeleteCandidate(null);
+					}
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogMedia>
+							<Trash2Icon />
+						</AlertDialogMedia>
+						<AlertDialogTitle>Удалить ручное помещение?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Помещение {deleteCandidate?.roomName ?? ""} будет удалено из
+							жёлтого блока для зоны {group.sourceZone || "Без зоны"} и отметки{" "}
+							{group.level}.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={pendingAction === "delete"}>
+							Отмена
+						</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={handleDeleteRoom}
+							disabled={pendingAction === "delete"}
+						>
+							{pendingAction === "delete" ? (
+								<LoaderCircleIcon
+									data-icon="inline-start"
+									className="animate-spin"
+								/>
+							) : (
+								<Trash2Icon data-icon="inline-start" />
+							)}
+							Удалить
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+		</>
+	);
+}
