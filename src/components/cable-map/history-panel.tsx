@@ -3,10 +3,18 @@
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import {
+	ArrowDownIcon,
+	ArrowUpDownIcon,
+	ArrowUpIcon,
 	CalendarDaysIcon,
+	Clock3Icon,
 	DownloadIcon,
+	FolderIcon,
 	LoaderCircleIcon,
+	PercentIcon,
 	RefreshCcwIcon,
+	TagIcon,
+	UserIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
@@ -41,13 +49,14 @@ import {
 	getHistory,
 } from "@/lib/cable-map/functions";
 import type { DateRangeInput, HistoryEntryView } from "@/lib/cable-map/shared";
+import { cn } from "@/lib/utils";
 
 function formatRangeLabel(range?: DateRange) {
 	if (!range?.from) {
-		return "Выбрать диапазон";
+		return "Сегодня";
 	}
 
-	if (!range.to) {
+	if (!range.to || dateToIso(range.from) === dateToIso(range.to)) {
 		return format(range.from, "d MMM yyyy", { locale: ru });
 	}
 
@@ -62,12 +71,108 @@ function dateToIso(value: Date | undefined) {
 	return value ? format(value, "yyyy-MM-dd") : null;
 }
 
+function createTodayRange(): DateRange {
+	const today = new Date();
+
+	return {
+		from: today,
+		to: today,
+	};
+}
+
 function formatTimestamp(value: string) {
 	return new Intl.DateTimeFormat("ru-RU", {
 		timeZone: "Europe/Moscow",
 		dateStyle: "medium",
 		timeStyle: "short",
 	}).format(new Date(value));
+}
+
+type SortKey =
+	| "changedAt"
+	| "effectiveDate"
+	| "userLogin"
+	| "roomName"
+	| "oldProgress"
+	| "newProgress"
+	| "isBackdated";
+
+type SortDirection = "asc" | "desc";
+
+const sortableColumns: Array<{
+	key: SortKey;
+	label: string;
+	icon: typeof Clock3Icon;
+}> = [
+	{ key: "changedAt", label: "Изменено", icon: Clock3Icon },
+	{ key: "effectiveDate", label: "Дата действия", icon: CalendarDaysIcon },
+	{ key: "userLogin", label: "Пользователь", icon: UserIcon },
+	{ key: "roomName", label: "Помещение", icon: FolderIcon },
+	{ key: "oldProgress", label: "Было", icon: PercentIcon },
+	{ key: "newProgress", label: "Стало", icon: PercentIcon },
+	{ key: "isBackdated", label: "Тип", icon: TagIcon },
+];
+
+function compareEntries(
+	left: HistoryEntryView,
+	right: HistoryEntryView,
+	key: SortKey,
+	direction: SortDirection,
+) {
+	const factor = direction === "asc" ? 1 : -1;
+
+	switch (key) {
+		case "changedAt":
+			return (
+				(new Date(left.changedAt).getTime() -
+					new Date(right.changedAt).getTime()) *
+				factor
+			);
+		case "effectiveDate":
+			return (
+				left.effectiveDate.localeCompare(right.effectiveDate, "ru", {
+					numeric: true,
+				}) * factor
+			);
+		case "userLogin":
+			return (
+				left.userLogin.localeCompare(right.userLogin, "ru", {
+					numeric: true,
+					sensitivity: "base",
+				}) * factor
+			);
+		case "roomName":
+			return (
+				left.roomName.localeCompare(right.roomName, "ru", {
+					numeric: true,
+					sensitivity: "base",
+				}) * factor
+			);
+		case "oldProgress":
+			return (left.oldProgress - right.oldProgress) * factor;
+		case "newProgress":
+			return (left.newProgress - right.newProgress) * factor;
+		case "isBackdated":
+			return (Number(left.isBackdated) - Number(right.isBackdated)) * factor;
+	}
+}
+
+function SortIcon({
+	active,
+	direction,
+}: {
+	active: boolean;
+	direction: SortDirection;
+}) {
+	if (!active) {
+		return <ArrowUpDownIcon className="text-muted-foreground/70" />;
+	}
+
+	return direction === "asc" ? (
+		<ArrowUpIcon className="text-foreground" />
+	) : (
+		<ArrowDownIcon className="text-foreground" />
+	);
 }
 
 export function HistoryPanel({
@@ -82,8 +187,9 @@ export function HistoryPanel({
 	const [entries, setEntries] = useState(initialEntries);
 	const [pending, setPending] = useState(false);
 	const [exporting, setExporting] = useState(false);
-	const [range, setRange] = useState<DateRange | undefined>();
-	const hasRange = Boolean(range?.from || range?.to);
+	const [range, setRange] = useState<DateRange>(createTodayRange);
+	const [sortKey, setSortKey] = useState<SortKey>("changedAt");
+	const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
 	const rangePayload = useMemo(
 		() =>
@@ -93,6 +199,23 @@ export function HistoryPanel({
 			}) satisfies DateRangeInput,
 		[range],
 	);
+	const sortedEntries = useMemo(
+		() =>
+			[...entries].sort((left, right) =>
+				compareEntries(left, right, sortKey, sortDirection),
+			),
+		[entries, sortDirection, sortKey],
+	);
+
+	function handleSort(nextKey: SortKey) {
+		if (sortKey === nextKey) {
+			setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+			return;
+		}
+
+		setSortKey(nextKey);
+		setSortDirection(nextKey === "changedAt" ? "desc" : "asc");
+	}
 
 	async function reloadEntries(nextRange: DateRangeInput) {
 		setPending(true);
@@ -174,7 +297,7 @@ export function HistoryPanel({
 								mode="range"
 								numberOfMonths={2}
 								selected={range}
-								onSelect={(value) => setRange(value)}
+								onSelect={(value) => setRange(value ?? createTodayRange())}
 							/>
 						</PopoverContent>
 					</Popover>
@@ -200,13 +323,16 @@ export function HistoryPanel({
 						type="button"
 						variant="ghost"
 						onClick={() => {
-							setRange(undefined);
+							const todayRange = createTodayRange();
+							setSortKey("changedAt");
+							setSortDirection("desc");
+							setRange(todayRange);
 							void reloadEntries({
-								from: null,
-								to: null,
+								from: dateToIso(todayRange.from),
+								to: dateToIso(todayRange.to),
 							});
 						}}
-						disabled={!hasRange || pending}
+						disabled={pending}
 					>
 						Сбросить
 					</Button>
@@ -230,18 +356,34 @@ export function HistoryPanel({
 				<Table>
 					<TableHeader>
 						<TableRow>
-							<TableHead>Изменено</TableHead>
-							<TableHead>Дата действия</TableHead>
-							<TableHead>Пользователь</TableHead>
-							<TableHead>Помещение</TableHead>
-							<TableHead>Было</TableHead>
-							<TableHead>Стало</TableHead>
-							<TableHead>Тип</TableHead>
+							{sortableColumns.map((column) => {
+								const active = sortKey === column.key;
+								const Icon = column.icon;
+
+								return (
+									<TableHead key={column.key}>
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											onClick={() => handleSort(column.key)}
+											className={cn(
+												"-ml-2 h-8 px-2 text-muted-foreground hover:text-foreground",
+												active && "text-foreground",
+											)}
+										>
+											<Icon />
+											{column.label}
+											<SortIcon active={active} direction={sortDirection} />
+										</Button>
+									</TableHead>
+								);
+							})}
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{entries.length > 0 ? (
-							entries.map((entry) => (
+						{sortedEntries.length > 0 ? (
+							sortedEntries.map((entry) => (
 								<TableRow key={entry.id}>
 									<TableCell>{formatTimestamp(entry.changedAt)}</TableCell>
 									<TableCell>{entry.effectiveDate}</TableCell>
