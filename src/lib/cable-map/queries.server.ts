@@ -4,6 +4,7 @@ import {
 	changeAuditLogs,
 	graphGroupRooms,
 	graphGroups,
+	importedCableRows,
 	importSnapshots,
 	manualGraphRooms,
 	users,
@@ -36,6 +37,52 @@ function compareRoomNames(left: string, right: string) {
 		numeric: true,
 		sensitivity: "base",
 	});
+}
+
+const copperDensityKgPerMeterPerMm2 = 0.00889;
+const cableSectionPattern = /(\d+)\s*[xх×]\s*(\d+(?:[.,]\d+)?)/gi;
+
+function getImportedRowGroupKey(row: {
+	graphSide: GraphGroupView["graphSide"];
+	graphSubzone: GraphGroupView["graphSubzone"];
+	sourceZone: string;
+	level: string;
+}) {
+	return [
+		row.graphSide,
+		row.graphSubzone ?? "none",
+		row.sourceZone || "unknown",
+		row.level,
+	].join(":");
+}
+
+function parseCableCrossSection(cableLabel: string) {
+	const matches = [...cableLabel.matchAll(cableSectionPattern)];
+	const sectionValue = matches.at(-1)?.[2]?.replace(",", ".") ?? "";
+	const parsedSection = Number(sectionValue);
+
+	return Number.isFinite(parsedSection) ? parsedSection : 0;
+}
+
+function getCableCopperMassKg(row: {
+	cableLabel: string;
+	threadLength: number | null;
+	threadCount: number | null;
+}) {
+	const cableCrossSection = parseCableCrossSection(row.cableLabel);
+	const threadLength = row.threadLength ?? 0;
+	const threadCount = row.threadCount ?? 0;
+
+	if (cableCrossSection <= 0 || threadLength <= 0 || threadCount <= 0) {
+		return 0;
+	}
+
+	return (
+		threadLength *
+		threadCount *
+		cableCrossSection *
+		copperDensityKgPerMeterPerMm2
+	);
 }
 
 export async function getActiveDashboardData(): Promise<DashboardData> {
@@ -98,6 +145,18 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			asc(graphGroupRooms.roomRole),
 			asc(graphGroupRooms.sortOrder),
 		);
+	const importedRows = await db
+		.select({
+			graphSide: importedCableRows.graphSide,
+			graphSubzone: importedCableRows.graphSubzone,
+			sourceZone: importedCableRows.fromZone,
+			level: importedCableRows.level,
+			cableLabel: importedCableRows.cableLabel,
+			threadLength: importedCableRows.threadLength,
+			threadCount: importedCableRows.threadCount,
+		})
+		.from(importedCableRows)
+		.where(eq(importedCableRows.snapshotId, snapshot.id));
 	const manualRoomRows = await db
 		.select({
 			id: manualGraphRooms.id,
@@ -106,6 +165,15 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			level: manualGraphRooms.level,
 		})
 		.from(manualGraphRooms);
+	const copperMassByGroup = new Map<string, number>();
+
+	for (const row of importedRows) {
+		const groupKey = getImportedRowGroupKey(row);
+		const currentMass = copperMassByGroup.get(groupKey) ?? 0;
+		const nextMass = currentMass + getCableCopperMassKg(row);
+
+		copperMassByGroup.set(groupKey, nextMass);
+	}
 
 	const groups = new Map<string, GraphGroupView>();
 
@@ -124,6 +192,7 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 				cableCount: row.groupCableCount,
 				threadCount: row.groupThreadCount,
 				totalLength: row.groupTotalLength,
+				copperMassKg: copperMassByGroup.get(row.groupKey) ?? 0,
 				averageProgress: 0,
 				primaryRooms: [],
 				secondaryRooms: [],

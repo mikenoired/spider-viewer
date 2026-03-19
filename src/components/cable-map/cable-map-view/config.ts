@@ -29,7 +29,7 @@ export const shaftPalette = {
 	}
 >;
 
-export const boardColumnWidths = [252, 52, 320, 112, 320, 52, 252] as const;
+export const boardColumnWidths = [252, 96, 320, 112, 320, 96, 252] as const;
 export const boardColumns = boardColumnWidths
 	.map((width) => `${width}px`)
 	.join(" ");

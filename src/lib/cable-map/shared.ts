@@ -109,6 +109,7 @@ export type GraphGroupView = {
 	cableCount: number;
 	threadCount: number;
 	totalLength: number;
+	copperMassKg: number;
 	averageProgress: number;
 	primaryRooms: GraphRoomView[];
 	secondaryRooms: GraphRoomView[];
