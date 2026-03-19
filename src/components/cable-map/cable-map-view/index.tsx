@@ -121,10 +121,11 @@ export function CableMapView({
 	}
 
 	const levelBands = buildLevelBands(data.levels);
+	const mapCanvasWidth = boardWidth + 16;
 
 	return (
 		<div className="flex flex-1 flex-col gap-4">
-			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 px-4">
+			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 px-4 pt-4">
 				<SummaryCard
 					title="Активный снимок"
 					value={data.snapshot.fileName}
@@ -164,7 +165,7 @@ export function CableMapView({
 					onScroll={() => syncScroll("title")}
 					className="no-scrollbar overflow-x-auto overflow-y-hidden"
 				>
-					<div style={{ minWidth: boardWidth }}>
+					<div className="pl-4" style={{ minWidth: mapCanvasWidth }}>
 						<MapTitle />
 					</div>
 				</div>
@@ -178,9 +179,9 @@ export function CableMapView({
 					<div
 						ref={headerScrollRef}
 						onScroll={() => syncScroll("header")}
-						className="no-scrollbar overflow-x-auto overflow-y-hidden border-b-2 border-dashed border-zinc-400/90 bg-background/95 py-3 shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] backdrop-blur-sm dark:border-zinc-700 dark:bg-background/92"
+						className="no-scrollbar overflow-x-auto overflow-y-hidden border-b-2 border-dashed border-zinc-400/90 bg-background/95 pb-3 pt-6 shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] backdrop-blur-sm dark:border-zinc-700 dark:bg-background/92"
 					>
-						<div style={{ minWidth: boardWidth }}>
+						<div className="pl-4" style={{ minWidth: mapCanvasWidth }}>
 							<div
 								className="grid items-center"
 								style={{
@@ -206,8 +207,8 @@ export function CableMapView({
 					onScroll={() => syncScroll("body")}
 					className="w-full overflow-x-auto overflow-y-visible"
 				>
-					<div style={{ minWidth: boardWidth }}>
-						<div className="relative overflow-hidden rounded-[24px]">
+					<div className="pl-4" style={{ minWidth: mapCanvasWidth }}>
+						<div className="relative overflow-hidden">
 							<BoardPathLayer bands={levelBands} />
 							<div className="relative z-10">
 								{levelBands.map((band, index) => (

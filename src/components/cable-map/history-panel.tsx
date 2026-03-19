@@ -275,7 +275,7 @@ export function HistoryPanel({
 	}
 
 	return (
-		<Card className="border-none rounded-none ring-0 px-0">
+		<Card className="border-none rounded-none ring-0 px-0 flex-1">
 			<CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 				<div className="flex flex-col gap-1">
 					<CardDescription>{description}</CardDescription>
