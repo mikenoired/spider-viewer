@@ -11,9 +11,7 @@ import { PROJECT_NAME } from "@/lib/auth/shared";
 
 export const Route = createFileRoute("/login")({
 	beforeLoad: ({ context }) => {
-		if (context.auth) {
-			throw redirect({ to: "/app" });
-		}
+		if (context.auth) throw redirect({ to: "/app" });
 	},
 	component: LoginPage,
 });

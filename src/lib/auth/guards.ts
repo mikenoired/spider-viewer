@@ -4,9 +4,7 @@ import type { AuthSession, UserRole } from "./shared";
 export async function requireSession() {
 	const session = await getCurrentSession();
 
-	if (!session) {
-		throw new Error("Требуется авторизация.");
-	}
+	if (!session) throw new Error("Требуется авторизация.");
 
 	return session;
 }

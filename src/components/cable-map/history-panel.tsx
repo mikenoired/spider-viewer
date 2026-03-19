@@ -75,7 +75,6 @@ export function HistoryPanel({
 	initialEntries,
 	backdatedOnly,
 }: {
-	title: string;
 	description: string;
 	initialEntries: HistoryEntryView[];
 	backdatedOnly?: boolean;

@@ -23,9 +23,7 @@ export async function createManualGroupRoom(
 		.where(eq(graphGroups.id, input.groupId))
 		.limit(1);
 
-	if (!group) {
-		throw new Error("Группа для ручного помещения не найдена.");
-	}
+	if (!group) throw new Error("Группа для ручного помещения не найдена.");
 
 	const now = new Date();
 	const [createdRoom] = await db
@@ -66,9 +64,7 @@ export async function deleteManualGroupRoom(
 			roomName: manualGraphRooms.roomName,
 		});
 
-	if (!deletedRoom) {
-		throw new Error("Ручное помещение не найдено.");
-	}
+	if (!deletedRoom) throw new Error("Ручное помещение не найдено.");
 
 	return deletedRoom;
 }

@@ -19,18 +19,15 @@ import { loginSchema } from "@/lib/auth/shared";
 
 function toFieldErrors(errors: Array<unknown>) {
 	return errors.flatMap((error) => {
-		if (typeof error === "string") {
-			return [{ message: error }];
-		}
+		if (typeof error === "string") return [{ message: error }];
 
 		if (
 			error &&
 			typeof error === "object" &&
 			"message" in error &&
 			typeof error.message === "string"
-		) {
+		)
 			return [{ message: error.message }];
-		}
 
 		return [];
 	});

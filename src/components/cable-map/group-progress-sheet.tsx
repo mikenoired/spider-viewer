@@ -71,9 +71,7 @@ function getTodayInMoscow() {
 }
 
 function parseIsoDate(value: string | null) {
-	if (!value) {
-		return undefined;
-	}
+	if (!value) return undefined;
 
 	const date = new Date(`${value}T12:00:00+03:00`);
 	return Number.isNaN(date.getTime()) ? undefined : date;
@@ -91,9 +89,7 @@ function createDraftRooms(group: GraphGroupView): DraftRoom[] {
 }
 
 function clampProgress(value: number) {
-	if (Number.isNaN(value)) {
-		return 0;
-	}
+	if (Number.isNaN(value)) return 0;
 
 	return Math.min(100, Math.max(0, Math.round(value)));
 }
@@ -139,9 +135,7 @@ export function GroupProgressSheet({
 					(candidate) => candidate.id === room.id,
 				);
 
-				if (!source || source.progress === room.progress) {
-					return [];
-				}
+				if (!source || source.progress === room.progress) return [];
 
 				return [
 					{
@@ -177,9 +171,7 @@ export function GroupProgressSheet({
 	}
 
 	async function handleSave() {
-		if (!canEdit || changedRooms.length === 0) {
-			return;
-		}
+		if (!canEdit || changedRooms.length === 0) return;
 
 		setPending(true);
 

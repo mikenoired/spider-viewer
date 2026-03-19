@@ -29,7 +29,7 @@ import type {
 const historyTableColumnWidths = [1700, 1400, 1600, 2800, 900, 900] as const;
 
 function getTodayInMoscow() {
-	return new Intl.DateTimeFormat("sv-SE", {
+	return new Intl.DateTimeFormat("ru-RU", {
 		timeZone: "Europe/Moscow",
 	}).format(new Date());
 }
@@ -49,9 +49,7 @@ function getEffectiveDate(value?: string | null) {
 }
 
 async function pushAuditEntriesToRedis(entries: HistoryEntryView[]) {
-	if (entries.length === 0) {
-		return;
-	}
+	if (entries.length === 0) return;
 
 	const redis = await getRedis();
 	const payloads = entries.map((entry) => JSON.stringify(entry));

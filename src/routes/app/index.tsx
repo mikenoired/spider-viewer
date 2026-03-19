@@ -12,9 +12,7 @@ function AppHomePage() {
 	const data = Route.useLoaderData();
 	const { auth } = Route.useRouteContext();
 
-	if (!auth) {
-		return null;
-	}
+	if (!auth) return null;
 
 	return (
 		<CableMapView
