@@ -5,12 +5,14 @@ import {
 	graphGroupRooms,
 	graphGroups,
 	importSnapshots,
+	manualGraphRooms,
 	users,
 } from "@/lib/db/schema";
 import type {
 	DashboardData,
 	DateRangeInput,
 	GraphGroupView,
+	GraphManualRoomView,
 	GraphRoomView,
 	HistoryEntryView,
 	SnapshotSummaryView,
@@ -27,6 +29,13 @@ function toIsoString(value: Date | string | null | undefined) {
 	}
 
 	return value.toISOString();
+}
+
+function compareRoomNames(left: string, right: string) {
+	return left.localeCompare(right, "ru", {
+		numeric: true,
+		sensitivity: "base",
+	});
 }
 
 export async function getActiveDashboardData(): Promise<DashboardData> {
@@ -89,6 +98,14 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			asc(graphGroupRooms.roomRole),
 			asc(graphGroupRooms.sortOrder),
 		);
+	const manualRoomRows = await db
+		.select({
+			id: manualGraphRooms.id,
+			roomName: manualGraphRooms.roomName,
+			sourceZone: manualGraphRooms.sourceZone,
+			level: manualGraphRooms.level,
+		})
+		.from(manualGraphRooms);
 
 	const groups = new Map<string, GraphGroupView>();
 
@@ -110,6 +127,7 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 				averageProgress: 0,
 				primaryRooms: [],
 				secondaryRooms: [],
+				manualRooms: [],
 				buckets: [
 					{
 						shaft: 0,
@@ -165,6 +183,18 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 		}
 	}
 
+	const manualRoomsByGroup = new Map<string, GraphManualRoomView[]>();
+
+	for (const row of manualRoomRows) {
+		const groupKey = `${row.sourceZone}:${row.level}`;
+		const rooms = manualRoomsByGroup.get(groupKey) ?? [];
+		rooms.push({
+			id: row.id,
+			roomName: row.roomName,
+		});
+		manualRoomsByGroup.set(groupKey, rooms);
+	}
+
 	const levelMap = new Map<
 		string,
 		{
@@ -177,6 +207,12 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 	const allPrimaryRooms: GraphRoomView[] = [];
 
 	for (const group of groups.values()) {
+		group.manualRooms =
+			manualRoomsByGroup
+				.get(`${group.sourceZone}:${group.level}`)
+				?.sort((left, right) =>
+					compareRoomNames(left.roomName, right.roomName),
+				) ?? [];
 		const averageProgress =
 			group.primaryRooms.length > 0
 				? Math.round(

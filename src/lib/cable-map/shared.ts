@@ -41,12 +41,27 @@ export const saveRoomProgressSchema = z.object({
 	rooms: z.array(roomProgressPatchSchema).min(1),
 });
 
+export const createManualRoomSchema = z.object({
+	groupId: z.string().uuid(),
+	roomName: z
+		.string()
+		.trim()
+		.min(1, "Введите название помещения.")
+		.max(120, "Название помещения не должно быть длиннее 120 символов."),
+});
+
+export const deleteManualRoomSchema = z.object({
+	roomId: z.string().uuid(),
+});
+
 export const exportBackdatedSchema = dateRangeSchema.extend({
 	fileName: z.string().trim().optional().nullable(),
 });
 
 export type DateRangeInput = z.infer<typeof dateRangeSchema>;
 export type SaveRoomProgressInput = z.infer<typeof saveRoomProgressSchema>;
+export type CreateManualRoomInput = z.infer<typeof createManualRoomSchema>;
+export type DeleteManualRoomInput = z.infer<typeof deleteManualRoomSchema>;
 export type ExportBackdatedInput = z.infer<typeof exportBackdatedSchema>;
 
 export type HistoryEntryView = {
@@ -78,6 +93,11 @@ export type GraphRoomView = {
 	effectiveDate: string | null;
 };
 
+export type GraphManualRoomView = {
+	id: string;
+	roomName: string;
+};
+
 export type GraphGroupView = {
 	id: string;
 	groupKey: string;
@@ -92,6 +112,7 @@ export type GraphGroupView = {
 	averageProgress: number;
 	primaryRooms: GraphRoomView[];
 	secondaryRooms: GraphRoomView[];
+	manualRooms: GraphManualRoomView[];
 	buckets: GraphBucketView[];
 };
 

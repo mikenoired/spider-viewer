@@ -71,7 +71,7 @@ export function SnapshotImportForm({
 	}
 
 	return (
-		<div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+		<div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] px-4">
 			<Card>
 				<CardHeader>
 					<CardTitle>Импорт графа из workbook</CardTitle>

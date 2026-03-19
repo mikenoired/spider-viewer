@@ -53,11 +53,7 @@ export function LogoutButton({
 	return (
 		<AlertDialog>
 			<AlertDialogTrigger asChild>
-				<Button
-					type="button"
-					variant="outline"
-					className={cn("flex-1", className)}
-				>
+				<Button type="button" variant="outline" className={cn(className)}>
 					<LogOutIcon data-icon="inline-start" />
 					<span className={cn(labelClassName)}>Выйти</span>
 				</Button>

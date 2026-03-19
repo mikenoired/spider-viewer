@@ -4,6 +4,7 @@ import {
 	Paragraph,
 	Table,
 	TableCell,
+	TableLayoutType,
 	TableRow,
 	TextRun,
 	WidthType,
@@ -24,6 +25,8 @@ import type {
 	HistoryEntryView,
 	SaveRoomProgressInput,
 } from "./shared";
+
+const historyTableColumnWidths = [1700, 1400, 1600, 2800, 900, 900] as const;
 
 function getTodayInMoscow() {
 	return new Intl.DateTimeFormat("sv-SE", {
@@ -220,11 +223,11 @@ export async function saveRoomProgressChanges(
 	};
 }
 
-function createTableCell(text: string) {
+function createTableCell(text: string, width: number) {
 	return new TableCell({
 		width: {
-			size: 20,
-			type: WidthType.PERCENTAGE,
+			size: width,
+			type: WidthType.DXA,
 		},
 		children: [
 			new Paragraph({
@@ -240,28 +243,39 @@ function createHistoryTable(entries: HistoryEntryView[]) {
 			size: 100,
 			type: WidthType.PERCENTAGE,
 		},
+		layout: TableLayoutType.FIXED,
+		columnWidths: historyTableColumnWidths,
 		rows: [
 			new TableRow({
 				tableHeader: true,
 				children: [
-					createTableCell("Дата изменения"),
-					createTableCell("Дата действия"),
-					createTableCell("Пользователь"),
-					createTableCell("Помещение"),
-					createTableCell("Было"),
-					createTableCell("Стало"),
+					createTableCell("Дата изменения", historyTableColumnWidths[0]),
+					createTableCell("Дата действия", historyTableColumnWidths[1]),
+					createTableCell("Пользователь", historyTableColumnWidths[2]),
+					createTableCell("Помещение", historyTableColumnWidths[3]),
+					createTableCell("Было", historyTableColumnWidths[4]),
+					createTableCell("Стало", historyTableColumnWidths[5]),
 				],
 			}),
 			...entries.map(
 				(entry) =>
 					new TableRow({
 						children: [
-							createTableCell(getTimestampLabel(entry.changedAt)),
-							createTableCell(entry.effectiveDate),
-							createTableCell(entry.userLogin),
-							createTableCell(entry.roomName),
-							createTableCell(`${entry.oldProgress}%`),
-							createTableCell(`${entry.newProgress}%`),
+							createTableCell(
+								getTimestampLabel(entry.changedAt),
+								historyTableColumnWidths[0],
+							),
+							createTableCell(entry.effectiveDate, historyTableColumnWidths[1]),
+							createTableCell(entry.userLogin, historyTableColumnWidths[2]),
+							createTableCell(entry.roomName, historyTableColumnWidths[3]),
+							createTableCell(
+								`${entry.oldProgress}%`,
+								historyTableColumnWidths[4],
+							),
+							createTableCell(
+								`${entry.newProgress}%`,
+								historyTableColumnWidths[5],
+							),
 						],
 					}),
 			),

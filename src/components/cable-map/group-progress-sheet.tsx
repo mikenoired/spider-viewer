@@ -102,11 +102,13 @@ export function GroupProgressSheet({
 	group,
 	canEdit,
 	variant = "default",
+	align = "left",
 	className,
 }: {
 	group: GraphGroupView;
 	canEdit: boolean;
-	variant?: "default" | "pdf";
+	variant?: "default" | "map";
+	align?: "left" | "right";
 	className?: string;
 }) {
 	const router = useRouter();
@@ -206,72 +208,71 @@ export function GroupProgressSheet({
 	return (
 		<>
 			<Sheet open={open} onOpenChange={handleOpenChange}>
-				<button
-					type="button"
-					onClick={() => setOpen(true)}
-					className={cn(
-						variant === "pdf"
-							? "relative flex h-full w-full flex-col rounded-[8px] border border-[#d2b55a] bg-[#f7db76] px-3 py-2 text-left text-zinc-900 shadow-sm transition hover:bg-[#f2d169] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#9b7c19] dark:bg-[#d7b652] dark:text-[#1f1400]"
-							: "flex min-h-40 w-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left transition hover:border-primary/40 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60",
-						!hasRooms && "pointer-events-none",
-						className,
-					)}
-					disabled={!hasRooms}
-				>
-					{variant === "pdf" ? (
-						<>
-							<div className="absolute right-2 top-2 rounded-[4px] border border-white/70 bg-white/85 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 shadow-sm dark:border-black/10 dark:bg-[#fff4cf] dark:text-[#3d2b00]">
-								{group.averageProgress}%
-							</div>
-							<div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-700/75">
-								Основной блок
-							</div>
-							<div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] font-semibold leading-4">
-								{group.primaryRooms.slice(0, 10).map((room) => (
-									<div key={room.id} className="truncate">
-										{room.roomName}
+				<div className="flex w-full items-center justify-center">
+					<button
+						type="button"
+						onClick={() => setOpen(true)}
+						className={cn(
+							variant === "map"
+								? "relative flex h-full w-full flex-col rounded-[8px] border border-zinc-400/80 bg-white/90 px-3 py-2 text-left text-zinc-900 shadow-sm transition hover:border-zinc-500 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950/80 dark:text-zinc-100 dark:hover:border-zinc-500 dark:hover:bg-zinc-800 cursor-pointer"
+								: "flex min-h-40 w-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left transition hover:border-primary/40 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60",
+							!hasRooms && "pointer-events-none",
+							className,
+						)}
+						disabled={!hasRooms}
+					>
+						{variant === "map" ? (
+							<div
+								className={cn(
+									"grid grid-cols-2 gap-x-2 gap-y-1 overflow-hidden text-xs font-medium leading-4 text-zinc-700 dark:text-zinc-200",
+									align === "right" && "text-right",
+								)}
+							>
+								{group.primaryRooms.map((room) => (
+									<div key={room.id}>
+										{room.roomName.length > 15
+											? `${room.roomName.slice(0, 15)}...`
+											: room.roomName}
 									</div>
 								))}
 							</div>
-							{group.primaryRooms.length > 10 ? (
-								<div className="mt-auto pt-2 text-[10px] font-medium text-zinc-700/80">
-									+{group.primaryRooms.length - 10}
-								</div>
-							) : null}
-						</>
-					) : (
-						<>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex flex-col gap-1">
-									<div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-										Основной блок помещений
+						) : (
+							<>
+								<div className="flex items-start justify-between gap-3">
+									<div className="flex flex-col gap-1">
+										<div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+											Основной блок помещений
+										</div>
+										<div className="text-sm font-medium">
+											{group.primaryRooms.length} помещений
+										</div>
 									</div>
-									<div className="text-sm font-medium">
-										{group.primaryRooms.length} помещений
-									</div>
+									<Badge variant="secondary">{group.averageProgress}%</Badge>
 								</div>
-								<Badge variant="secondary">{group.averageProgress}%</Badge>
-							</div>
-							<div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-								{group.primaryRooms.slice(0, 8).map((room) => (
-									<div
-										key={room.id}
-										className="truncate rounded-lg bg-muted/60 px-2 py-1.5"
-									>
-										{room.roomName}
-									</div>
-								))}
-							</div>
-							{group.primaryRooms.length > 8 ? (
-								<div className="text-xs text-muted-foreground">
-									Ещё {group.primaryRooms.length - 8} помещений
+								<div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+									{group.primaryRooms.slice(0, 8).map((room) => (
+										<div
+											key={room.id}
+											className="truncate rounded-lg bg-muted/60 px-2 py-1.5"
+										>
+											{room.roomName}
+										</div>
+									))}
 								</div>
-							) : null}
-						</>
-					)}
-				</button>
+								{group.primaryRooms.length > 8 ? (
+									<div className="text-xs text-muted-foreground">
+										Ещё {group.primaryRooms.length - 8} помещений
+									</div>
+								) : null}
+							</>
+						)}
+					</button>
+				</div>
 
-				<SheetContent className="w-full sm:max-w-4xl">
+				<SheetContent
+					side="bottom"
+					className="max-h-[85vh] w-full rounded-t-[28px] border-x border-t sm:max-w-none"
+				>
 					<SheetHeader>
 						<SheetTitle>Помещения уровня {group.level}</SheetTitle>
 						<SheetDescription>
@@ -283,7 +284,7 @@ export function GroupProgressSheet({
 						</SheetDescription>
 					</SheetHeader>
 
-					<div className="flex flex-col gap-4 px-4 pb-4">
+					<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 pb-4">
 						<div className="flex flex-wrap items-center gap-2">
 							<Badge variant="outline">Кабелей: {group.cableCount}</Badge>
 							<Badge variant="outline">Ниток: {group.threadCount}</Badge>

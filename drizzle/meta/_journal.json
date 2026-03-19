@@ -15,6 +15,13 @@
       "when": 1773866898427,
       "tag": "0001_adorable_brood",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773924053106,
+      "tag": "0002_whole_serpent_society",
+      "breakpoints": true
     }
   ]
 }

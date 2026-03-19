@@ -46,5 +46,9 @@ export function canViewAudit(role: UserRole) {
 	return role === "super-admin";
 }
 
+export function canManageManualRooms(role: UserRole) {
+	return role === "super-admin";
+}
+
 export const TEST_USERS_PASSWORD = "Password123!";
 export const AUTH_COOKIE_NAME = "spider_viewer_session";
