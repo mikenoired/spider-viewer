@@ -1,42 +1,6 @@
 import type { GraphGroupView } from "@/lib/cable-map/shared";
 import { GroupProgressSheet } from "../group-progress-sheet";
 import { ManualRoomBlock } from "./manual-room-block";
-import type { GraphSide } from "./types";
-
-export function SchedulePill({
-	group,
-	side,
-	height,
-}: {
-	group: GraphGroupView | null;
-	side: GraphSide;
-	height: number;
-}) {
-	if (!group) {
-		return <div className="h-full" />;
-	}
-
-	const label =
-		side === "dirty" && group.graphSubzone === "dirty"
-			? "6 ч. в день / 6 ч. в ночь"
-			: side === "dirty"
-				? "10 ч. в день / 10 ч. в ночь"
-				: "10 ч. в день / 10 ч. в ночь";
-
-	return (
-		<div className="flex items-center justify-center py-3" style={{ height }}>
-			<div
-				className="flex h-full w-8 items-center justify-center rounded-[10px] border border-zinc-400/80 bg-linear-to-b from-zinc-100 to-zinc-200 px-1 text-[11px] font-medium text-zinc-700 shadow-sm dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-800 dark:text-zinc-300"
-				style={{
-					writingMode: "vertical-rl",
-					transform: side === "dirty" ? "rotate(180deg)" : undefined,
-				}}
-			>
-				{label}
-			</div>
-		</div>
-	);
-}
 
 export function LeftRoomArea({
 	group,

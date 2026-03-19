@@ -179,18 +179,6 @@ export function getBucketThreadCount(
 	);
 }
 
-export function findBandGroupForSchedule(band: LevelBand, side: GraphSide) {
-	for (const row of band.rows) {
-		const group = side === "dirty" ? row.dirtyGroup : row.cleanGroup;
-
-		if (group) {
-			return group;
-		}
-	}
-
-	return null;
-}
-
 export function getShaftX(side: GraphSide) {
 	return side === "dirty"
 		? {
