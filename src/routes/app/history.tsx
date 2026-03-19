@@ -4,9 +4,7 @@ import { getHistory } from "@/lib/cable-map/functions";
 
 export const Route = createFileRoute("/app/history")({
 	beforeLoad: ({ context }) => {
-		if (context.auth?.role !== "super-admin") {
-			throw redirect({ to: "/app" });
-		}
+		if (context.auth?.role !== "super-admin") throw redirect({ to: "/app" });
 	},
 	loader: async () =>
 		getHistory({

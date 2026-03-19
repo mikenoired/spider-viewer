@@ -7,6 +7,7 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { getCurrentSession } from "@/lib/auth/auth.functions";
 import type { AuthSession } from "@/lib/auth/shared";
+import { PROJECT_NAME } from "@/lib/auth/shared";
 
 import appCss from "../styles.css?url";
 
@@ -30,7 +31,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 				content: "width=device-width, initial-scale=1",
 			},
 			{
-				title: "Spider Viewer",
+				title: PROJECT_NAME,
 			},
 		],
 		links: [

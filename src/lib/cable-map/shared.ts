@@ -31,18 +31,18 @@ export const dateRangeSchema = z.object({
 });
 
 export const roomProgressPatchSchema = z.object({
-	roomId: z.string().uuid(),
+	roomId: z.uuid(),
 	progress: z.number().int().min(0).max(100),
 });
 
 export const saveRoomProgressSchema = z.object({
-	groupId: z.string().uuid(),
+	groupId: z.uuid(),
 	effectiveDate: z.string().trim().optional().nullable(),
 	rooms: z.array(roomProgressPatchSchema).min(1),
 });
 
 export const createManualRoomSchema = z.object({
-	groupId: z.string().uuid(),
+	groupId: z.uuid(),
 	roomName: z
 		.string()
 		.trim()
@@ -51,7 +51,7 @@ export const createManualRoomSchema = z.object({
 });
 
 export const deleteManualRoomSchema = z.object({
-	roomId: z.string().uuid(),
+	roomId: z.uuid(),
 });
 
 export const exportBackdatedSchema = dateRangeSchema.extend({

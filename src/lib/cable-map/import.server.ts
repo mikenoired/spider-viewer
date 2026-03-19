@@ -10,6 +10,7 @@ import {
 	importedCableRows,
 	importSnapshots,
 } from "@/lib/db/schema";
+import { enToRuVisual } from "@/lib/utils";
 import { supportedWorkbookExtensions } from "./shared";
 
 type GraphSide = (typeof graphSideEnum.enumValues)[number];
@@ -287,7 +288,7 @@ function parseWorkbookRows(fileName: string, buffer: Buffer) {
 				repeatFrom: row[workbookColumnIndexes.repeatFrom] ?? "",
 				repeatTo: row[workbookColumnIndexes.repeatTo] ?? "",
 				repeatKks: row[workbookColumnIndexes.repeatKks] ?? "",
-				fromRoom,
+				fromRoom: enToRuVisual(fromRoom),
 				fromLocation: row[workbookColumnIndexes.fromLocation] ?? "",
 				fromEquipment: row[workbookColumnIndexes.fromEquipment] ?? "",
 				toRoom,
@@ -380,9 +381,7 @@ function aggregateGroups(rows: ParsedCableRow[]) {
 	for (const group of groups.values()) {
 		const sideState = sideSummary.get(group.graphSide);
 
-		if (sideState) {
-			sideState.groupCount += 1;
-		}
+		if (sideState) sideState.groupCount += 1;
 	}
 
 	const orderedLevels = [...uniqueLevels].sort(
@@ -422,16 +421,13 @@ function getFileType(fileName: string) {
 	return extension as "ods" | "xlsx" | "xls";
 }
 
+// TODO: Add more file validation
 async function ensureUploadFile(formData: FormData) {
 	const file = formData.get("file");
 
-	if (!(file instanceof File)) {
-		throw new Error("Выберите файл для импорта.");
-	}
+	if (!(file instanceof File)) throw new Error("Выберите файл для импорта.");
 
-	if (file.size === 0) {
-		throw new Error("Файл для импорта пустой.");
-	}
+	if (file.size === 0) throw new Error("Файл для импорта пустой.");
 
 	return file;
 }
@@ -519,9 +515,7 @@ export async function importWorkbookFromFormData(
 		const roomRows = groups.flatMap((group) => {
 			const groupId = groupIdByKey.get(group.groupKey);
 
-			if (!groupId) {
-				return [];
-			}
+			if (!groupId) return [];
 
 			const primaryRooms = sortRoomNames(group.primaryRooms.keys()).map(
 				(roomName, index) => {

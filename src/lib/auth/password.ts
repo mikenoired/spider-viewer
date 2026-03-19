@@ -18,9 +18,7 @@ export async function hashPassword(password: string) {
 export async function verifyPassword(password: string, storedHash: string) {
 	const [salt, expectedHash] = storedHash.split(":");
 
-	if (!salt || !expectedHash) {
-		return false;
-	}
+	if (!salt || !expectedHash) return false;
 
 	const derivedKey = (await scryptAsync(
 		password,
@@ -29,9 +27,7 @@ export async function verifyPassword(password: string, storedHash: string) {
 	)) as Buffer;
 	const expectedBuffer = Buffer.from(expectedHash, "hex");
 
-	if (expectedBuffer.length !== derivedKey.length) {
-		return false;
-	}
+	if (expectedBuffer.length !== derivedKey.length) return false;
 
 	return timingSafeEqual(expectedBuffer, derivedKey);
 }

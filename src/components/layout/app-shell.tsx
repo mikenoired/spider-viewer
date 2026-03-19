@@ -98,7 +98,7 @@ function AppSidebar({
 				<SidebarGroup>
 					<SidebarGroupLabel>Навигация</SidebarGroupLabel>
 					<SidebarGroupContent>
-						<SidebarMenu>
+						<SidebarMenu className="gap-1">
 							{items.map((item) => (
 								<SidebarMenuItem key={item.to}>
 									<SidebarMenuButton
@@ -195,17 +195,11 @@ function getNavigationItems(role: AuthSession["role"]) {
 }
 
 function getPageTitle(pathname: string) {
-	if (pathname.startsWith("/app/import")) {
-		return "Загрузка данных";
-	}
-
-	if (pathname.startsWith("/app/history")) {
-		return "История изменений";
-	}
-
-	if (pathname.startsWith("/app/backdated")) {
-		return "Изменения задним числом";
-	}
-
-	return "Карта демонтажа";
+	return (
+		[
+			["/app/import", "Загрузка данных"],
+			["/app/history", "История изменений"],
+			["/app/backdated", "Изменения задним числом"],
+		].find(([path]) => pathname.startsWith(path))?.[1] ?? "Карта демонтажа"
+	);
 }

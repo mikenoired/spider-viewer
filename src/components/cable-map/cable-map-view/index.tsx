@@ -60,20 +60,14 @@ export function CableMapView({
 		] as const;
 		const sourceElement = refs.find(([key]) => key === source)?.[1].current;
 
-		if (!sourceElement) {
-			return;
-		}
+		if (!sourceElement) return;
 
 		activeScrollSourceRef.current = source;
 
 		for (const [key, ref] of refs) {
-			if (key === source || !ref.current) {
+			if (key === source || !ref.current) continue;
+			if (Math.abs(ref.current.scrollLeft - sourceElement.scrollLeft) < 1)
 				continue;
-			}
-
-			if (Math.abs(ref.current.scrollLeft - sourceElement.scrollLeft) < 1) {
-				continue;
-			}
 
 			ref.current.scrollLeft = sourceElement.scrollLeft;
 		}
@@ -89,14 +83,12 @@ export function CableMapView({
 	}, []);
 
 	useEffect(() => {
-		if (!data.snapshot || !bodyScrollRef.current) {
-			return;
-		}
+		if (!data.snapshot || !bodyScrollRef.current) return;
 
 		syncScroll("body");
 
 		return () => {
-			if (releaseScrollLockFrameRef.current !== null) {
+			if (releaseScrollLockFrameRef.current) {
 				cancelAnimationFrame(releaseScrollLockFrameRef.current);
 			}
 		};

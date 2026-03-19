@@ -13,7 +13,7 @@ import { getShaftX } from "./utils";
 export function MapTitle() {
 	return (
 		<div className="space-y-1 text-center">
-			<div className="text-[30px] font-semibold leading-tight tracking-[-0.03em] text-zinc-950 dark:text-zinc-50">
+			<div className="text-[30px] font-semibold leading-tight text-zinc-950 dark:text-zinc-50">
 				Демонтаж кабеля САЭ в части 1 канала СБ и НЭ энергоблока № 1
 			</div>
 			<div className="grid grid-cols-[1fr_auto_1fr] items-end gap-6 text-balance">
@@ -31,7 +31,7 @@ export function MapTitle() {
 
 export function LeftZoneHeader() {
 	return (
-		<div className="grid h-11 grid-cols-[98px_minmax(0,1fr)] items-center gap-3 pb-1 text-center text-xs font-semibold uppercase tracking-[0.18em] text-zinc-700 dark:text-zinc-300">
+		<div className="grid h-11 grid-cols-[98px_minmax(0,1fr)] items-center gap-3 pb-1 text-center text-base font-semibold text-zinc-700 dark:text-zinc-300">
 			<div>{graphSubzoneLabels.dirty}</div>
 			<div>{graphSubzoneLabels.clean}</div>
 		</div>
@@ -40,7 +40,7 @@ export function LeftZoneHeader() {
 
 export function RightZoneHeader() {
 	return (
-		<div className="grid h-11 grid-cols-[minmax(0,1fr)_98px] items-center gap-3 pb-1 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-700 dark:text-zinc-300">
+		<div className="grid h-11 grid-cols-[minmax(0,1fr)_98px] items-center gap-3 pb-1 text-center text-base font-semibold text-zinc-700 dark:text-zinc-300">
 			<div />
 			<div>{graphSubzoneLabels.clean}</div>
 		</div>

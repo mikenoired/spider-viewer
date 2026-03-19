@@ -17,9 +17,7 @@ const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 function getJwtSecret() {
 	const secret = process.env.JWT_SECRET;
 
-	if (!secret) {
-		throw new Error("JWT_SECRET is not configured.");
-	}
+	if (!secret) throw new Error("JWT_SECRET is not configured.");
 
 	return new TextEncoder().encode(secret);
 }
@@ -58,9 +56,7 @@ function normalizeLogin(login: string) {
 export async function getCurrentSession() {
 	const token = getCookie(AUTH_COOKIE_NAME);
 
-	if (!token) {
-		return null;
-	}
+	if (!token) return null;
 
 	try {
 		const payload = await verifyAuthToken(token);
@@ -111,15 +107,11 @@ export async function loginWithCredentials(input: LoginInput) {
 		.where(eq(users.login, normalizeLogin(login)))
 		.limit(1);
 
-	if (!user) {
-		throw new Error("Неверный логин или пароль.");
-	}
+	if (!user) throw new Error("Неверный логин или пароль.");
 
 	const passwordMatches = await verifyPassword(password, user.passwordHash);
 
-	if (!passwordMatches) {
-		throw new Error("Неверный логин или пароль.");
-	}
+	if (!passwordMatches) throw new Error("Неверный логин или пароль.");
 
 	const session = {
 		id: user.id,

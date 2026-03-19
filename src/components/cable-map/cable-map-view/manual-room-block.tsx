@@ -203,7 +203,7 @@ export function ManualRoomBlock({
 									openContextMenuOnClick(event);
 								}}
 								className={cn(
-									"flex h-full min-h-[140px] w-full flex-col items-center justify-center gap-3 rounded-[10px] border-2 border-dashed px-3 py-4 text-center shadow-sm transition border-[#c6a643] bg-amber-200/50 dark:bg-amber-600/50 text-amber-950 dark:text-amber-100",
+									"flex h-full min-h-35 w-full flex-col items-center justify-center gap-3 rounded-[10px] border-2 border-dashed px-3 py-4 text-center shadow-sm transition border-[#c6a643] bg-amber-200/50 dark:bg-amber-600/50 text-amber-950 dark:text-amber-100",
 									canManage && "cursor-pointer dark:hover:bg-amber-700",
 								)}
 							>

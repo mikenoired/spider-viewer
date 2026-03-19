@@ -2,11 +2,7 @@ import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { boardColumns } from "./config";
 import { PathArea } from "./path-layer";
-import {
-	LeftRoomArea,
-	RightRoomArea,
-	TotalThreadsBadge,
-} from "./room-blocks";
+import { LeftRoomArea, RightRoomArea, TotalThreadsBadge } from "./room-blocks";
 import type { LevelBand } from "./types";
 
 export function LevelBandView({

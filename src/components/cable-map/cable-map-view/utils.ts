@@ -77,9 +77,7 @@ export function buildLevelBands(levels: DashboardData["levels"]): LevelBand[] {
 }
 
 export function getBoardHeight(bands: LevelBand[]) {
-	if (bands.length === 0) {
-		return 0;
-	}
+	if (bands.length === 0) return 0;
 
 	return bands.reduce((total, band, index) => {
 		const bandHeight = band.rows.reduce((sum, row) => sum + row.height, 0);
@@ -115,9 +113,7 @@ export function getShaftExtents(
 		}
 	}
 
-	if (top === null || bottom === null || bottom <= top) {
-		return null;
-	}
+	if (top === null || bottom === null || bottom <= top) return null;
 
 	return { top, bottom };
 }
@@ -134,9 +130,7 @@ function getPdfRowHeight(
 }
 
 function getPdfRenderedGroupHeight(group: GraphGroupView | null) {
-	if (!group) {
-		return minPdfRowHeight;
-	}
+	if (!group) return minPdfRowHeight;
 
 	return Math.max(
 		getPdfImportedRoomBlockHeight(group.primaryRooms.length),
@@ -149,18 +143,11 @@ function sortGroupsForPdf(groups: GraphGroupView[]) {
 		const leftPriority = getZonePriority(left.sourceZone);
 		const rightPriority = getZonePriority(right.sourceZone);
 
-		if (leftPriority !== rightPriority) {
-			return leftPriority - rightPriority;
-		}
+		if (leftPriority !== rightPriority) return leftPriority - rightPriority;
 
 		if (left.graphSubzone !== right.graphSubzone) {
-			if (left.graphSubzone === "dirty") {
-				return -1;
-			}
-
-			if (right.graphSubzone === "dirty") {
-				return 1;
-			}
+			if (left.graphSubzone === "dirty") return -1;
+			if (right.graphSubzone === "dirty") return 1;
 		}
 
 		return left.sourceZone.localeCompare(right.sourceZone, "ru", {

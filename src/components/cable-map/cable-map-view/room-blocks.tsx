@@ -71,7 +71,9 @@ export function TotalThreadsBadge({ group }: { group: GraphGroupView | null }) {
 	}
 
 	const displayThreadCount = group.cableCount;
-	const hasStartedProgress = group.primaryRooms.some((room) => room.progress > 0);
+	const hasStartedProgress = group.primaryRooms.some(
+		(room) => room.progress > 0,
+	);
 
 	if (!hasStartedProgress) {
 		return (
