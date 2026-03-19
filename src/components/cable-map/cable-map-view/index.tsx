@@ -14,7 +14,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { canUploadSnapshot } from "@/lib/auth/shared";
 import type { DashboardData } from "@/lib/cable-map/shared";
-import { boardColumns } from "./config";
+import { boardColumns, boardWidth } from "./config";
 import { LevelBandView } from "./level-band-view";
 import {
 	LeftZoneHeader,
@@ -172,7 +172,7 @@ export function CableMapView({
 					onScroll={() => syncScroll("title")}
 					className="no-scrollbar overflow-x-auto overflow-y-hidden"
 				>
-					<div className="min-w-[1540px]">
+					<div style={{ minWidth: boardWidth }}>
 						<MapTitle />
 					</div>
 				</div>
@@ -188,14 +188,13 @@ export function CableMapView({
 						onScroll={() => syncScroll("header")}
 						className="no-scrollbar overflow-x-auto overflow-y-hidden border-b-2 border-dashed border-zinc-400/90 bg-background/95 py-3 shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] backdrop-blur-sm dark:border-zinc-700 dark:bg-background/92"
 					>
-						<div className="min-w-[1540px]">
+						<div style={{ minWidth: boardWidth }}>
 							<div
 								className="grid items-center"
 								style={{
 									gridTemplateColumns: boardColumns,
 								}}
 							>
-								<div />
 								<LeftZoneHeader />
 								<div />
 								<PathHeader side="dirty" />
@@ -205,7 +204,6 @@ export function CableMapView({
 								<PathHeader side="clean" />
 								<div />
 								<RightZoneHeader />
-								<div />
 							</div>
 						</div>
 					</div>
@@ -216,7 +214,7 @@ export function CableMapView({
 					onScroll={() => syncScroll("body")}
 					className="w-full overflow-x-auto overflow-y-visible"
 				>
-					<div className="min-w-[1540px]">
+					<div style={{ minWidth: boardWidth }}>
 						<div className="relative overflow-hidden rounded-[24px]">
 							<BoardPathLayer bands={levelBands} />
 							<div className="relative z-10">
@@ -225,7 +223,6 @@ export function CableMapView({
 										key={`${band.level}:${band.levelOrder}`}
 										band={band}
 										bandIndex={index}
-										nextBand={levelBands[index + 1] ?? null}
 										canEditProgress={canEditProgress}
 										canManageManualRooms={canManageManualRooms}
 										isLast={index === levelBands.length - 1}

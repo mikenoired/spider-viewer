@@ -29,9 +29,7 @@ export const shaftPalette = {
 	}
 >;
 
-export const boardColumnWidths = [
-	46, 252, 52, 320, 112, 320, 52, 252, 46,
-] as const;
+export const boardColumnWidths = [252, 52, 320, 112, 320, 52, 252] as const;
 export const boardColumns = boardColumnWidths
 	.map((width) => `${width}px`)
 	.join(" ");
@@ -40,12 +38,12 @@ export const boardWidth = boardColumnWidths.reduce(
 	0,
 );
 export const dirtyPathColumnStart = boardColumnWidths
-	.slice(0, 3)
+	.slice(0, 2)
 	.reduce((total, width) => total + width, 0);
 export const cleanPathColumnStart = boardColumnWidths
-	.slice(0, 5)
+	.slice(0, 4)
 	.reduce((total, width) => total + width, 0);
-export const pathColumnWidth = boardColumnWidths[3];
+export const pathColumnWidth = boardColumnWidths[2];
 export const bandBorderThickness = 2;
 export const shaftCapInset = 4;
 export const pdfRowVerticalInset = 16;
