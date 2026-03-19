@@ -8,7 +8,6 @@ import {
 	MapIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
 	Sidebar,
 	SidebarContent,
@@ -50,13 +49,12 @@ export function AppShell({
 	return (
 		<SidebarProvider>
 			<AppSidebar pathname={pathname} user={user} />
-			<SidebarInset className="[--app-shell-content-padding:1rem] [--app-shell-header-height:3.5rem] [--app-shell-sidebar-offset:0px] md:peer-data-[state=collapsed]:[--app-shell-sidebar-offset:var(--sidebar-width-icon)] md:peer-data-[state=expanded]:[--app-shell-sidebar-offset:var(--sidebar-width)]">
-				<header className="fixed top-0 right-0 left-0 z-50 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur-sm md:left-(--app-shell-sidebar-offset)">
+			<SidebarInset className="[--app-shell-content-padding:1rem] [--app-shell-header-height:1.5rem] [--app-shell-sidebar-offset:0px] md:peer-data-[state=collapsed]:[--app-shell-sidebar-offset:var(--sidebar-width-icon)] md:peer-data-[state=expanded]:[--app-shell-sidebar-offset:var(--sidebar-width)]">
+				<header className="fixed top-0 right-0 left-0 z-50 flex h-10 items-center gap-2 border-b bg-background/95 px-2 backdrop-blur-sm md:left-(--app-shell-sidebar-offset)">
 					<SidebarTrigger />
-					<Separator orientation="vertical" className="h-4" />
 					<div className="text-sm font-medium">{getPageTitle(pathname)}</div>
 				</header>
-				<div className="flex flex-1 flex-col pb-(--app-shell-content-padding) pt-[calc(var(--app-shell-header-height)+var(--app-shell-content-padding))]">
+				<div className="flex flex-1 flex-col pt-[calc(var(--app-shell-header-height)+var(--app-shell-content-padding))]">
 					{children}
 				</div>
 			</SidebarInset>
