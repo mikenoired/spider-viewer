@@ -93,7 +93,8 @@ export function SnapshotImportForm({
 								/>
 								<FieldDescription>
 									После повторного импорта активный snapshot будет заменён
-									новым.
+									новым. Поддерживаются только корректные workbook-файлы до 15
+									МБ.
 								</FieldDescription>
 							</Field>
 						</FieldGroup>

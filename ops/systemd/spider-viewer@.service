@@ -1,0 +1,23 @@
+[Unit]
+Description=Spider Viewer (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=spider
+Group=spider
+WorkingDirectory=/opt/spider-viewer/slots/%i/current
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/spider-viewer/spider-viewer.env
+EnvironmentFile=-/etc/spider-viewer/slots/%i.env
+ExecStart=/usr/bin/env node ./scripts/serve.mjs
+Restart=always
+RestartSec=3
+TimeoutStopSec=35
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

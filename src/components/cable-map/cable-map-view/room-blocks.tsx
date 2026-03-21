@@ -70,7 +70,7 @@ export function TotalThreadsBadge({ group }: { group: GraphGroupView | null }) {
 		return <div className="h-full" />;
 	}
 
-	const displayThreadCount = group.cableCount;
+	const displayThreadCount = group.threadCount;
 	const hasStartedProgress = group.primaryRooms.some(
 		(room) => room.progress > 0,
 	);

@@ -11,7 +11,10 @@ import {
 	importSnapshots,
 } from "@/lib/db/schema";
 import { enToRuVisual } from "@/lib/utils";
-import { supportedWorkbookExtensions } from "./shared";
+import {
+	supportedWorkbookExtensions,
+	supportedWorkbookMimeTypes,
+} from "./shared";
 
 type GraphSide = (typeof graphSideEnum.enumValues)[number];
 type GraphSubzone = (typeof graphSubzoneEnum.enumValues)[number] | null;
@@ -92,6 +95,16 @@ const workbookColumnIndexes = {
 	route: 31,
 } as const;
 
+const maxWorkbookFileSizeBytes = 15 * 1024 * 1024;
+const maxWorkbookRowCount = 20_000;
+const requiredWorkbookColumnIndexes = [
+	workbookColumnIndexes.cableLabel,
+	workbookColumnIndexes.fromRoom,
+	workbookColumnIndexes.toRoom,
+	workbookColumnIndexes.level,
+	workbookColumnIndexes.fromZone,
+] as const;
+
 function getTodayInMoscow() {
 	return new Intl.DateTimeFormat("sv-SE", {
 		timeZone: "Europe/Moscow",
@@ -115,6 +128,41 @@ function parseInteger(value: string) {
 
 function getWorkbookExtension(fileName: string) {
 	return fileName.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function hasZipWorkbookSignature(buffer: Buffer) {
+	return (
+		buffer.length >= 4 &&
+		buffer[0] === 0x50 &&
+		buffer[1] === 0x4b &&
+		(buffer[2] === 0x03 || buffer[2] === 0x05 || buffer[2] === 0x07) &&
+		(buffer[3] === 0x04 || buffer[3] === 0x06 || buffer[3] === 0x08)
+	);
+}
+
+function hasLegacyExcelSignature(buffer: Buffer) {
+	return (
+		buffer.length >= 8 &&
+		buffer[0] === 0xd0 &&
+		buffer[1] === 0xcf &&
+		buffer[2] === 0x11 &&
+		buffer[3] === 0xe0 &&
+		buffer[4] === 0xa1 &&
+		buffer[5] === 0xb1 &&
+		buffer[6] === 0x1a &&
+		buffer[7] === 0xe1
+	);
+}
+
+export function hasExpectedWorkbookSignature(
+	fileType: "ods" | "xlsx" | "xls",
+	buffer: Buffer,
+) {
+	if (fileType === "xls") {
+		return hasLegacyExcelSignature(buffer);
+	}
+
+	return hasZipWorkbookSignature(buffer);
 }
 
 function resolveGraphSide(fromZone: string): GraphSide {
@@ -234,7 +282,7 @@ function chunkValues<T>(values: T[], size: number) {
 	return chunks;
 }
 
-function parseWorkbookRows(fileName: string, buffer: Buffer) {
+export function parseWorkbookRows(fileName: string, buffer: Buffer) {
 	const workbook = XLSX.read(buffer, {
 		type: "buffer",
 		cellDates: false,
@@ -258,6 +306,22 @@ function parseWorkbookRows(fileName: string, buffer: Buffer) {
 	}
 
 	const headerRow = rawRows[0].map(normalizeCellValue);
+	const lastRequiredColumnIndex = Math.max(...requiredWorkbookColumnIndexes);
+
+	if (headerRow.length <= lastRequiredColumnIndex) {
+		throw new Error(
+			'Структура листа "Общ" не соответствует ожидаемому шаблону.',
+		);
+	}
+
+	const dataRowCount = rawRows.length - 1;
+
+	if (dataRowCount > maxWorkbookRowCount) {
+		throw new Error(
+			`Файл содержит слишком много строк для безопасного импорта (${dataRowCount}). Лимит: ${maxWorkbookRowCount}.`,
+		);
+	}
+
 	const parsedRows = rawRows
 		.slice(1)
 		.map((rawRow, index) => {
@@ -422,23 +486,52 @@ function getFileType(fileName: string) {
 }
 
 // TODO: Add more file validation
-async function ensureUploadFile(formData: FormData) {
+export async function ensureUploadFile(formData: FormData) {
 	const file = formData.get("file");
 
 	if (!(file instanceof File)) throw new Error("Выберите файл для импорта.");
 
 	if (file.size === 0) throw new Error("Файл для импорта пустой.");
 
-	return file;
+	if (file.size > maxWorkbookFileSizeBytes) {
+		throw new Error(
+			`Файл слишком большой. Максимальный размер: ${Math.floor(maxWorkbookFileSizeBytes / (1024 * 1024))} МБ.`,
+		);
+	}
+
+	const fileType = getFileType(file.name);
+	const fileMimeType = file.type.trim().toLowerCase();
+
+	if (
+		fileMimeType &&
+		fileMimeType !== "application/octet-stream" &&
+		!supportedWorkbookMimeTypes.includes(
+			fileMimeType as (typeof supportedWorkbookMimeTypes)[number],
+		)
+	) {
+		throw new Error(
+			`Неверный MIME-тип файла: ${file.type}. Разрешены только таблицы Excel или LibreOffice.`,
+		);
+	}
+
+	const buffer = Buffer.from(await file.arrayBuffer());
+
+	if (!hasExpectedWorkbookSignature(fileType, buffer)) {
+		throw new Error("Файл не похож на корректный workbook выбранного формата.");
+	}
+
+	return {
+		file,
+		fileType,
+		buffer,
+	};
 }
 
 export async function importWorkbookFromFormData(
 	formData: FormData,
 	session: AuthSession,
 ) {
-	const file = await ensureUploadFile(formData);
-	const fileType = getFileType(file.name);
-	const buffer = Buffer.from(await file.arrayBuffer());
+	const { file, fileType, buffer } = await ensureUploadFile(formData);
 	const parsedRows = parseWorkbookRows(file.name, buffer);
 	const { groups, orderedLevels, sideSummary } = aggregateGroups(parsedRows);
 	const checksum = createHash("sha256").update(buffer).digest("hex");
