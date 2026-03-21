@@ -1,8 +1,7 @@
 import { z } from "zod";
 
-export const supportedWorkbookExtensions = ["ods", "xlsx", "xls"] as const;
+export const supportedWorkbookExtensions = ["xlsx", "xls"] as const;
 export const supportedWorkbookMimeTypes = [
-	"application/vnd.oasis.opendocument.spreadsheet",
 	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 	"application/vnd.ms-excel",
 ] as const;
