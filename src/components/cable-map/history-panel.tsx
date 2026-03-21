@@ -45,11 +45,12 @@ import {
 } from "@/components/ui/table";
 import {
 	downloadBackdatedDocx,
+	downloadHistoryDocx,
 	getBackdatedHistory,
 	getHistory,
 } from "@/lib/cable-map/functions";
 import type { DateRangeInput, HistoryEntryView } from "@/lib/cable-map/shared";
-import { cn } from "@/lib/utils";
+import { cn, downloadResponseFile } from "@/lib/utils";
 
 function formatRangeLabel(range?: DateRange) {
 	if (!range?.from) {
@@ -69,6 +70,17 @@ function formatRangeLabel(range?: DateRange) {
 
 function dateToIso(value: Date | undefined) {
 	return value ? format(value, "yyyy-MM-dd") : null;
+}
+
+function buildExportFileName(range: DateRangeInput, backdatedOnly?: boolean) {
+	const suffix =
+		range.from && range.to
+			? range.from === range.to
+				? range.from
+				: `${range.from}_${range.to}`
+			: (range.from ?? range.to ?? format(new Date(), "yyyy-MM-dd"));
+
+	return `${backdatedOnly ? "backdated-history" : "history-levels"}-${suffix}.docx`;
 }
 
 function createTodayRange(): DateRange {
@@ -245,24 +257,26 @@ export function HistoryPanel({
 		setExporting(true);
 
 		try {
-			const response = await downloadBackdatedDocx({
-				data: {
-					...rangePayload,
-					fileName: "backdated-history.docx",
-				},
-			});
+			const fileName = buildExportFileName(rangePayload, backdatedOnly);
+			const response = backdatedOnly
+				? await downloadBackdatedDocx({
+						data: {
+							...rangePayload,
+							fileName,
+						},
+					})
+				: await downloadHistoryDocx({
+						data: {
+							...rangePayload,
+							fileName,
+						},
+					});
 
 			if (!(response instanceof Response)) {
 				throw new Error("Сервер вернул неожиданный ответ при экспорте.");
 			}
 
-			const blob = await response.blob();
-			const objectUrl = URL.createObjectURL(blob);
-			const link = document.createElement("a");
-			link.href = objectUrl;
-			link.download = "backdated-history.docx";
-			link.click();
-			URL.revokeObjectURL(objectUrl);
+			await downloadResponseFile(response, fileName);
 		} catch (error) {
 			toast.error(
 				error instanceof Error
@@ -337,19 +351,17 @@ export function HistoryPanel({
 						Сбросить
 					</Button>
 
-					{backdatedOnly ? (
-						<Button type="button" onClick={handleExport} disabled={exporting}>
-							{exporting ? (
-								<LoaderCircleIcon
-									data-icon="inline-start"
-									className="animate-spin"
-								/>
-							) : (
-								<DownloadIcon data-icon="inline-start" />
-							)}
-							Выгрузить DOCX
-						</Button>
-					) : null}
+					<Button type="button" onClick={handleExport} disabled={exporting}>
+						{exporting ? (
+							<LoaderCircleIcon
+								data-icon="inline-start"
+								className="animate-spin"
+							/>
+						) : (
+							<DownloadIcon data-icon="inline-start" />
+						)}
+						Выгрузить DOCX
+					</Button>
 				</div>
 			</CardHeader>
 			<CardContent>

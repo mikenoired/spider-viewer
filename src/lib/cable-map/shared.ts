@@ -1,8 +1,7 @@
 import { z } from "zod";
 
-export const supportedWorkbookExtensions = ["ods", "xlsx", "xls"] as const;
+export const supportedWorkbookExtensions = ["xlsx", "xls"] as const;
 export const supportedWorkbookMimeTypes = [
-	"application/vnd.oasis.opendocument.spreadsheet",
 	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 	"application/vnd.ms-excel",
 ] as const;
@@ -54,15 +53,22 @@ export const deleteManualRoomSchema = z.object({
 	roomId: z.uuid(),
 });
 
-export const exportBackdatedSchema = dateRangeSchema.extend({
+export const exportHistorySchema = dateRangeSchema.extend({
 	fileName: z.string().trim().optional().nullable(),
+});
+export const exportBackdatedSchema = exportHistorySchema;
+export const exportDailyHistorySchema = z.object({
+	fileName: z.string().trim().optional().nullable(),
+	level: z.string().trim().min(1).optional().nullable(),
 });
 
 export type DateRangeInput = z.infer<typeof dateRangeSchema>;
 export type SaveRoomProgressInput = z.infer<typeof saveRoomProgressSchema>;
 export type CreateManualRoomInput = z.infer<typeof createManualRoomSchema>;
 export type DeleteManualRoomInput = z.infer<typeof deleteManualRoomSchema>;
-export type ExportBackdatedInput = z.infer<typeof exportBackdatedSchema>;
+export type ExportHistoryInput = z.infer<typeof exportHistorySchema>;
+export type ExportBackdatedInput = ExportHistoryInput;
+export type ExportDailyHistoryInput = z.infer<typeof exportDailyHistorySchema>;
 
 export type HistoryEntryView = {
 	id: string;
@@ -74,6 +80,8 @@ export type HistoryEntryView = {
 	effectiveDate: string;
 	isBackdated: boolean;
 	groupId: string | null;
+	level: string | null;
+	levelOrder: number | null;
 };
 
 export type GraphBucketView = {
