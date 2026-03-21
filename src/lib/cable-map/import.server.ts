@@ -418,7 +418,7 @@ function getFileType(fileName: string) {
 		);
 	}
 
-	return extension as "ods" | "xlsx" | "xls";
+	return extension as (typeof supportedWorkbookExtensions)[number];
 }
 
 // TODO: Add more file validation
