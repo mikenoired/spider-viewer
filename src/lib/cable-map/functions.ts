@@ -6,6 +6,8 @@ import {
 	dateRangeSchema,
 	deleteManualRoomSchema,
 	exportBackdatedSchema,
+	exportDailyHistorySchema,
+	exportHistorySchema,
 	saveRoomProgressSchema,
 } from "./shared";
 
@@ -76,7 +78,31 @@ export const getBackdatedHistory = createServerFn({ method: "GET" })
 		}
 
 		const { getHistoryEntries } = await import("./queries.server");
-		return getHistoryEntries(data, true);
+		return getHistoryEntries(data, {
+			backdatedOnly: true,
+		});
+	});
+
+export const downloadHistoryDocx = createServerFn({ method: "POST" })
+	.inputValidator(exportHistorySchema)
+	.handler(async ({ data }) => {
+		const session = await requireRole(["super-admin"]);
+
+		if (!canViewAudit(session.role)) {
+			throw new Error("Недостаточно прав для экспорта отчёта.");
+		}
+
+		const { createHistoryDocx } = await import("./history.server");
+		const buffer = await createHistoryDocx(data);
+		const fileName = data.fileName?.trim() || "history-report.docx";
+
+		return new Response(new Uint8Array(buffer), {
+			headers: {
+				"Content-Type":
+					"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+				"Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
+			},
+		});
 	});
 
 export const downloadBackdatedDocx = createServerFn({ method: "POST" })
@@ -91,6 +117,30 @@ export const downloadBackdatedDocx = createServerFn({ method: "POST" })
 		const { createBackdatedDocx } = await import("./history.server");
 		const buffer = await createBackdatedDocx(data);
 		const fileName = data.fileName?.trim() || "backdated-report.docx";
+
+		return new Response(new Uint8Array(buffer), {
+			headers: {
+				"Content-Type":
+					"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+				"Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
+			},
+		});
+	});
+
+export const downloadDailyHistoryDocx = createServerFn({ method: "POST" })
+	.inputValidator(exportDailyHistorySchema)
+	.handler(async ({ data }) => {
+		const session = await requireRole(["super-admin"]);
+
+		if (!canViewAudit(session.role)) {
+			throw new Error("Недостаточно прав для экспорта отчёта.");
+		}
+
+		const { createDailyHistoryDocx } = await import("./history.server");
+		const { buildDailyHistoryReportFileName } = await import("./report-utils");
+		const buffer = await createDailyHistoryDocx(data.level);
+		const fileName =
+			data.fileName?.trim() || buildDailyHistoryReportFileName(data.level);
 
 		return new Response(new Uint8Array(buffer), {
 			headers: {
