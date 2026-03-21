@@ -1,9 +1,18 @@
 "use client";
 
 import { Link } from "@tanstack/react-router";
-import { FileUpIcon, Layers2Icon, MapIcon, PercentIcon } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import {
+	DownloadIcon,
+	FileUpIcon,
+	Layers2Icon,
+	LoaderCircleIcon,
+	MapIcon,
+	PercentIcon,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -12,8 +21,11 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { canUploadSnapshot } from "@/lib/auth/shared";
+import { canUploadSnapshot, canViewAudit } from "@/lib/auth/shared";
+import { downloadDailyHistoryDocx } from "@/lib/cable-map/functions";
+import { buildDailyHistoryReportFileName } from "@/lib/cable-map/report-utils";
 import type { DashboardData } from "@/lib/cable-map/shared";
+import { downloadResponseFile } from "@/lib/utils";
 import { boardColumns, boardWidth } from "./config";
 import { LevelBandView } from "./level-band-view";
 import {
@@ -44,6 +56,9 @@ export function CableMapView({
 		null,
 	);
 	const releaseScrollLockFrameRef = useRef<number | null>(null);
+	const [exportingDailyReport, setExportingDailyReport] = useState(false);
+	const [exportingLevel, setExportingLevel] = useState<string | null>(null);
+	const canExportDailyReport = canViewAudit(role);
 
 	const syncScroll = useCallback((source: "title" | "header" | "body") => {
 		if (
@@ -93,6 +108,49 @@ export function CableMapView({
 			}
 		};
 	}, [data.snapshot, syncScroll]);
+
+	async function handleDailyReportExport(level?: string) {
+		if (!canExportDailyReport) {
+			return;
+		}
+
+		const fileName = buildDailyHistoryReportFileName(level);
+
+		if (level) {
+			setExportingLevel(level);
+		} else {
+			setExportingDailyReport(true);
+		}
+
+		try {
+			const response = await downloadDailyHistoryDocx({
+				data: {
+					fileName,
+					level: level ?? null,
+				},
+			});
+
+			if (!(response instanceof Response)) {
+				throw new Error("Сервер вернул неожиданный ответ при экспорте.");
+			}
+
+			await downloadResponseFile(response, fileName);
+		} catch (error) {
+			toast.error(
+				error instanceof Error
+					? error.message
+					: level
+						? `Не удалось выгрузить отчёт по уровню ${level}.`
+						: "Не удалось выгрузить ежедневный отчёт.",
+			);
+		} finally {
+			if (level) {
+				setExportingLevel((current) => (current === level ? null : current));
+			} else {
+				setExportingDailyReport(false);
+			}
+		}
+	}
 
 	if (!data.snapshot) {
 		return (
@@ -159,6 +217,29 @@ export function CableMapView({
 				</Card>
 			</div>
 
+			{canExportDailyReport ? (
+				<div className="px-4">
+					<div className="flex justify-end">
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => void handleDailyReportExport()}
+							disabled={exportingDailyReport || exportingLevel !== null}
+						>
+							{exportingDailyReport ? (
+								<LoaderCircleIcon
+									data-icon="inline-start"
+									className="animate-spin"
+								/>
+							) : (
+								<DownloadIcon data-icon="inline-start" />
+							)}
+							Выгрузить DOCX за день
+						</Button>
+					</div>
+				</div>
+			) : null}
+
 			<div className="flex flex-col">
 				<div
 					ref={titleScrollRef}
@@ -218,6 +299,14 @@ export function CableMapView({
 										bandIndex={index}
 										canEditProgress={canEditProgress}
 										canManageManualRooms={canManageManualRooms}
+										canExportDailyReport={canExportDailyReport}
+										isExportDisabled={
+											exportingDailyReport || exportingLevel !== null
+										}
+										isExportingReport={exportingLevel === band.level}
+										onExportDailyReport={() =>
+											void handleDailyReportExport(band.level)
+										}
 										isLast={index === levelBands.length - 1}
 									/>
 								))}
