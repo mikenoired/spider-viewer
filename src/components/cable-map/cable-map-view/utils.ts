@@ -8,7 +8,6 @@ import {
 	getPdfImportedRoomBlockHeight,
 	getPdfManualRoomBlockHeight,
 	getZonePriority,
-	isLevelValue,
 	minPdfRowHeight,
 	pdfRowVerticalInset,
 	shaftCapInset,
@@ -18,35 +17,33 @@ import type { GraphSide, LevelBand } from "./types";
 export function buildLevelBands(levels: DashboardData["levels"]): LevelBand[] {
 	let globalRowIndex = 0;
 
-	const rawBands = levels
-		.filter((level) => isLevelValue(level.level))
-		.map((level) => {
-			const dirtyGroups = sortGroupsForPdf(level.dirtyGroups);
-			const cleanGroups = sortGroupsForPdf(level.cleanGroups);
-			const rowCount = Math.max(dirtyGroups.length, cleanGroups.length, 1);
-			const rows = Array.from({ length: rowCount }, (_, rowIndex) => ({
-				dirtyGroup: dirtyGroups[rowIndex] ?? null,
-				cleanGroup: cleanGroups[rowIndex] ?? null,
-				globalRowIndex: globalRowIndex + rowIndex,
-				height:
-					getPdfRowHeight(
-						dirtyGroups[rowIndex] ?? null,
-						cleanGroups[rowIndex] ?? null,
-					) +
-					pdfRowVerticalInset * 2,
-				startY: 0,
-			}));
+	const rawBands = levels.map((level) => {
+		const dirtyGroups = sortGroupsForPdf(level.dirtyGroups);
+		const cleanGroups = sortGroupsForPdf(level.cleanGroups);
+		const rowCount = Math.max(dirtyGroups.length, cleanGroups.length, 1);
+		const rows = Array.from({ length: rowCount }, (_, rowIndex) => ({
+			dirtyGroup: dirtyGroups[rowIndex] ?? null,
+			cleanGroup: cleanGroups[rowIndex] ?? null,
+			globalRowIndex: globalRowIndex + rowIndex,
+			height:
+				getPdfRowHeight(
+					dirtyGroups[rowIndex] ?? null,
+					cleanGroups[rowIndex] ?? null,
+				) +
+				pdfRowVerticalInset * 2,
+			startY: 0,
+		}));
 
-			globalRowIndex += rowCount;
+		globalRowIndex += rowCount;
 
-			return {
-				level: level.level,
-				levelOrder: level.levelOrder,
-				rows,
-				rowCount,
-				startY: 0,
-			} satisfies LevelBand;
-		});
+		return {
+			level: level.level,
+			levelOrder: level.levelOrder,
+			rows,
+			rowCount,
+			startY: 0,
+		} satisfies LevelBand;
+	});
 
 	let boardOffset = 0;
 

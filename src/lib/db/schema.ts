@@ -1,7 +1,9 @@
+import { sql } from "drizzle-orm";
 import {
 	boolean,
 	date,
 	doublePrecision,
+	index,
 	integer,
 	jsonb,
 	pgEnum,
@@ -43,81 +45,96 @@ export const users = pgTable(
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
-export const importSnapshots = pgTable("import_snapshots", {
-	id: uuid("id").defaultRandom().primaryKey(),
-	fileName: text("file_name").notNull(),
-	fileType: snapshotSourceTypeEnum("file_type").notNull(),
-	checksum: text("checksum").notNull(),
-	importedByUserId: uuid("imported_by_user_id")
-		.notNull()
-		.references(() => users.id, { onDelete: "restrict" }),
-	rowCount: integer("row_count").notNull().default(0),
-	isActive: boolean("is_active").notNull().default(false),
-	summary: jsonb("summary")
-		.$type<{
-			levels: string[];
-			sides: Array<{
-				side: "dirty" | "clean";
-				groupCount: number;
-				roomCount: number;
-			}>;
-		}>()
-		.notNull()
-		.default({
-			levels: [],
-			sides: [],
-		}),
-	createdAt: timestamp("created_at", { withTimezone: true })
-		.notNull()
-		.defaultNow(),
-	updatedAt: timestamp("updated_at", { withTimezone: true })
-		.notNull()
-		.defaultNow(),
-});
+export const importSnapshots = pgTable(
+	"import_snapshots",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		fileName: text("file_name").notNull(),
+		fileType: snapshotSourceTypeEnum("file_type").notNull(),
+		checksum: text("checksum").notNull(),
+		importedByUserId: uuid("imported_by_user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		rowCount: integer("row_count").notNull().default(0),
+		isActive: boolean("is_active").notNull().default(false),
+		summary: jsonb("summary")
+			.$type<{
+				levels: string[];
+				sides: Array<{
+					side: "dirty" | "clean";
+					groupCount: number;
+					roomCount: number;
+				}>;
+			}>()
+			.notNull()
+			.default({
+				levels: [],
+				sides: [],
+			}),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [
+		index("import_snapshots_active_idx").on(table.isActive),
+		uniqueIndex("import_snapshots_single_active_unique")
+			.on(table.isActive)
+			.where(sql`${table.isActive} = true`),
+	],
+);
 
-export const importedCableRows = pgTable("imported_cable_rows", {
-	id: uuid("id").defaultRandom().primaryKey(),
-	snapshotId: uuid("snapshot_id")
-		.notNull()
-		.references(() => importSnapshots.id, { onDelete: "cascade" }),
-	sourceRowIndex: integer("source_row_index").notNull(),
-	cableLabel: text("cable_label").notNull(),
-	cableJournal: text("cable_journal").notNull().default(""),
-	cableNumber: text("cable_number").notNull().default(""),
-	repeatFrom: text("repeat_from").notNull().default(""),
-	repeatTo: text("repeat_to").notNull().default(""),
-	repeatKks: text("repeat_kks").notNull().default(""),
-	fromRoom: text("from_room").notNull().default(""),
-	fromLocation: text("from_location").notNull().default(""),
-	fromEquipment: text("from_equipment").notNull().default(""),
-	toRoom: text("to_room").notNull().default(""),
-	threadLength: doublePrecision("thread_length").notNull().default(0),
-	threadCount: integer("thread_count").notNull().default(0),
-	totalLength: doublePrecision("total_length").notNull().default(0),
-	level: text("level").notNull().default(""),
-	levelOrder: doublePrecision("level_order").notNull().default(0),
-	fromZone: text("from_zone").notNull().default(""),
-	toZone: text("to_zone").notNull().default(""),
-	graphSide: graphSideEnum("graph_side").notNull(),
-	graphSubzone: graphSubzoneEnum("graph_subzone"),
-	farthestShaft: integer("farthest_shaft"),
-	shaftValues: jsonb("shaft_values")
-		.$type<
-			Array<{
-				column: number;
-				label: string;
-				value: string;
-				shaft: number;
-			}>
-		>()
-		.notNull()
-		.default([]),
-	route: text("route").notNull().default(""),
-	rawRow: jsonb("raw_row").$type<string[]>().notNull().default([]),
-	createdAt: timestamp("created_at", { withTimezone: true })
-		.notNull()
-		.defaultNow(),
-});
+export const importedCableRows = pgTable(
+	"imported_cable_rows",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		snapshotId: uuid("snapshot_id")
+			.notNull()
+			.references(() => importSnapshots.id, { onDelete: "cascade" }),
+		sourceRowIndex: integer("source_row_index").notNull(),
+		cableLabel: text("cable_label").notNull(),
+		cableJournal: text("cable_journal").notNull().default(""),
+		cableNumber: text("cable_number").notNull().default(""),
+		repeatFrom: text("repeat_from").notNull().default(""),
+		repeatTo: text("repeat_to").notNull().default(""),
+		repeatKks: text("repeat_kks").notNull().default(""),
+		fromRoom: text("from_room").notNull().default(""),
+		fromLocation: text("from_location").notNull().default(""),
+		fromEquipment: text("from_equipment").notNull().default(""),
+		toRoom: text("to_room").notNull().default(""),
+		threadLength: doublePrecision("thread_length").notNull().default(0),
+		threadCount: integer("thread_count").notNull().default(0),
+		totalLength: doublePrecision("total_length").notNull().default(0),
+		level: text("level").notNull().default(""),
+		levelOrder: doublePrecision("level_order").notNull().default(0),
+		fromZone: text("from_zone").notNull().default(""),
+		toZone: text("to_zone").notNull().default(""),
+		graphSide: graphSideEnum("graph_side").notNull(),
+		graphSubzone: graphSubzoneEnum("graph_subzone"),
+		farthestShaft: integer("farthest_shaft"),
+		shaftValues: jsonb("shaft_values")
+			.$type<
+				Array<{
+					column: number;
+					label: string;
+					value: string;
+					shaft: number;
+				}>
+			>()
+			.notNull()
+			.default([]),
+		route: text("route").notNull().default(""),
+		rawRow: jsonb("raw_row").$type<string[]>().notNull().default([]),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [
+		index("imported_cable_rows_snapshot_id_idx").on(table.snapshotId),
+	],
+);
 
 export const graphGroups = pgTable(
 	"graph_groups",
@@ -153,6 +170,12 @@ export const graphGroups = pgTable(
 			.defaultNow(),
 	},
 	(table) => [
+		index("graph_groups_snapshot_sort_idx").on(
+			table.snapshotId,
+			table.levelOrder,
+			table.graphSide,
+			table.sourceZone,
+		),
 		uniqueIndex("graph_groups_snapshot_group_key_unique").on(
 			table.snapshotId,
 			table.groupKey,
@@ -189,6 +212,12 @@ export const graphGroupRooms = pgTable(
 			.defaultNow(),
 	},
 	(table) => [
+		index("graph_group_rooms_snapshot_group_sort_idx").on(
+			table.snapshotId,
+			table.groupId,
+			table.roomRole,
+			table.sortOrder,
+		),
 		uniqueIndex("graph_group_rooms_unique").on(
 			table.groupId,
 			table.roomRole,
@@ -223,33 +252,45 @@ export const manualGraphRooms = pgTable(
 	],
 );
 
-export const changeAuditLogs = pgTable("change_audit_logs", {
-	id: uuid("id").defaultRandom().primaryKey(),
-	snapshotId: uuid("snapshot_id").references(() => importSnapshots.id, {
-		onDelete: "set null",
-	}),
-	groupId: uuid("group_id").references(() => graphGroups.id, {
-		onDelete: "set null",
-	}),
-	roomId: uuid("room_id").references(() => graphGroupRooms.id, {
-		onDelete: "set null",
-	}),
-	roomName: text("room_name").notNull(),
-	userId: uuid("user_id")
-		.notNull()
-		.references(() => users.id, { onDelete: "restrict" }),
-	userLogin: text("user_login").notNull(),
-	changedAt: timestamp("changed_at", { withTimezone: true })
-		.notNull()
-		.defaultNow(),
-	effectiveDate: date("effective_date", { mode: "string" }).notNull(),
-	isBackdated: boolean("is_backdated").notNull().default(false),
-	oldProgress: integer("old_progress").notNull(),
-	newProgress: integer("new_progress").notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true })
-		.notNull()
-		.defaultNow(),
-});
+export const changeAuditLogs = pgTable(
+	"change_audit_logs",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		snapshotId: uuid("snapshot_id").references(() => importSnapshots.id, {
+			onDelete: "set null",
+		}),
+		groupId: uuid("group_id").references(() => graphGroups.id, {
+			onDelete: "set null",
+		}),
+		roomId: uuid("room_id").references(() => graphGroupRooms.id, {
+			onDelete: "set null",
+		}),
+		roomName: text("room_name").notNull(),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		userLogin: text("user_login").notNull(),
+		changedAt: timestamp("changed_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		effectiveDate: date("effective_date", { mode: "string" }).notNull(),
+		isBackdated: boolean("is_backdated").notNull().default(false),
+		oldProgress: integer("old_progress").notNull(),
+		newProgress: integer("new_progress").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [
+		index("change_audit_logs_changed_at_idx").on(table.changedAt),
+		index("change_audit_logs_effective_date_idx").on(table.effectiveDate),
+		index("change_audit_logs_backdated_effective_changed_idx").on(
+			table.isBackdated,
+			table.effectiveDate,
+			table.changedAt,
+		),
+	],
+);
 
 export type ImportSnapshot = typeof importSnapshots.$inferSelect;
 export type ImportedCableRow = typeof importedCableRows.$inferSelect;
