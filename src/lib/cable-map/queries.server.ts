@@ -20,6 +20,11 @@ import type {
 } from "./shared";
 import { shaftBucketLabels } from "./shared";
 
+type HistoryQueryOptions = {
+	backdatedOnly?: boolean;
+	level?: string | null;
+};
+
 function toIsoString(value: Date | string | null | undefined) {
 	if (!value) {
 		return "";
@@ -339,10 +344,13 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 	};
 }
 
-function buildDateConditions(range?: DateRangeInput, backdatedOnly = false) {
+function buildHistoryConditions(
+	range?: DateRangeInput,
+	options: HistoryQueryOptions = {},
+) {
 	const conditions = [];
 
-	if (backdatedOnly) {
+	if (options.backdatedOnly) {
 		conditions.push(eq(changeAuditLogs.isBackdated, true));
 	}
 
@@ -354,15 +362,19 @@ function buildDateConditions(range?: DateRangeInput, backdatedOnly = false) {
 		conditions.push(lte(changeAuditLogs.effectiveDate, range.to));
 	}
 
+	if (options.level?.trim()) {
+		conditions.push(eq(graphGroups.level, options.level.trim()));
+	}
+
 	return conditions;
 }
 
 export async function getHistoryEntries(
 	range?: DateRangeInput,
-	backdatedOnly = false,
+	options: HistoryQueryOptions = {},
 ) {
 	const db = getDb();
-	const conditions = buildDateConditions(range, backdatedOnly);
+	const conditions = buildHistoryConditions(range, options);
 	const result = await db
 		.select({
 			id: changeAuditLogs.id,
@@ -374,8 +386,11 @@ export async function getHistoryEntries(
 			effectiveDate: changeAuditLogs.effectiveDate,
 			isBackdated: changeAuditLogs.isBackdated,
 			groupId: changeAuditLogs.groupId,
+			level: graphGroups.level,
+			levelOrder: graphGroups.levelOrder,
 		})
 		.from(changeAuditLogs)
+		.leftJoin(graphGroups, eq(graphGroups.id, changeAuditLogs.groupId))
 		.where(conditions.length > 0 ? and(...conditions) : undefined)
 		.orderBy(desc(changeAuditLogs.changedAt));
 
@@ -391,6 +406,8 @@ export async function getHistoryEntries(
 				effectiveDate: entry.effectiveDate,
 				isBackdated: entry.isBackdated,
 				groupId: entry.groupId,
+				level: entry.level ?? null,
+				levelOrder: entry.levelOrder ?? null,
 			}) satisfies HistoryEntryView,
 	);
 }

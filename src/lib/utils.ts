@@ -38,3 +38,16 @@ export function enToRuVisual(text: string) {
 		.map((char) => enToRuMap[char] ?? char)
 		.join("");
 }
+
+export async function downloadResponseFile(
+	response: Response,
+	fileName: string,
+) {
+	const blob = await response.blob();
+	const objectUrl = URL.createObjectURL(blob);
+	const link = document.createElement("a");
+	link.href = objectUrl;
+	link.download = fileName;
+	link.click();
+	URL.revokeObjectURL(objectUrl);
+}

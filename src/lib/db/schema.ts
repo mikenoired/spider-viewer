@@ -17,6 +17,7 @@ import { userRoles } from "@/lib/auth/shared";
 
 export const userRoleEnum = pgEnum("user_role", userRoles);
 export const snapshotSourceTypeEnum = pgEnum("snapshot_source_type", [
+	// Keep ODS for already stored snapshots; new uploads are limited in app code.
 	"ods",
 	"xlsx",
 	"xls",

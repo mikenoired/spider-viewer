@@ -1,4 +1,11 @@
+import { DownloadIcon, LoaderCircleIcon } from "lucide-react";
 import type { CSSProperties } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { boardColumns } from "./config";
 import { PathArea } from "./path-layer";
@@ -10,12 +17,20 @@ export function LevelBandView({
 	bandIndex,
 	canEditProgress,
 	canManageManualRooms,
+	canExportDailyReport,
+	isExportDisabled,
+	isExportingReport,
+	onExportDailyReport,
 	isLast,
 }: {
 	band: LevelBand;
 	bandIndex: number;
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
+	canExportDailyReport: boolean;
+	isExportDisabled: boolean;
+	isExportingReport: boolean;
+	onExportDailyReport: () => void;
 	isLast: boolean;
 }) {
 	const isFirst = bandIndex === 0;
@@ -44,8 +59,31 @@ export function LevelBandView({
 					} satisfies CSSProperties
 				}
 			>
-				<div className="text-3xl font-semibold leading-none tracking-[-0.03em] text-zinc-900 dark:text-zinc-100">
-					{band.level}
+				<div className="flex w-full flex-col items-center gap-3">
+					<div className="text-3xl font-semibold leading-none tracking-[-0.03em] text-zinc-900 dark:text-zinc-100">
+						{band.level}
+					</div>
+					{canExportDailyReport ? (
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Button
+									type="button"
+									size="icon-sm"
+									variant="outline"
+									onClick={onExportDailyReport}
+									disabled={isExportDisabled}
+									aria-label={`Выгрузить DOCX по уровню ${band.level}`}
+								>
+									{isExportingReport ? (
+										<LoaderCircleIcon className="animate-spin" />
+									) : (
+										<DownloadIcon />
+									)}
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent>Выгрузить DOCX</TooltipContent>
+						</Tooltip>
+					) : null}
 				</div>
 			</div>
 
