@@ -16,7 +16,7 @@ import {
 	TagIcon,
 	UserIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -202,6 +202,17 @@ export function HistoryPanel({
 	const [range, setRange] = useState<DateRange>(createTodayRange);
 	const [sortKey, setSortKey] = useState<SortKey>("changedAt");
 	const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+	const [isCompact, setIsCompact] = useState(false);
+
+	useEffect(() => {
+		const mediaQuery = window.matchMedia("(max-width: 767px)");
+		const updateIsCompact = () => setIsCompact(mediaQuery.matches);
+
+		updateIsCompact();
+		mediaQuery.addEventListener("change", updateIsCompact);
+
+		return () => mediaQuery.removeEventListener("change", updateIsCompact);
+	}, []);
 
 	const rangePayload = useMemo(
 		() =>
@@ -295,23 +306,31 @@ export function HistoryPanel({
 					<CardDescription>{description}</CardDescription>
 				</div>
 
-				<div className="flex flex-wrap items-center gap-2">
+				<div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
 					<Popover>
 						<PopoverTrigger asChild>
-							<Button type="button" variant="outline">
+							<Button
+								type="button"
+								variant="outline"
+								className="h-10 w-full justify-between sm:h-8 sm:w-auto sm:justify-center"
+							>
 								<CalendarDaysIcon data-icon="inline-start" />
 								{formatRangeLabel(range)}
 							</Button>
 						</PopoverTrigger>
-						<PopoverContent align="end" className="w-auto">
+						<PopoverContent
+							align="end"
+							className="w-[min(22rem,calc(100vw-2rem))]"
+						>
 							<PopoverHeader>
 								<PopoverTitle>Диапазон дат</PopoverTitle>
 							</PopoverHeader>
 							<Calendar
 								mode="range"
-								numberOfMonths={2}
+								numberOfMonths={isCompact ? 1 : 2}
 								selected={range}
 								onSelect={(value) => setRange(value ?? createTodayRange())}
+								className="w-full"
 							/>
 						</PopoverContent>
 					</Popover>
@@ -321,6 +340,7 @@ export function HistoryPanel({
 						variant="outline"
 						onClick={() => reloadEntries(rangePayload)}
 						disabled={pending}
+						className="h-10 w-full sm:h-8 sm:w-auto"
 					>
 						{pending ? (
 							<LoaderCircleIcon
@@ -347,11 +367,17 @@ export function HistoryPanel({
 							});
 						}}
 						disabled={pending}
+						className="h-10 w-full sm:h-8 sm:w-auto"
 					>
 						Сбросить
 					</Button>
 
-					<Button type="button" onClick={handleExport} disabled={exporting}>
+					<Button
+						type="button"
+						onClick={handleExport}
+						disabled={exporting}
+						className="h-10 w-full sm:h-8 sm:w-auto"
+					>
 						{exporting ? (
 							<LoaderCircleIcon
 								data-icon="inline-start"
@@ -366,7 +392,7 @@ export function HistoryPanel({
 			</CardHeader>
 			<CardContent>
 				<Table>
-					<TableHeader>
+					<TableHeader className="hidden sm:table-header-group">
 						<TableRow>
 							{sortableColumns.map((column) => {
 								const active = sortKey === column.key;
@@ -393,19 +419,63 @@ export function HistoryPanel({
 							})}
 						</TableRow>
 					</TableHeader>
-					<TableBody>
+					<TableBody className="block space-y-3 sm:table-row-group sm:space-y-0">
 						{sortedEntries.length > 0 ? (
 							sortedEntries.map((entry) => (
-								<TableRow key={entry.id}>
-									<TableCell>{formatTimestamp(entry.changedAt)}</TableCell>
-									<TableCell>{entry.effectiveDate}</TableCell>
-									<TableCell>{entry.userLogin}</TableCell>
-									<TableCell className="font-medium">
+								<TableRow
+									key={entry.id}
+									className="block rounded-xl border sm:table-row sm:rounded-none sm:border-x-0"
+								>
+									<TableCell
+										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+										data-label="Изменено"
+									>
+										<span className="text-right sm:text-left">
+											{formatTimestamp(entry.changedAt)}
+										</span>
+									</TableCell>
+									<TableCell
+										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+										data-label="Дата действия"
+									>
+										<span className="text-right sm:text-left">
+											{entry.effectiveDate}
+										</span>
+									</TableCell>
+									<TableCell
+										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+										data-label="Пользователь"
+									>
+										<span className="text-right sm:text-left">
+											{entry.userLogin}
+										</span>
+									</TableCell>
+									<TableCell
+										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 font-medium before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+										data-label="Помещение"
+									>
 										{entry.roomName}
 									</TableCell>
-									<TableCell>{entry.oldProgress}%</TableCell>
-									<TableCell>{entry.newProgress}%</TableCell>
-									<TableCell>
+									<TableCell
+										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+										data-label="Было"
+									>
+										<span className="text-right sm:text-left">
+											{entry.oldProgress}%
+										</span>
+									</TableCell>
+									<TableCell
+										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+										data-label="Стало"
+									>
+										<span className="text-right sm:text-left">
+											{entry.newProgress}%
+										</span>
+									</TableCell>
+									<TableCell
+										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+										data-label="Тип"
+									>
 										{entry.isBackdated ? (
 											<Badge variant="destructive">Задним числом</Badge>
 										) : (
@@ -418,7 +488,7 @@ export function HistoryPanel({
 							<TableRow>
 								<TableCell
 									colSpan={7}
-									className="h-32 text-center text-muted-foreground"
+									className="block h-auto px-4 py-8 text-center text-muted-foreground sm:table-cell sm:h-32"
 								>
 									За выбранный период записей не найдено.
 								</TableCell>
