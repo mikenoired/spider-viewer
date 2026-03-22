@@ -33,7 +33,7 @@ export function LeftZoneHeader() {
 	return (
 		<div className="grid h-11 grid-cols-[98px_minmax(0,1fr)] items-center gap-3 pb-1 text-center text-base font-semibold text-zinc-700 dark:text-zinc-300">
 			<div>{graphSubzoneLabels.dirty}</div>
-			<div>{graphSubzoneLabels.clean}</div>
+			<div />
 		</div>
 	);
 }
