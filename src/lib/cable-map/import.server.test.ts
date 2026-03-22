@@ -22,6 +22,14 @@ const workbookColumnIndexes = {
 } as const;
 
 function createWorkbookBuffer(rows: string[][], sheetName = "Общ") {
+	return createWorkbookBufferForType(rows, "xlsx", sheetName);
+}
+
+function createWorkbookBufferForType(
+	rows: string[][],
+	bookType: "ods" | "xlsx",
+	sheetName = "Общ",
+) {
 	const workbook = XLSX.utils.book_new();
 	const sheet = XLSX.utils.aoa_to_sheet(rows);
 
@@ -30,7 +38,7 @@ function createWorkbookBuffer(rows: string[][], sheetName = "Общ") {
 	return Buffer.from(
 		XLSX.write(workbook, {
 			type: "buffer",
-			bookType: "xlsx",
+			bookType,
 		}),
 	);
 }
@@ -75,6 +83,25 @@ describe("workbook import validation", () => {
 		);
 	});
 
+	it("accepts a valid ods upload", async () => {
+		const buffer = createWorkbookBufferForType(createWorkbookRows(), "ods");
+		const formData = new FormData();
+
+		formData.set(
+			"file",
+			new File([buffer], "report.ods", {
+				type: "application/vnd.oasis.opendocument.spreadsheet",
+			}),
+		);
+
+		const result = await ensureUploadFile(formData);
+
+		expect(result.fileType).toBe("ods");
+		expect(hasExpectedWorkbookSignature(result.fileType, result.buffer)).toBe(
+			true,
+		);
+	});
+
 	it("rejects an upload with an unexpected mime type", async () => {
 		const formData = new FormData();
 
@@ -111,6 +138,18 @@ describe("workbook import validation", () => {
 		expect(rows[0]?.fromRoom).toBe("А101");
 		expect(rows[0]?.threadCount).toBe(4);
 		expect(rows[0]?.graphSide).toBe("dirty");
+	});
+
+	it("parses a valid ods row", () => {
+		const rows = parseWorkbookRows(
+			"report.ods",
+			createWorkbookBufferForType(createWorkbookRows(), "ods"),
+		);
+
+		expect(rows).toHaveLength(1);
+		expect(rows[0]?.fromRoom).toBe("А101");
+		expect(rows[0]?.threadCount).toBe(4);
+		expect(rows[0]?.graphSubzone).toBe("dirty");
 	});
 
 	it("rejects a workbook without the expected sheet", () => {
