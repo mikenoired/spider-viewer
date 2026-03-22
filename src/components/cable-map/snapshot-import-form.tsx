@@ -40,7 +40,7 @@ export function SnapshotImportForm({
 		event.preventDefault();
 
 		if (!file) {
-			toast.error("Выберите файл `.xlsx` или `.xls`.");
+			toast.error("Выберите файл `.ods`, `.xlsx` или `.xls`.");
 			return;
 		}
 
@@ -76,8 +76,8 @@ export function SnapshotImportForm({
 				<CardHeader>
 					<CardTitle>Импорт графа из workbook</CardTitle>
 					<CardDescription>
-						Поддерживаются только файлы Microsoft Excel. В обработку идёт только
-						лист {'"Общ"'}.
+						Поддерживаются файлы Excel и LibreOffice Calc. В обработку идёт
+						только лист {'"Общ"'}.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -88,13 +88,13 @@ export function SnapshotImportForm({
 								<Input
 									id="workbook-file"
 									type="file"
-									accept=".xlsx,.xls"
+									accept=".ods,.xlsx,.xls"
 									onChange={(event) => setFile(event.target.files?.[0] ?? null)}
 								/>
 								<FieldDescription>
 									После повторного импорта активный snapshot будет заменён
-									новым. Поддерживаются только корректные workbook-файлы до 15
-									МБ.
+									новым. Поддерживаются корректные `.ods`, `.xlsx`, `.xls` файлы
+									до 15 МБ.
 								</FieldDescription>
 							</Field>
 						</FieldGroup>
