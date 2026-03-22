@@ -263,7 +263,7 @@ export function GroupProgressSheet({
 
 				<SheetContent
 					side="bottom"
-					className="max-h-[85vh] w-full rounded-t-[28px] border-x border-t sm:max-w-none"
+					className="max-h-[85vh] w-full rounded-t-[28px] border-x border-t pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:max-w-none"
 				>
 					<SheetHeader>
 						<SheetTitle>Помещения уровня {group.level}</SheetTitle>
@@ -276,7 +276,7 @@ export function GroupProgressSheet({
 						</SheetDescription>
 					</SheetHeader>
 
-					<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 pb-4">
+					<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 pb-2">
 						<div className="flex flex-wrap items-center gap-2">
 							<Badge variant="outline">Кабелей: {group.cableCount}</Badge>
 							<Badge variant="outline">Ниток: {group.threadCount}</Badge>
@@ -289,11 +289,12 @@ export function GroupProgressSheet({
 						</div>
 
 						{canEdit ? (
-							<div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-muted/30 p-3">
+							<div className="grid gap-2 rounded-2xl border bg-muted/30 p-3 sm:flex sm:flex-wrap sm:items-center">
 								<Button
 									type="button"
 									onClick={handleSave}
 									disabled={!isDirty || pending}
+									className="h-10 sm:h-8"
 								>
 									{pending ? (
 										<LoaderCircleIcon
@@ -308,7 +309,11 @@ export function GroupProgressSheet({
 
 								<Popover>
 									<PopoverTrigger asChild>
-										<Button type="button" variant="outline">
+										<Button
+											type="button"
+											variant="outline"
+											className="h-10 justify-between sm:h-8 sm:justify-center"
+										>
 											<CalendarIcon data-icon="inline-start" />
 											{effectiveDate
 												? format(
@@ -319,7 +324,10 @@ export function GroupProgressSheet({
 												: "Выбрать дату"}
 										</Button>
 									</PopoverTrigger>
-									<PopoverContent align="start" className="w-auto">
+									<PopoverContent
+										align="start"
+										className="w-[min(22rem,calc(100vw-2rem))]"
+									>
 										<PopoverHeader>
 											<PopoverTitle>Дата изменения</PopoverTitle>
 										</PopoverHeader>
@@ -333,6 +341,7 @@ export function GroupProgressSheet({
 														: getTodayInMoscow(),
 												)
 											}
+											className="w-full"
 										/>
 									</PopoverContent>
 								</Popover>
@@ -348,6 +357,7 @@ export function GroupProgressSheet({
 										);
 									}}
 									disabled={!isDirty || pending}
+									className="h-10 sm:h-8"
 								>
 									<RotateCcwIcon data-icon="inline-start" />
 									Отменить изменения
@@ -363,7 +373,7 @@ export function GroupProgressSheet({
 						<Separator />
 
 						<Table>
-							<TableHeader>
+							<TableHeader className="hidden sm:table-header-group">
 								<TableRow>
 									<TableHead>Помещение</TableHead>
 									<TableHead>Длина, общая</TableHead>
@@ -374,17 +384,47 @@ export function GroupProgressSheet({
 									</TableHead>
 								</TableRow>
 							</TableHeader>
-							<TableBody>
+							<TableBody className="block space-y-3 sm:table-row-group sm:space-y-0">
 								{draftRooms.map((room) => (
-									<TableRow key={room.id}>
-										<TableCell className="font-medium">
+									<TableRow
+										key={room.id}
+										className="block rounded-xl border sm:table-row sm:rounded-none sm:border-x-0"
+									>
+										<TableCell
+											className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 font-medium before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+											data-label="Помещение"
+										>
 											{room.roomName}
 										</TableCell>
-										<TableCell>{Math.round(room.totalLength)} м</TableCell>
-										<TableCell>{room.threadCount}</TableCell>
-										<TableCell>{room.cableCount}</TableCell>
-										<TableCell className="sticky right-0 bg-background">
-											<div className="grid min-w-64 grid-cols-[1fr_84px] items-center gap-3">
+										<TableCell
+											className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+											data-label="Длина, общая"
+										>
+											<span className="text-right sm:text-left">
+												{Math.round(room.totalLength)} м
+											</span>
+										</TableCell>
+										<TableCell
+											className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+											data-label="Кол-во ниток"
+										>
+											<span className="text-right sm:text-left">
+												{room.threadCount}
+											</span>
+										</TableCell>
+										<TableCell
+											className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+											data-label="Кабелей"
+										>
+											<span className="text-right sm:text-left">
+												{room.cableCount}
+											</span>
+										</TableCell>
+										<TableCell
+											className="whitespace-normal px-3 py-3 before:mb-2 before:block before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:sticky sm:right-0 sm:table-cell sm:bg-background sm:p-2 sm:before:hidden"
+											data-label="Прогресс"
+										>
+											<div className="grid min-w-0 gap-3 sm:min-w-64 sm:grid-cols-[1fr_84px] sm:items-center">
 												<Slider
 													value={[room.progress]}
 													onValueChange={(value) =>
@@ -400,6 +440,7 @@ export function GroupProgressSheet({
 													min={0}
 													max={100}
 													value={room.progress}
+													className="h-10 sm:h-8"
 													onChange={(event) =>
 														updateRoomProgress(
 															room.id,
