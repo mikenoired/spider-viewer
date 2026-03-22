@@ -6,7 +6,40 @@ umask 077
 DATABASE_URL="${DATABASE_URL:-}"
 DB_BACKUP_DIR="${DB_BACKUP_DIR:-/opt/spider-viewer/backups/postgres}"
 DB_BACKUP_RETENTION_DAYS="${DB_BACKUP_RETENTION_DAYS:-7}"
+PG_DUMP_BIN="${PG_DUMP_BIN:-}"
 BACKUP_PREFIX="spider-viewer-postgres"
+
+detect_pg_dump_bin() {
+	local candidate
+	local -a versioned_bins=()
+
+	if [[ -n "$PG_DUMP_BIN" ]]; then
+		if [[ ! -x "$PG_DUMP_BIN" ]]; then
+			echo "PG_DUMP_BIN does not exist or is not executable: $PG_DUMP_BIN" >&2
+			exit 1
+		fi
+
+		echo "$PG_DUMP_BIN"
+		return
+	fi
+
+	while IFS= read -r candidate; do
+		versioned_bins+=("$candidate")
+	done < <(compgen -G "/usr/lib/postgresql/*/bin/pg_dump" | sort -V)
+
+	if (( ${#versioned_bins[@]} > 0 )); then
+		echo "${versioned_bins[-1]}"
+		return
+	fi
+
+	if candidate="$(command -v pg_dump 2>/dev/null)"; then
+		echo "$candidate"
+		return
+	fi
+
+	echo "pg_dump was not found. Install PostgreSQL client tools or set PG_DUMP_BIN." >&2
+	exit 1
+}
 
 if [[ -z "$DATABASE_URL" ]]; then
 	echo "DATABASE_URL is required for database backups." >&2
@@ -19,6 +52,8 @@ if ! [[ "$DB_BACKUP_RETENTION_DAYS" =~ ^[0-9]+$ ]] || (( DB_BACKUP_RETENTION_DAY
 fi
 
 mkdir -p "$DB_BACKUP_DIR"
+
+PG_DUMP_BIN="$(detect_pg_dump_bin)"
 
 lock_file="$DB_BACKUP_DIR/.backup.lock"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -38,7 +73,7 @@ cleanup() {
 
 trap cleanup EXIT
 
-pg_dump \
+"$PG_DUMP_BIN" \
 	--dbname="$DATABASE_URL" \
 	--format=custom \
 	--compress=9 \
