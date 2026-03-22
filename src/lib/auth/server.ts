@@ -22,12 +22,21 @@ function getJwtSecret() {
 	return new TextEncoder().encode(secret);
 }
 
+function shouldUseSecureAuthCookie() {
+	const configuredValue = process.env.AUTH_COOKIE_SECURE?.trim().toLowerCase();
+
+	if (configuredValue === "true") return true;
+	if (configuredValue === "false") return false;
+
+	return process.env.NODE_ENV === "production";
+}
+
 function getAuthCookieOptions(): CookieSerializeOptions {
 	return {
 		httpOnly: true,
 		path: "/",
 		sameSite: "lax",
-		secure: process.env.NODE_ENV === "production",
+		secure: shouldUseSecureAuthCookie(),
 		maxAge: AUTH_COOKIE_MAX_AGE,
 	};
 }
