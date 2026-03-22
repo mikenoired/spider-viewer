@@ -4,10 +4,13 @@
 ## Режим разработки
 ```bash
 bun install # Установка зависимостей
-cp .env.example .env # Создание файла с секретными ключами
+cp env.example .env # Создание файла с секретными ключами
 # Меняйте значение JWT_SECRET на новое, например через комманду `openssl rand -hex 64`
 docker compose up -d # Запуск базы данных
 bun run db:push # Встраивание имеющейся схемы в БД
 bun run db:seed:test-users # Вставка новых пользователей
 bun dev # Запуск проекта
 ```
+
+## Продакшн-деплой
+Production деплой по SSH-ключу и GitHub Actions описан в [docs/deploy-production.md](docs/deploy-production.md).
