@@ -22,6 +22,14 @@ const workbookColumnIndexes = {
 } as const;
 
 function createWorkbookBuffer(rows: string[][], sheetName = "Общ") {
+	return createWorkbookBufferOfType(rows, "xlsx", sheetName);
+}
+
+function createWorkbookBufferOfType(
+	rows: string[][],
+	bookType: "ods" | "xlsx",
+	sheetName = "Общ",
+) {
 	const workbook = XLSX.utils.book_new();
 	const sheet = XLSX.utils.aoa_to_sheet(rows);
 
@@ -30,7 +38,7 @@ function createWorkbookBuffer(rows: string[][], sheetName = "Общ") {
 	return Buffer.from(
 		XLSX.write(workbook, {
 			type: "buffer",
-			bookType: "xlsx",
+			bookType,
 		}),
 	);
 }
@@ -70,6 +78,25 @@ describe("workbook import validation", () => {
 		const result = await ensureUploadFile(formData);
 
 		expect(result.fileType).toBe("xlsx");
+		expect(hasExpectedWorkbookSignature(result.fileType, result.buffer)).toBe(
+			true,
+		);
+	});
+
+	it("accepts a valid ods upload", async () => {
+		const buffer = createWorkbookBufferOfType(createWorkbookRows(), "ods");
+		const formData = new FormData();
+
+		formData.set(
+			"file",
+			new File([buffer], "report.ods", {
+				type: "application/vnd.oasis.opendocument.spreadsheet",
+			}),
+		);
+
+		const result = await ensureUploadFile(formData);
+
+		expect(result.fileType).toBe("ods");
 		expect(hasExpectedWorkbookSignature(result.fileType, result.buffer)).toBe(
 			true,
 		);
