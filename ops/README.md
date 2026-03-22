@@ -66,6 +66,8 @@ SHUTDOWN_TIMEOUT_MS=30000
 HEALTHCHECK_REDIS_REQUIRED=false
 DB_BACKUP_DIR=/opt/spider-viewer/backups/postgres
 DB_BACKUP_RETENTION_DAYS=7
+# Optional: force a specific pg_dump binary
+# PG_DUMP_BIN=/usr/lib/postgresql/16/bin/pg_dump
 ```
 
 Generate a secret:
@@ -200,6 +202,7 @@ Rollback restarts the previous slot, waits for readiness, switches Nginx back, a
 - Backups run every 30 minutes through `spider-viewer-db-backup.timer`.
 - Dumps are written to `DB_BACKUP_DIR` in PostgreSQL custom format (`*.dump`).
 - Files older than `DB_BACKUP_RETENTION_DAYS` are deleted automatically after each successful backup.
+- If several PostgreSQL client versions are installed, the script prefers the newest `/usr/lib/postgresql/*/bin/pg_dump`; you can override it via `PG_DUMP_BIN`.
 
 Useful commands:
 
