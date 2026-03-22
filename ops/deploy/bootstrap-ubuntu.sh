@@ -5,6 +5,8 @@ APP_USER="${APP_USER:-spider}"
 APP_GROUP="${APP_GROUP:-$APP_USER}"
 BASE_DIR="${BASE_DIR:-/opt/spider-viewer}"
 SYSTEMD_UNIT_PATH="${SYSTEMD_UNIT_PATH:-/etc/systemd/system/spider-viewer@.service}"
+DB_BACKUP_SERVICE_PATH="${DB_BACKUP_SERVICE_PATH:-/etc/systemd/system/spider-viewer-db-backup.service}"
+DB_BACKUP_TIMER_PATH="${DB_BACKUP_TIMER_PATH:-/etc/systemd/system/spider-viewer-db-backup.timer}"
 NGINX_SITE_PATH="${NGINX_SITE_PATH:-/etc/nginx/sites-available/spider-viewer.conf}"
 NGINX_SITE_LINK="${NGINX_SITE_LINK:-/etc/nginx/sites-enabled/spider-viewer.conf}"
 NGINX_UPSTREAM_FILE="${NGINX_UPSTREAM_FILE:-/etc/nginx/spider-viewer-upstream.conf}"
@@ -14,16 +16,18 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 
 sudo apt-get update
-sudo apt-get install -y nginx curl rsync
+sudo apt-get install -y nginx curl rsync postgresql-client
 
 if ! id -u "$APP_USER" >/dev/null 2>&1; then
 	sudo useradd --system --create-home --shell /bin/bash "$APP_USER"
 fi
 
-sudo mkdir -p "$BASE_DIR/slots/blue" "$BASE_DIR/slots/green" "$ENV_DIR/slots"
+sudo mkdir -p "$BASE_DIR/slots/blue" "$BASE_DIR/slots/green" "$BASE_DIR/backups/postgres" "$ENV_DIR/slots"
 sudo chown -R "$APP_USER:$APP_GROUP" "$BASE_DIR"
 
 sudo install -m 0644 "$PROJECT_ROOT/ops/systemd/spider-viewer@.service" "$SYSTEMD_UNIT_PATH"
+sudo install -m 0644 "$PROJECT_ROOT/ops/systemd/spider-viewer-db-backup.service" "$DB_BACKUP_SERVICE_PATH"
+sudo install -m 0644 "$PROJECT_ROOT/ops/systemd/spider-viewer-db-backup.timer" "$DB_BACKUP_TIMER_PATH"
 sudo install -m 0644 "$PROJECT_ROOT/ops/nginx/spider-viewer.conf" "$NGINX_SITE_PATH"
 sudo ln -sfn "$NGINX_SITE_PATH" "$NGINX_SITE_LINK"
 
