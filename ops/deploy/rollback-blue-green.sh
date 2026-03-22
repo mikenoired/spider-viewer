@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 BASE_DIR="${BASE_DIR:-/opt/spider-viewer}"
 ACTIVE_SLOT_FILE="${ACTIVE_SLOT_FILE:-$BASE_DIR/active-slot}"
-NGINX_UPSTREAM_FILE="${NGINX_UPSTREAM_FILE:-/etc/nginx/conf.d/spider-viewer-upstream.conf}"
+NGINX_UPSTREAM_FILE="${NGINX_UPSTREAM_FILE:-/etc/nginx/spider-viewer-upstream.conf}"
 PORT_BLUE="${PORT_BLUE:-3101}"
 PORT_GREEN="${PORT_GREEN:-3102}"
 
@@ -29,6 +29,7 @@ if [[ ! -L "$target_current" ]]; then
 	exit 1
 fi
 
+sudo systemctl enable "spider-viewer@$target_slot" >/dev/null
 sudo systemctl restart "spider-viewer@$target_slot"
 
 for _ in {1..30}; do
@@ -41,6 +42,7 @@ done
 curl -fsS "http://127.0.0.1:$target_port/readyz" >/dev/null
 
 printf 'server 127.0.0.1:%s;\n' "$target_port" | sudo tee "$NGINX_UPSTREAM_FILE" >/dev/null
+sudo rm -f /etc/nginx/conf.d/spider-viewer-upstream.conf
 sudo ln -sfn "$target_current" "$BASE_DIR/current"
 echo "$target_slot" | sudo tee "$ACTIVE_SLOT_FILE" >/dev/null
 

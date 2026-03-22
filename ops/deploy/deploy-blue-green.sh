@@ -6,7 +6,7 @@ APP_USER="${APP_USER:-spider}"
 APP_GROUP="${APP_GROUP:-$APP_USER}"
 BASE_DIR="${BASE_DIR:-/opt/spider-viewer}"
 ENV_DIR="${ENV_DIR:-/etc/spider-viewer}"
-NGINX_UPSTREAM_FILE="${NGINX_UPSTREAM_FILE:-/etc/nginx/conf.d/spider-viewer-upstream.conf}"
+NGINX_UPSTREAM_FILE="${NGINX_UPSTREAM_FILE:-/etc/nginx/spider-viewer-upstream.conf}"
 ACTIVE_SLOT_FILE="${ACTIVE_SLOT_FILE:-$BASE_DIR/active-slot}"
 PORT_BLUE="${PORT_BLUE:-3101}"
 PORT_GREEN="${PORT_GREEN:-3102}"
@@ -57,6 +57,7 @@ EOF
 
 sudo -u "$APP_USER" bash -lc "set -a && source '$shared_env_file' && set +a && cd '$release_dir' && bun install --frozen-lockfile && bun run build && bun run db:migrate"
 sudo ln -sfn "$release_dir" "$current_link"
+sudo systemctl enable "spider-viewer@$inactive_slot" >/dev/null
 sudo systemctl restart "spider-viewer@$inactive_slot"
 
 for _ in {1..30}; do
@@ -69,6 +70,7 @@ done
 curl -fsS "http://127.0.0.1:$inactive_port/readyz" >/dev/null
 
 printf 'server 127.0.0.1:%s;\n' "$inactive_port" | sudo tee "$NGINX_UPSTREAM_FILE" >/dev/null
+sudo rm -f /etc/nginx/conf.d/spider-viewer-upstream.conf
 sudo ln -sfn "$current_link" "$BASE_DIR/current"
 echo "$inactive_slot" | sudo tee "$ACTIVE_SLOT_FILE" >/dev/null
 
