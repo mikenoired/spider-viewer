@@ -7,7 +7,7 @@ BASE_DIR="${BASE_DIR:-/opt/spider-viewer}"
 SYSTEMD_UNIT_PATH="${SYSTEMD_UNIT_PATH:-/etc/systemd/system/spider-viewer@.service}"
 NGINX_SITE_PATH="${NGINX_SITE_PATH:-/etc/nginx/sites-available/spider-viewer.conf}"
 NGINX_SITE_LINK="${NGINX_SITE_LINK:-/etc/nginx/sites-enabled/spider-viewer.conf}"
-NGINX_UPSTREAM_FILE="${NGINX_UPSTREAM_FILE:-/etc/nginx/conf.d/spider-viewer-upstream.conf}"
+NGINX_UPSTREAM_FILE="${NGINX_UPSTREAM_FILE:-/etc/nginx/spider-viewer-upstream.conf}"
 ENV_DIR="${ENV_DIR:-/etc/spider-viewer}"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,6 +40,7 @@ if [[ ! -f "$ENV_DIR/slots/green.env" ]]; then
 fi
 
 printf 'server 127.0.0.1:3101;\n' | sudo tee "$NGINX_UPSTREAM_FILE" >/dev/null
+sudo rm -f /etc/nginx/conf.d/spider-viewer-upstream.conf
 
 sudo nginx -t
 sudo systemctl daemon-reload
