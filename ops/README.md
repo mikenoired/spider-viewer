@@ -193,7 +193,15 @@ Rollback restarts the previous slot, waits for readiness, switches Nginx back, a
 
 ## HTTPS
 
-This setup currently targets plain HTTP on Nginx. After the app is stable, add TLS with Certbot or your existing reverse-proxy standard.
+Production is configured for:
+
+- `http://npp-spider.ru` -> `https://npp-spider.ru`
+- `http://www.npp-spider.ru` -> `https://npp-spider.ru`
+- `https://www.npp-spider.ru` -> `https://npp-spider.ru`
+- `https://npp-spider.ru` -> application
+
+Certificates are issued by Certbot for `npp-spider.ru` and `www.npp-spider.ru`.
+HSTS is enabled in soft mode with `max-age=2592000` and without `includeSubDomains` or `preload`.
 
 ## Health endpoints
 
