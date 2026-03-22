@@ -2,7 +2,7 @@
 
 import { useRouter } from "@tanstack/react-router";
 import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { type MouseEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
 	AlertDialog,
@@ -16,12 +16,6 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-	ContextMenu,
-	ContextMenuContent,
-	ContextMenuItem,
-	ContextMenuTrigger,
-} from "@/components/ui/context-menu";
 import {
 	Dialog,
 	DialogContent,
@@ -37,21 +31,6 @@ import type {
 	GraphManualRoomView,
 } from "@/lib/cable-map/shared";
 import { cn } from "@/lib/utils";
-
-function openContextMenuOnClick(event: MouseEvent<HTMLElement>) {
-	const target = event.currentTarget;
-	const rect = target.getBoundingClientRect();
-
-	target.dispatchEvent(
-		new MouseEvent("contextmenu", {
-			bubbles: true,
-			cancelable: true,
-			clientX: rect.left + rect.width / 2,
-			clientY: rect.top + rect.height / 2,
-			button: 2,
-		}),
-	);
-}
 
 export function ManualRoomBlock({
 	group,
@@ -141,90 +120,52 @@ export function ManualRoomBlock({
 					<div className="flex w-full flex-col gap-2 rounded-[8px] border border-[#d2b55a] bg-amber-200 dark:bg-amber-700 px-2 py-2 text-amber-950 dark:text-amber-100 shadow-sm">
 						<div className="flex flex-col gap-1">
 							{group.manualRooms.map((room) => (
-								<ContextMenu key={room.id}>
-									<ContextMenuTrigger asChild>
-										<button
-											type="button"
-											className={cn(
-												"rounded-[6px] border border-[#b89124]/40 bg-white/40 px-2 py-1 text-left text-xs font-semibold leading-4 break-keep transition",
-												canManage
-													? "cursor-pointer hover:bg-white/60"
-													: "cursor-default",
-											)}
-											onClick={(event) => {
-												if (!canManage) {
-													return;
-												}
+								<button
+									key={room.id}
+									type="button"
+									onClick={() => {
+										if (!canManage) {
+											return;
+										}
 
-												event.preventDefault();
-												openContextMenuOnClick(event);
-											}}
-										>
-											{room.roomName}
-										</button>
-									</ContextMenuTrigger>
-									{canManage ? (
-										<ContextMenuContent>
-											<ContextMenuItem
-												variant="destructive"
-												onSelect={() => setDeleteCandidate(room)}
-											>
-												<Trash2Icon />
-												Удалить
-											</ContextMenuItem>
-										</ContextMenuContent>
-									) : null}
-								</ContextMenu>
+										setDeleteCandidate(room);
+									}}
+									className={cn(
+										"min-w-0 rounded-[6px] border border-[#b89124]/40 bg-white/40 px-2 py-1.5 text-left text-xs font-semibold leading-4 break-words transition",
+										canManage
+											? "cursor-pointer hover:bg-white/60"
+											: "cursor-default",
+									)}
+								>
+									{room.roomName}
+								</button>
 							))}
 						</div>
 
 						{canManage ? (
-							<button
+							<Button
 								type="button"
 								onClick={() => setAddDialogOpen(true)}
-								className="rounded-[6px] border border-dashed border-amber-800 dark:border-amber-200 px-2 py-1 text-amber-950 dark:text-amber-100 transition hover:bg-white/35"
+								variant="outline"
+								className="h-10 border-dashed border-amber-800 bg-white/20 text-amber-950 hover:bg-white/35 dark:border-amber-200 dark:bg-transparent dark:text-amber-100 dark:hover:bg-white/10"
 							>
-								<PlusIcon className="mx-auto mb-1" />
-							</button>
+								<PlusIcon data-icon="inline-start" />
+							</Button>
 						) : null}
 					</div>
 				) : (
-					<ContextMenu>
-						<ContextMenuTrigger asChild>
-							<button
-								type="button"
-								disabled={!canManage}
-								onClick={(event) => {
-									if (!canManage) {
-										return;
-									}
-
-									event.preventDefault();
-									openContextMenuOnClick(event);
-								}}
-								className={cn(
-									"flex h-full min-h-35 w-full flex-col items-center justify-center gap-3 rounded-[10px] border-2 border-dashed px-3 py-4 text-center shadow-sm transition border-[#c6a643] bg-amber-200/50 dark:bg-amber-600/50 text-amber-950 dark:text-amber-100",
-									canManage && "cursor-pointer dark:hover:bg-amber-700",
-								)}
-							>
-								<PlusIcon />
-								{!canManage && (
-									<div className="text-xs font-semibold">
-										Ручные помещения не заданы
-									</div>
-								)}
-							</button>
-						</ContextMenuTrigger>
-
+					<div className="flex h-full min-h-35 w-full flex-col items-center justify-center gap-3 rounded-[10px] border-2 border-dashed border-[#c6a643] bg-amber-200/50 px-3 py-4 text-center text-amber-950 shadow-sm dark:bg-amber-600/50 dark:text-amber-100">
 						{canManage ? (
-							<ContextMenuContent>
-								<ContextMenuItem onSelect={() => setAddDialogOpen(true)}>
-									<PlusIcon />
-									Создать помещение
-								</ContextMenuItem>
-							</ContextMenuContent>
+							<Button
+								type="button"
+								onClick={() => setAddDialogOpen(true)}
+								variant="outline"
+								className="h-10 border-dashed border-amber-800 bg-white/20 text-amber-950 hover:bg-white/35 dark:border-amber-200 dark:bg-transparent dark:text-amber-100 dark:hover:bg-white/10"
+							>
+								<PlusIcon data-icon="inline-start" />
+							</Button>
 						) : null}
-					</ContextMenu>
+					</div>
 				)}
 			</div>
 
