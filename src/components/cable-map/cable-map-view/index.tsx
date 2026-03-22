@@ -191,7 +191,7 @@ export function CableMapView({
 					icon={<MapIcon />}
 				/>
 				<SummaryCard
-					title="Уровни"
+					title="Отметки"
 					value={String(data.snapshot.levelCount)}
 					description={`Групп на карте: ${data.snapshot.groupCount}`}
 					icon={<Layers2Icon />}
@@ -205,7 +205,7 @@ export function CableMapView({
 				<Card>
 					<CardHeader>
 						<CardTitle className="text-sm font-medium text-muted-foreground">
-							Средний прогресс
+							Общий прогресс
 						</CardTitle>
 						<CardDescription className="text-3xl font-semibold text-foreground">
 							{data.snapshot.averageProgress}%
