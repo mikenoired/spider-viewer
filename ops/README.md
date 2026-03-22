@@ -64,6 +64,8 @@ JWT_SECRET=replace-with-a-long-random-secret
 HOST=127.0.0.1
 SHUTDOWN_TIMEOUT_MS=30000
 HEALTHCHECK_REDIS_REQUIRED=false
+DB_BACKUP_DIR=/opt/spider-viewer/backups/postgres
+DB_BACKUP_RETENTION_DAYS=7
 ```
 
 Generate a secret:
@@ -85,6 +87,7 @@ openssl rand -hex 64
    - `curl -fsS http://127.0.0.1/readyz`
    - `systemctl status spider-viewer@blue --no-pager`
    - `systemctl status spider-viewer@green --no-pager`
+   - `systemctl status spider-viewer-db-backup.timer --no-pager`
    - `systemctl status nginx --no-pager`
 
 ## GitHub Actions CI/CD
@@ -190,6 +193,28 @@ Rollback restarts the previous slot, waits for readiness, switches Nginx back, a
 - systemd
 - Bun
 - Node.js
+- PostgreSQL client tools (`pg_dump`)
+
+## Database backups
+
+- Backups run every 30 minutes through `spider-viewer-db-backup.timer`.
+- Dumps are written to `DB_BACKUP_DIR` in PostgreSQL custom format (`*.dump`).
+- Files older than `DB_BACKUP_RETENTION_DAYS` are deleted automatically after each successful backup.
+
+Useful commands:
+
+```bash
+systemctl status spider-viewer-db-backup.timer --no-pager
+systemctl list-timers spider-viewer-db-backup.timer --all
+systemctl start spider-viewer-db-backup.service
+ls -lh /opt/spider-viewer/backups/postgres
+```
+
+Restore example:
+
+```bash
+pg_restore --clean --if-exists --dbname="postgresql://app_user:strong_password@127.0.0.1:5432/spider_viewer" /opt/spider-viewer/backups/postgres/spider-viewer-postgres-YYYYMMDDTHHMMSSZ.dump
+```
 
 ## HTTPS
 
