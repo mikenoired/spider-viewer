@@ -8,6 +8,8 @@ BASE_DIR="${BASE_DIR:-/opt/spider-viewer}"
 ENV_DIR="${ENV_DIR:-/etc/spider-viewer}"
 NGINX_UPSTREAM_FILE="${NGINX_UPSTREAM_FILE:-/etc/nginx/spider-viewer-upstream.conf}"
 ACTIVE_SLOT_FILE="${ACTIVE_SLOT_FILE:-$BASE_DIR/active-slot}"
+DB_BACKUP_SERVICE_PATH="${DB_BACKUP_SERVICE_PATH:-/etc/systemd/system/spider-viewer-db-backup.service}"
+DB_BACKUP_TIMER_PATH="${DB_BACKUP_TIMER_PATH:-/etc/systemd/system/spider-viewer-db-backup.timer}"
 PORT_BLUE="${PORT_BLUE:-3101}"
 PORT_GREEN="${PORT_GREEN:-3102}"
 SOURCE_DIR="${SOURCE_DIR:-$(pwd)}"
@@ -57,6 +59,9 @@ EOF
 
 sudo -u "$APP_USER" bash -lc "set -a && source '$shared_env_file' && set +a && cd '$release_dir' && bun install --frozen-lockfile && bun run build && bun run db:migrate"
 sudo ln -sfn "$release_dir" "$current_link"
+sudo install -m 0644 "$SOURCE_DIR/ops/systemd/spider-viewer-db-backup.service" "$DB_BACKUP_SERVICE_PATH"
+sudo install -m 0644 "$SOURCE_DIR/ops/systemd/spider-viewer-db-backup.timer" "$DB_BACKUP_TIMER_PATH"
+sudo systemctl daemon-reload
 sudo systemctl enable "spider-viewer@$inactive_slot" >/dev/null
 sudo systemctl restart "spider-viewer@$inactive_slot"
 
@@ -76,6 +81,8 @@ echo "$inactive_slot" | sudo tee "$ACTIVE_SLOT_FILE" >/dev/null
 
 sudo nginx -t
 sudo systemctl reload nginx
+sudo systemctl enable spider-viewer-db-backup.timer >/dev/null
+sudo systemctl restart spider-viewer-db-backup.timer
 
 if systemctl is-active --quiet "spider-viewer@$active_slot"; then
 	sleep 5
