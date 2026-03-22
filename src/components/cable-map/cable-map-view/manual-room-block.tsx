@@ -131,7 +131,7 @@ export function ManualRoomBlock({
 										setDeleteCandidate(room);
 									}}
 									className={cn(
-										"min-w-0 rounded-[6px] border border-[#b89124]/40 bg-white/40 px-2 py-1.5 text-left text-xs font-semibold leading-4 break-words transition",
+										"min-w-0 rounded-[6px] border border-[#b89124]/40 bg-white/40 px-2 py-1.5 text-left text-xs font-semibold leading-4 wrap-break-word transition",
 										canManage
 											? "cursor-pointer hover:bg-white/60"
 											: "cursor-default",
