@@ -13,7 +13,7 @@
     "db:migrate": "bunx --bun drizzle-kit migrate",
     "db:push": "bunx --bun drizzle-kit push",
     "db:studio": "bunx --bun drizzle-kit studio",
-    "db:seed:test-users": "bun run ./seed-test-users.ts",
+    "db:seed:test-users": "bun run ./scripts/seed-requested-users.ts",
     "lint": "biome lint",
     "lint:format": "biome format",
     "lint:check": "biome check"
