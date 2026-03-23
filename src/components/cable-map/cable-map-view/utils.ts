@@ -8,7 +8,7 @@ import {
 	pdfRowVerticalInset,
 	shaftCapInset,
 } from "./config"
-import type { GraphSide, LevelBand } from "./types"
+import type { BoardMetrics, GraphSide, LevelBand, ShaftExtent } from "./types"
 
 export function buildLevelBands(levels: DashboardData["levels"]): LevelBand[] {
 	let globalRowIndex = 0
@@ -80,6 +80,34 @@ export function getBoardHeight(bands: LevelBand[]) {
 	}, 0)
 }
 
+function mergeShaftExtent(current: ShaftExtent | undefined, next: ShaftExtent) {
+	if (!current) {
+		return next
+	}
+
+	return {
+		top: Math.min(current.top, next.top),
+		bottom: Math.max(current.bottom, next.bottom),
+	}
+}
+
+function updateShaftExtentsForRow(
+	shaftExtents: BoardMetrics["shaftExtents"],
+	row: LevelBand["rows"][number]
+) {
+	for (const side of ["dirty", "clean"] as const) {
+		for (const shaft of [1, 2, 3, 4] as const) {
+			const nextExtent = getRowShaftExtent(row, side, shaft)
+
+			if (!nextExtent) {
+				continue
+			}
+
+			shaftExtents[side][shaft] = mergeShaftExtent(shaftExtents[side][shaft], nextExtent)
+		}
+	}
+}
+
 function getGroupForSide(row: LevelBand["rows"][number], side: GraphSide) {
 	return side === "dirty" ? row.dirtyGroup : row.cleanGroup
 }
@@ -113,6 +141,25 @@ export function getShaftExtents(bands: LevelBand[], side: GraphSide, shaft: 1 | 
 	const bottom = Math.max(...extents.map(extent => extent.bottom))
 
 	return bottom > top ? { top, bottom } : null
+}
+
+export function buildBoardMetrics(bands: LevelBand[]): BoardMetrics {
+	const shaftExtents: BoardMetrics["shaftExtents"] = {
+		dirty: {},
+		clean: {},
+	}
+	const height = getBoardHeight(bands)
+
+	for (const band of bands) {
+		for (const row of band.rows) {
+			updateShaftExtentsForRow(shaftExtents, row)
+		}
+	}
+
+	return {
+		height,
+		shaftExtents,
+	}
 }
 
 function getPdfRowHeight(dirtyGroup: GraphGroupView | null, cleanGroup: GraphGroupView | null) {

@@ -1,5 +1,5 @@
 import { DownloadIcon, LoaderCircleIcon } from "lucide-react"
-import type { CSSProperties } from "react"
+import { type CSSProperties, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -8,7 +8,7 @@ import { PathArea } from "./path-layer"
 import { LeftRoomArea, RightRoomArea, TotalThreadsBadge } from "./room-blocks"
 import type { LevelBand } from "./types"
 
-export function LevelBandView({
+export const LevelBandView = memo(function LevelBandView({
 	band,
 	bandIndex,
 	canEditProgress,
@@ -26,7 +26,7 @@ export function LevelBandView({
 	canExportDailyReport: boolean
 	isExportDisabled: boolean
 	isExportingReport: boolean
-	onExportDailyReport: () => void
+	onExportDailyReport: (level: string) => void
 	isLast: boolean
 }) {
 	const isFirst = bandIndex === 0
@@ -63,7 +63,7 @@ export function LevelBandView({
 									type="button"
 									size="icon-sm"
 									variant="outline"
-									onClick={onExportDailyReport}
+									onClick={() => void onExportDailyReport(band.level)}
 									disabled={isExportDisabled}
 									aria-label={`Выгрузить DOCX по уровню ${band.level}`}>
 									{isExportingReport ? (
@@ -96,9 +96,9 @@ export function LevelBandView({
 			})}
 		</div>
 	)
-}
+})
 
-function LevelBandRowView({
+const LevelBandRowView = memo(function LevelBandRowView({
 	dirtyGroup,
 	cleanGroup,
 	gridRow,
@@ -148,4 +148,7 @@ function LevelBandRowView({
 			</div>
 		</>
 	)
-}
+})
+
+LevelBandView.displayName = "LevelBandView"
+LevelBandRowView.displayName = "LevelBandRowView"

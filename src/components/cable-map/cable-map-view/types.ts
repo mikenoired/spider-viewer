@@ -17,3 +17,13 @@ export type LevelBand = {
 	rowCount: number
 	startY: number
 }
+
+export type ShaftExtent = {
+	top: number
+	bottom: number
+}
+
+export type BoardMetrics = {
+	height: number
+	shaftExtents: Record<GraphSide, Partial<Record<1 | 2 | 3 | 4, ShaftExtent>>>
+}

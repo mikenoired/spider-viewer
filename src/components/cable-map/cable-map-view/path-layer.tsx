@@ -1,11 +1,12 @@
+import { memo } from "react"
 import type { GraphBucketView, GraphGroupView } from "@/lib/cable-map/shared"
 import { cn } from "@/lib/utils"
 import { cleanPathColumnStart, dirtyPathColumnStart, pathColumnWidth, shaftPalette } from "./config"
-import type { GraphSide, LevelBand } from "./types"
-import { getBoardHeight, getBucketY, getShaftExtents, getShaftX } from "./utils"
+import type { BoardMetrics, GraphSide } from "./types"
+import { getBucketY, getShaftX } from "./utils"
 
-export function BoardPathLayer({ bands }: { bands: LevelBand[] }) {
-	const height = getBoardHeight(bands)
+export const BoardPathLayer = memo(function BoardPathLayer({ metrics }: { metrics: BoardMetrics }) {
+	const { height } = metrics
 
 	if (height <= 0) return
 
@@ -14,24 +15,24 @@ export function BoardPathLayer({ bands }: { bands: LevelBand[] }) {
 			<div
 				className="absolute inset-y-0"
 				style={{ left: dirtyPathColumnStart, width: pathColumnWidth }}>
-				<PathColumnBackdrop side="dirty" bands={bands} height={height} />
+				<PathColumnBackdrop side="dirty" metrics={metrics} height={height} />
 			</div>
 			<div
 				className="absolute inset-y-0"
 				style={{ left: cleanPathColumnStart, width: pathColumnWidth }}>
-				<PathColumnBackdrop side="clean" bands={bands} height={height} />
+				<PathColumnBackdrop side="clean" metrics={metrics} height={height} />
 			</div>
 		</div>
 	)
-}
+})
 
 function PathColumnBackdrop({
 	side,
-	bands,
+	metrics,
 	height,
 }: {
 	side: GraphSide
-	bands: LevelBand[]
+	metrics: BoardMetrics
 	height: number
 }) {
 	const shaftX = getShaftX(side)
@@ -47,7 +48,7 @@ function PathColumnBackdrop({
 			) : null}
 
 			{([1, 2, 3, 4] as const).map(shaft => {
-				const extent = getShaftExtents(bands, side, shaft)
+				const extent = metrics.shaftExtents[side][shaft]
 
 				if (!extent) return null
 
@@ -83,7 +84,7 @@ function PathColumnBackdrop({
 	)
 }
 
-export function PathArea({
+export const PathArea = memo(function PathArea({
 	side,
 	group,
 	height,
@@ -105,7 +106,7 @@ export function PathArea({
 			))}
 		</svg>
 	)
-}
+})
 
 function PathBucketRow({
 	side,
@@ -243,3 +244,6 @@ function ArrowHead({
 		<polygon points={points} fill={color} className={cn(shaft === 0 ? "dark:fill-white" : "")} />
 	)
 }
+
+BoardPathLayer.displayName = "BoardPathLayer"
+PathArea.displayName = "PathArea"
