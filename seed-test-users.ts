@@ -1,10 +1,13 @@
 #!/usr/bin/env bun
 
 import { sql } from "drizzle-orm";
+import { createLogger } from "./src/lib/logger";
 import { TEST_USERS_PASSWORD, type UserRole } from "./src/lib/auth/shared";
 import { hashPassword } from "./src/lib/auth/password";
 import { closeDbConnection, getDb } from "./src/lib/db";
 import { users } from "./src/lib/db/schema";
+
+const logger = createLogger({ script: "seed-test-users" });
 
 const usersPerRole = 10;
 
@@ -45,9 +48,15 @@ async function seedTestUsers() {
 			},
 		});
 
-	console.log("Created or updated 30 test users.");
-	console.log(`Password for all seeded users: ${TEST_USERS_PASSWORD}`);
-	console.log("Examples: user01, admin01, superadmin01");
+	logger.info({ count: records.length }, "Created or updated test users");
+	logger.info(
+		{ password: TEST_USERS_PASSWORD },
+		"Password for all seeded users",
+	);
+	logger.info(
+		{ examples: ["user01", "admin01", "superadmin01"] },
+		"Seeded user examples",
+	);
 }
 
 try {

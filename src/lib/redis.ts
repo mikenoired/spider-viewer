@@ -1,6 +1,9 @@
 import { createClient } from "redis"
+import { createLogger } from "@/lib/logger"
 
 type SpiderViewerRedisClient = ReturnType<typeof createClient>
+
+const logger = createLogger({ module: "redis" })
 
 declare global {
 	var __spiderViewerRedis__: SpiderViewerRedisClient | undefined
@@ -22,7 +25,7 @@ async function connectRedisClient() {
 		})
 
 		client.on("error", error => {
-			console.error("Redis error:", error)
+			logger.error({ err: error }, "Redis client error")
 		})
 
 		globalThis.__spiderViewerRedis__ = client

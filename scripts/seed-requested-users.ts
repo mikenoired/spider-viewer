@@ -1,10 +1,13 @@
 #!/usr/bin/env bun
 
 import { sql } from "drizzle-orm";
+import { createLogger } from "../src/lib/logger";
 import type { UserRole } from "../src/lib/auth/shared";
 import { hashPassword } from "../src/lib/auth/password";
 import { closeDbConnection, getDb } from "../src/lib/db";
 import { users } from "../src/lib/db/schema";
+
+const logger = createLogger({ script: "seed-requested-users" });
 
 const requestedUsers: Array<{
 	login: string;
@@ -90,9 +93,12 @@ async function seedRequestedUsers() {
 			},
 		});
 
-	console.log(`Created or updated ${requestedUsers.length} requested users.`);
+	logger.info(
+		{ count: requestedUsers.length },
+		"Created or updated requested users",
+	);
 	for (const { login, password, role } of requestedUsers) {
-		console.log(`${login}:${password}:${role}`);
+		logger.info({ login, password, role }, "Requested user credential");
 	}
 }
 
