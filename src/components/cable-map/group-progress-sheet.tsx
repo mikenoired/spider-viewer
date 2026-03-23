@@ -10,7 +10,7 @@ import {
 	SaveIcon,
 	TriangleAlertIcon,
 } from "lucide-react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
 	AlertDialog,
@@ -98,11 +98,15 @@ function getInitialEffectiveDate(group: GraphGroupView) {
 	return group.primaryRooms[0]?.effectiveDate ?? getTodayInMoscow()
 }
 
-function buildChangedRooms(draftRooms: DraftRoom[], primaryRooms: GraphGroupView["primaryRooms"]) {
-	return draftRooms.flatMap(room => {
-		const source = primaryRooms.find(candidate => candidate.id === room.id)
+function buildRoomProgressById(primaryRooms: GraphGroupView["primaryRooms"]) {
+	return new Map(primaryRooms.map(room => [room.id, room.progress]))
+}
 
-		if (!source || source.progress === room.progress) return []
+function buildChangedRooms(draftRooms: DraftRoom[], roomProgressById: Map<string, number>) {
+	return draftRooms.flatMap(room => {
+		const sourceProgress = roomProgressById.get(room.id)
+
+		if (sourceProgress === undefined || sourceProgress === room.progress) return []
 
 		return [
 			{
@@ -128,9 +132,14 @@ function useGroupProgressDraft(group: GraphGroupView, open: boolean) {
 		}
 	}, [open, reset])
 
+	const roomProgressById = useMemo(
+		() => buildRoomProgressById(group.primaryRooms),
+		[group.primaryRooms]
+	)
+
 	const changedRooms = useMemo(
-		() => buildChangedRooms(draftRooms, group.primaryRooms),
-		[draftRooms, group.primaryRooms]
+		() => buildChangedRooms(draftRooms, roomProgressById),
+		[draftRooms, roomProgressById]
 	)
 
 	function updateRoomProgress(roomId: string, progress: number) {
@@ -382,7 +391,7 @@ function GroupProgressTable({
 	)
 }
 
-export function GroupProgressSheet({
+export const GroupProgressSheet = memo(function GroupProgressSheet({
 	group,
 	canEdit,
 	variant = "default",
@@ -524,4 +533,6 @@ export function GroupProgressSheet({
 			</AlertDialog>
 		</>
 	)
-}
+})
+
+GroupProgressSheet.displayName = "GroupProgressSheet"

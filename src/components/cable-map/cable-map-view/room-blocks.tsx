@@ -1,3 +1,4 @@
+import { memo } from "react"
 import type { GraphGroupView } from "@/lib/cable-map/shared"
 import { GroupProgressSheet } from "../group-progress-sheet"
 import { ManualRoomBlock } from "./manual-room-block"
@@ -14,7 +15,7 @@ function formatCopperMass(valueKg: number) {
 	return `${valueKg.toFixed(1).replace(".", ",")} кг`
 }
 
-export function LeftRoomArea({
+export const LeftRoomArea = memo(function LeftRoomArea({
 	group,
 	canEditProgress,
 	canManageManualRooms,
@@ -31,9 +32,9 @@ export function LeftRoomArea({
 			<GroupProgressSheet group={group} canEdit={canEditProgress} variant="map" />
 		</div>
 	)
-}
+})
 
-export function RightRoomArea({
+export const RightRoomArea = memo(function RightRoomArea({
 	group,
 	canEditProgress,
 	canManageManualRooms,
@@ -50,9 +51,13 @@ export function RightRoomArea({
 			<ManualRoomBlock group={group} canManage={canManageManualRooms} className="h-full" />
 		</div>
 	)
-}
+})
 
-export function TotalThreadsBadge({ group }: { group: GraphGroupView | null }) {
+export const TotalThreadsBadge = memo(function TotalThreadsBadge({
+	group,
+}: {
+	group: GraphGroupView | null
+}) {
 	if (!group) {
 		return <div className="h-full" />
 	}
@@ -85,4 +90,8 @@ export function TotalThreadsBadge({ group }: { group: GraphGroupView | null }) {
 			</div>
 		</div>
 	)
-}
+})
+
+LeftRoomArea.displayName = "LeftRoomArea"
+RightRoomArea.displayName = "RightRoomArea"
+TotalThreadsBadge.displayName = "TotalThreadsBadge"

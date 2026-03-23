@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte } from "drizzle-orm"
+import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm"
 import { getDb } from "@/lib/db"
 import {
 	changeAuditLogs,
@@ -157,7 +157,14 @@ async function getDashboardImportedRows(db: DbClient, snapshotId: string) {
 		.where(eq(importedCableRows.snapshotId, snapshotId))
 }
 
-async function getDashboardManualRoomRows(db: DbClient) {
+async function getDashboardManualRoomRows(db: DbClient, rows: DashboardGroupRow[]) {
+	const sourceZones = [...new Set(rows.map(row => row.sourceZone))]
+	const levels = [...new Set(rows.map(row => row.level))]
+
+	if (sourceZones.length === 0 || levels.length === 0) {
+		return []
+	}
+
 	return db
 		.select({
 			id: manualGraphRooms.id,
@@ -166,6 +173,12 @@ async function getDashboardManualRoomRows(db: DbClient) {
 			level: manualGraphRooms.level,
 		})
 		.from(manualGraphRooms)
+		.where(
+			and(
+				inArray(manualGraphRooms.sourceZone, sourceZones),
+				inArray(manualGraphRooms.level, levels)
+			)
+		)
 }
 
 type DashboardSnapshotRow = NonNullable<Awaited<ReturnType<typeof getActiveSnapshot>>>
@@ -376,11 +389,11 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 		}
 	}
 
-	const [rows, importedRows, manualRoomRows] = await Promise.all([
+	const [rows, importedRows] = await Promise.all([
 		getDashboardGroupRows(db, snapshot.id),
 		getDashboardImportedRows(db, snapshot.id),
-		getDashboardManualRoomRows(db),
 	])
+	const manualRoomRows = await getDashboardManualRoomRows(db, rows)
 	const copperMassByGroup = buildCopperMassByGroup(importedRows)
 	const groups = buildGroups(rows, copperMassByGroup)
 	const manualRoomsByGroup = buildManualRoomsByGroup(manualRoomRows)

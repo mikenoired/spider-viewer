@@ -2,7 +2,7 @@
 
 import { useRouter } from "@tanstack/react-router"
 import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react"
-import { useEffect, useState } from "react"
+import { memo, useEffect, useState } from "react"
 import { toast } from "sonner"
 import {
 	AlertDialog,
@@ -88,7 +88,7 @@ function ManualRoomBlockContent({
 	)
 }
 
-export function ManualRoomBlock({
+export const ManualRoomBlock = memo(function ManualRoomBlock({
 	group,
 	canManage,
 	className,
@@ -242,4 +242,6 @@ export function ManualRoomBlock({
 			</AlertDialog>
 		</>
 	)
-}
+})
+
+ManualRoomBlock.displayName = "ManualRoomBlock"

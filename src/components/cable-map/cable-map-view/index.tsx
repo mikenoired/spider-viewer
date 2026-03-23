@@ -24,7 +24,7 @@ import { boardColumns, boardWidth } from "./config"
 import { LevelBandView } from "./level-band-view"
 import { LeftZoneHeader, MapTitle, PathHeader, RightZoneHeader, SummaryCard } from "./map-header"
 import { BoardPathLayer } from "./path-layer"
-import { buildLevelBands } from "./utils"
+import { buildBoardMetrics, buildLevelBands } from "./utils"
 
 type ScrollSource = "title" | "header" | "body"
 type ScrollRef = {
@@ -143,6 +143,8 @@ export function CableMapView({
 	const [exportingDailyReport, setExportingDailyReport] = useState(false)
 	const [exportingLevel, setExportingLevel] = useState<string | null>(null)
 	const canExportDailyReport = canViewAudit(role)
+	const levelBands = useMemo(() => buildLevelBands(data.levels), [data.levels])
+	const boardMetrics = useMemo(() => buildBoardMetrics(levelBands), [levelBands])
 	const scrollRefs = useMemo(
 		() => ({
 			title: titleScrollRef,
@@ -181,21 +183,24 @@ export function CableMapView({
 		}
 	}, [data.snapshot, syncScroll])
 
-	async function handleDailyReportExport(level?: string) {
-		if (!canExportDailyReport) {
-			return
-		}
+	const handleDailyReportExport = useCallback(
+		async (level?: string) => {
+			if (!canExportDailyReport) {
+				return
+			}
 
-		startDailyReportExport(level, setExportingLevel, setExportingDailyReport)
+			startDailyReportExport(level, setExportingLevel, setExportingDailyReport)
 
-		try {
-			await exportDailyReport(level)
-		} catch (error) {
-			toast.error(getDailyReportExportErrorMessage(error, level))
-		} finally {
-			finishDailyReportExport(level, setExportingLevel, setExportingDailyReport)
-		}
-	}
+			try {
+				await exportDailyReport(level)
+			} catch (error) {
+				toast.error(getDailyReportExportErrorMessage(error, level))
+			} finally {
+				finishDailyReportExport(level, setExportingLevel, setExportingDailyReport)
+			}
+		},
+		[canExportDailyReport]
+	)
 
 	if (!data.snapshot) {
 		return (
@@ -222,7 +227,6 @@ export function CableMapView({
 		)
 	}
 
-	const levelBands = buildLevelBands(data.levels)
 	const mapCanvasWidth = boardWidth + 16
 
 	return (
@@ -325,7 +329,7 @@ export function CableMapView({
 					className="w-full overflow-x-auto overflow-y-visible">
 					<div className="pl-4" style={{ minWidth: mapCanvasWidth }}>
 						<div className="relative overflow-hidden">
-							<BoardPathLayer bands={levelBands} />
+							<BoardPathLayer metrics={boardMetrics} />
 							<div className="relative z-10">
 								{levelBands.map((band, index) => (
 									<LevelBandView
@@ -337,7 +341,7 @@ export function CableMapView({
 										canExportDailyReport={canExportDailyReport}
 										isExportDisabled={exportingDailyReport || exportingLevel !== null}
 										isExportingReport={exportingLevel === band.level}
-										onExportDailyReport={() => void handleDailyReportExport(band.level)}
+										onExportDailyReport={handleDailyReportExport}
 										isLast={index === levelBands.length - 1}
 									/>
 								))}
