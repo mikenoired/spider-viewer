@@ -9,6 +9,7 @@ export function getRouter() {
 		context: {
 			auth: null as AuthSession | null,
 		},
+		// biome-ignore lint: lint/style/useNamingConvention
 		Wrap: AppProviders,
 		scrollRestoration: true,
 		defaultPreload: "intent",
