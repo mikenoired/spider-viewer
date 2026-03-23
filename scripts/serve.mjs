@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import path from "node:path";
 import postgres from "postgres";
 import { createClient } from "redis";
+import { logger } from "./logger.mjs";
 
 const port = Number.parseInt(process.env.PORT ?? "3000", 10);
 const host = process.env.HOST ?? "127.0.0.1";
@@ -13,6 +14,7 @@ const shutdownTimeoutMs = Number.parseInt(
 );
 const healthcheckRedisRequired = process.env.HEALTHCHECK_REDIS_REQUIRED === "true";
 const releaseId = process.env.RELEASE_ID ?? "dev";
+const serverLogger = logger.child({ module: "http-server", releaseId });
 
 const entryUrl = pathToFileURL(
 	path.join(process.cwd(), "dist", "server", "server.js"),
@@ -142,6 +144,7 @@ const server = createServer(async (req, res) => {
 			await runReadinessChecks();
 			sendJson(res, 200, { ok: true, releaseId, status: "ready" });
 		} catch (error) {
+			serverLogger.warn({ err: error }, "Readiness check failed");
 			sendJson(res, 503, {
 				ok: false,
 				releaseId,
@@ -163,7 +166,10 @@ const server = createServer(async (req, res) => {
 		const response = await serverEntry.fetch(request);
 		await sendFetchResponse(res, response);
 	} catch (error) {
-		console.error("Unhandled server error", error);
+		serverLogger.error(
+			{ err: error, method: req.method, url: req.url },
+			"Unhandled server error",
+		);
 		sendJson(res, 500, { ok: false, error: "Internal server error." });
 	}
 });
@@ -186,14 +192,18 @@ function shutdown(signal) {
 	}
 
 	isShuttingDown = true;
-	console.log(`${signal} received, starting graceful shutdown`);
+	serverLogger.info(
+		{ signal, shutdownTimeoutMs },
+		"Starting graceful shutdown",
+	);
 
 	server.close((error) => {
 		if (error) {
-			console.error("Error while closing HTTP server", error);
+			serverLogger.error({ err: error }, "Error while closing HTTP server");
 			process.exit(1);
 		}
 
+		serverLogger.info("HTTP server closed");
 		process.exit(0);
 	});
 
@@ -206,6 +216,7 @@ function shutdown(signal) {
 			socket.destroy();
 		}
 
+		serverLogger.warn("Graceful shutdown timed out; destroying open sockets");
 		process.exit(1);
 	}, shutdownTimeoutMs).unref();
 }
@@ -214,5 +225,8 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 server.listen(port, host, () => {
-	console.log(`Spider Viewer listening on http://${host}:${port} (${releaseId})`);
+	serverLogger.info(
+		{ host, port, url: `http://${host}:${port}` },
+		"Spider Viewer listening",
+	);
 });
