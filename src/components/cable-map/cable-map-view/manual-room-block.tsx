@@ -29,6 +29,65 @@ import { createManualRoom, deleteManualRoom } from "@/lib/cable-map/functions"
 import type { GraphGroupView, GraphManualRoomView } from "@/lib/cable-map/shared"
 import { cn } from "@/lib/utils"
 
+function ManualRoomAddButton({ onClick }: { onClick: () => void }) {
+	return (
+		<Button
+			type="button"
+			onClick={onClick}
+			variant="outline"
+			className="h-10 border-dashed border-amber-800 bg-white/20 text-amber-950 hover:bg-white/35 dark:border-amber-200 dark:bg-transparent dark:text-amber-100 dark:hover:bg-white/10">
+			<PlusIcon data-icon="inline-start" />
+		</Button>
+	)
+}
+
+function ManualRoomBlockContent({
+	hasRooms,
+	rooms,
+	canManage,
+	onAdd,
+	onDeleteCandidateSelect,
+}: {
+	hasRooms: boolean
+	rooms: GraphManualRoomView[]
+	canManage: boolean
+	onAdd: () => void
+	onDeleteCandidateSelect: (room: GraphManualRoomView) => void
+}) {
+	if (hasRooms) {
+		return (
+			<div className="flex w-full flex-col gap-2 rounded-[8px] border border-[#d2b55a] bg-amber-200 px-2 py-2 text-amber-950 shadow-sm dark:bg-amber-700 dark:text-amber-100">
+				<div className="flex flex-col gap-1">
+					{rooms.map(room => (
+						<button
+							key={room.id}
+							type="button"
+							onClick={() => {
+								if (canManage) {
+									onDeleteCandidateSelect(room)
+								}
+							}}
+							className={cn(
+								"min-w-0 rounded-[6px] border border-[#b89124]/40 bg-white/40 px-2 py-1.5 text-left text-xs font-semibold leading-4 wrap-break-word transition",
+								canManage ? "cursor-pointer hover:bg-white/60" : "cursor-default"
+							)}>
+							{room.roomName}
+						</button>
+					))}
+				</div>
+
+				{canManage ? <ManualRoomAddButton onClick={onAdd} /> : null}
+			</div>
+		)
+	}
+
+	return (
+		<div className="flex h-full min-h-35 w-full flex-col items-center justify-center gap-3 rounded-[10px] border-2 border-dashed border-[#c6a643] bg-amber-200/50 px-3 py-4 text-center text-amber-950 shadow-sm dark:bg-amber-600/50 dark:text-amber-100">
+			{canManage ? <ManualRoomAddButton onClick={onAdd} /> : null}
+		</div>
+	)
+}
+
 export function ManualRoomBlock({
 	group,
 	canManage,
@@ -43,7 +102,6 @@ export function ManualRoomBlock({
 	const [pendingAction, setPendingAction] = useState<"create" | "delete" | null>(null)
 	const [draftRoomName, setDraftRoomName] = useState("")
 	const [deleteCandidate, setDeleteCandidate] = useState<GraphManualRoomView | null>(null)
-	const hasRooms = group.manualRooms.length > 0
 	const canSave = draftRoomName.trim().length > 0 && pendingAction !== "create"
 
 	useEffect(() => {
@@ -102,52 +160,13 @@ export function ManualRoomBlock({
 	return (
 		<>
 			<div className={cn("flex h-full items-center justify-center", className)}>
-				{hasRooms ? (
-					<div className="flex w-full flex-col gap-2 rounded-[8px] border border-[#d2b55a] bg-amber-200 dark:bg-amber-700 px-2 py-2 text-amber-950 dark:text-amber-100 shadow-sm">
-						<div className="flex flex-col gap-1">
-							{group.manualRooms.map(room => (
-								<button
-									key={room.id}
-									type="button"
-									onClick={() => {
-										if (!canManage) {
-											return
-										}
-
-										setDeleteCandidate(room)
-									}}
-									className={cn(
-										"min-w-0 rounded-[6px] border border-[#b89124]/40 bg-white/40 px-2 py-1.5 text-left text-xs font-semibold leading-4 wrap-break-word transition",
-										canManage ? "cursor-pointer hover:bg-white/60" : "cursor-default"
-									)}>
-									{room.roomName}
-								</button>
-							))}
-						</div>
-
-						{canManage ? (
-							<Button
-								type="button"
-								onClick={() => setAddDialogOpen(true)}
-								variant="outline"
-								className="h-10 border-dashed border-amber-800 bg-white/20 text-amber-950 hover:bg-white/35 dark:border-amber-200 dark:bg-transparent dark:text-amber-100 dark:hover:bg-white/10">
-								<PlusIcon data-icon="inline-start" />
-							</Button>
-						) : null}
-					</div>
-				) : (
-					<div className="flex h-full min-h-35 w-full flex-col items-center justify-center gap-3 rounded-[10px] border-2 border-dashed border-[#c6a643] bg-amber-200/50 px-3 py-4 text-center text-amber-950 shadow-sm dark:bg-amber-600/50 dark:text-amber-100">
-						{canManage ? (
-							<Button
-								type="button"
-								onClick={() => setAddDialogOpen(true)}
-								variant="outline"
-								className="h-10 border-dashed border-amber-800 bg-white/20 text-amber-950 hover:bg-white/35 dark:border-amber-200 dark:bg-transparent dark:text-amber-100 dark:hover:bg-white/10">
-								<PlusIcon data-icon="inline-start" />
-							</Button>
-						) : null}
-					</div>
-				)}
+				<ManualRoomBlockContent
+					hasRooms={group.manualRooms.length > 0}
+					rooms={group.manualRooms}
+					canManage={canManage}
+					onAdd={() => setAddDialogOpen(true)}
+					onDeleteCandidateSelect={setDeleteCandidate}
+				/>
 			</div>
 
 			<Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>

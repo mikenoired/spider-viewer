@@ -9,7 +9,7 @@ import {
 	MapIcon,
 	PercentIcon,
 } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,6 +26,104 @@ import { LeftZoneHeader, MapTitle, PathHeader, RightZoneHeader, SummaryCard } fr
 import { BoardPathLayer } from "./path-layer"
 import { buildLevelBands } from "./utils"
 
+type ScrollSource = "title" | "header" | "body"
+type ScrollRef = {
+	current: HTMLDivElement | null
+}
+type FrameRef = {
+	current: number | null
+}
+
+function isScrollLocked(activeSource: ScrollSource | null, source: ScrollSource) {
+	return activeSource !== null && activeSource !== source
+}
+
+function syncScrollTargets(
+	scrollRefs: Record<ScrollSource, ScrollRef>,
+	source: ScrollSource,
+	scrollLeft: number
+) {
+	for (const [key, ref] of Object.entries(scrollRefs) as [ScrollSource, ScrollRef][]) {
+		if (key === source || !ref.current) {
+			continue
+		}
+
+		if (Math.abs(ref.current.scrollLeft - scrollLeft) < 1) {
+			continue
+		}
+
+		ref.current.scrollLeft = scrollLeft
+	}
+}
+
+function scheduleScrollUnlock(
+	activeScrollSourceRef: {
+		current: ScrollSource | null
+	},
+	releaseScrollLockFrameRef: FrameRef
+) {
+	if (releaseScrollLockFrameRef.current !== null) {
+		cancelAnimationFrame(releaseScrollLockFrameRef.current)
+	}
+
+	releaseScrollLockFrameRef.current = requestAnimationFrame(() => {
+		activeScrollSourceRef.current = null
+		releaseScrollLockFrameRef.current = null
+	})
+}
+
+function startDailyReportExport(
+	level: string | undefined,
+	setExportingLevel: React.Dispatch<React.SetStateAction<string | null>>,
+	setExportingDailyReport: React.Dispatch<React.SetStateAction<boolean>>
+) {
+	if (level) {
+		setExportingLevel(level)
+		return
+	}
+
+	setExportingDailyReport(true)
+}
+
+function finishDailyReportExport(
+	level: string | undefined,
+	setExportingLevel: React.Dispatch<React.SetStateAction<string | null>>,
+	setExportingDailyReport: React.Dispatch<React.SetStateAction<boolean>>
+) {
+	if (level) {
+		setExportingLevel(current => (current === level ? null : current))
+		return
+	}
+
+	setExportingDailyReport(false)
+}
+
+function getDailyReportExportErrorMessage(error: unknown, level?: string) {
+	if (error instanceof Error) {
+		return error.message
+	}
+
+	return level
+		? `Не удалось выгрузить отчёт по уровню ${level}.`
+		: "Не удалось выгрузить ежедневный отчёт."
+}
+
+async function exportDailyReport(level?: string) {
+	const fileName = buildDailyHistoryReportFileName(level)
+	const response = await downloadDailyHistoryDocx({
+		data: {
+			fileName,
+			level: level ?? null,
+		},
+	})
+
+	if (!(response instanceof Response)) {
+		throw new Error("Сервер вернул неожиданный ответ при экспорте.")
+	}
+
+	await downloadResponseFile(response, fileName)
+}
+
 export function CableMapView({
 	data,
 	canEditProgress,
@@ -40,44 +138,36 @@ export function CableMapView({
 	const titleScrollRef = useRef<HTMLDivElement | null>(null)
 	const headerScrollRef = useRef<HTMLDivElement | null>(null)
 	const bodyScrollRef = useRef<HTMLDivElement | null>(null)
-	const activeScrollSourceRef = useRef<"title" | "header" | "body" | null>(null)
+	const activeScrollSourceRef = useRef<ScrollSource | null>(null)
 	const releaseScrollLockFrameRef = useRef<number | null>(null)
 	const [exportingDailyReport, setExportingDailyReport] = useState(false)
 	const [exportingLevel, setExportingLevel] = useState<string | null>(null)
 	const canExportDailyReport = canViewAudit(role)
+	const scrollRefs = useMemo(
+		() => ({
+			title: titleScrollRef,
+			header: headerScrollRef,
+			body: bodyScrollRef,
+		}),
+		[]
+	)
 
-	const syncScroll = useCallback((source: "title" | "header" | "body") => {
-		if (activeScrollSourceRef.current && activeScrollSourceRef.current !== source) {
-			return
-		}
+	const syncScroll = useCallback(
+		(source: ScrollSource) => {
+			if (isScrollLocked(activeScrollSourceRef.current, source)) {
+				return
+			}
 
-		const refs = [
-			["title", titleScrollRef],
-			["header", headerScrollRef],
-			["body", bodyScrollRef],
-		] as const
-		const sourceElement = refs.find(([key]) => key === source)?.[1].current
+			const sourceElement = scrollRefs[source].current
 
-		if (!sourceElement) return
+			if (!sourceElement) return
 
-		activeScrollSourceRef.current = source
-
-		for (const [key, ref] of refs) {
-			if (key === source || !ref.current) continue
-			if (Math.abs(ref.current.scrollLeft - sourceElement.scrollLeft) < 1) continue
-
-			ref.current.scrollLeft = sourceElement.scrollLeft
-		}
-
-		if (releaseScrollLockFrameRef.current !== null) {
-			cancelAnimationFrame(releaseScrollLockFrameRef.current)
-		}
-
-		releaseScrollLockFrameRef.current = requestAnimationFrame(() => {
-			activeScrollSourceRef.current = null
-			releaseScrollLockFrameRef.current = null
-		})
-	}, [])
+			activeScrollSourceRef.current = source
+			syncScrollTargets(scrollRefs, source, sourceElement.scrollLeft)
+			scheduleScrollUnlock(activeScrollSourceRef, releaseScrollLockFrameRef)
+		},
+		[scrollRefs]
+	)
 
 	useEffect(() => {
 		if (!data.snapshot || !bodyScrollRef.current) return
@@ -96,41 +186,14 @@ export function CableMapView({
 			return
 		}
 
-		const fileName = buildDailyHistoryReportFileName(level)
-
-		if (level) {
-			setExportingLevel(level)
-		} else {
-			setExportingDailyReport(true)
-		}
+		startDailyReportExport(level, setExportingLevel, setExportingDailyReport)
 
 		try {
-			const response = await downloadDailyHistoryDocx({
-				data: {
-					fileName,
-					level: level ?? null,
-				},
-			})
-
-			if (!(response instanceof Response)) {
-				throw new Error("Сервер вернул неожиданный ответ при экспорте.")
-			}
-
-			await downloadResponseFile(response, fileName)
+			await exportDailyReport(level)
 		} catch (error) {
-			toast.error(
-				error instanceof Error
-					? error.message
-					: level
-						? `Не удалось выгрузить отчёт по уровню ${level}.`
-						: "Не удалось выгрузить ежедневный отчёт."
-			)
+			toast.error(getDailyReportExportErrorMessage(error, level))
 		} finally {
-			if (level) {
-				setExportingLevel(current => (current === level ? null : current))
-			} else {
-				setExportingDailyReport(false)
-			}
+			finishDailyReportExport(level, setExportingLevel, setExportingDailyReport)
 		}
 	}
 

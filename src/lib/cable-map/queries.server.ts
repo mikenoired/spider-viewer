@@ -25,6 +25,8 @@ type HistoryQueryOptions = {
 	level?: string | null
 }
 
+type DbClient = ReturnType<typeof getDb>
+
 function toIsoString(value: Date | string | null | undefined) {
 	if (!value) {
 		return ""
@@ -82,8 +84,7 @@ function getCableCopperMassKg(row: {
 	return threadLength * threadCount * cableCrossSection * copperDensityKgPerMeterPerMm2
 }
 
-export async function getActiveDashboardData(): Promise<DashboardData> {
-	const db = getDb()
+async function getActiveSnapshot(db: DbClient) {
 	const [snapshot] = await db
 		.select({
 			id: importSnapshots.id,
@@ -99,14 +100,11 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 		.orderBy(desc(importSnapshots.createdAt))
 		.limit(1)
 
-	if (!snapshot) {
-		return {
-			snapshot: null,
-			levels: [],
-		}
-	}
+	return snapshot ?? null
+}
 
-	const rows = await db
+async function getDashboardGroupRows(db: DbClient, snapshotId: string) {
+	return db
 		.select({
 			groupId: graphGroups.id,
 			groupKey: graphGroups.groupKey,
@@ -134,7 +132,7 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 		})
 		.from(graphGroups)
 		.leftJoin(graphGroupRooms, eq(graphGroupRooms.groupId, graphGroups.id))
-		.where(eq(graphGroups.snapshotId, snapshot.id))
+		.where(eq(graphGroups.snapshotId, snapshotId))
 		.orderBy(
 			desc(graphGroups.levelOrder),
 			asc(graphGroups.graphSide),
@@ -142,7 +140,10 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			asc(graphGroupRooms.roomRole),
 			asc(graphGroupRooms.sortOrder)
 		)
-	const importedRows = await db
+}
+
+async function getDashboardImportedRows(db: DbClient, snapshotId: string) {
+	return db
 		.select({
 			graphSide: importedCableRows.graphSide,
 			graphSubzone: importedCableRows.graphSubzone,
@@ -153,8 +154,11 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			threadCount: importedCableRows.threadCount,
 		})
 		.from(importedCableRows)
-		.where(eq(importedCableRows.snapshotId, snapshot.id))
-	const manualRoomRows = await db
+		.where(eq(importedCableRows.snapshotId, snapshotId))
+}
+
+async function getDashboardManualRoomRows(db: DbClient) {
+	return db
 		.select({
 			id: manualGraphRooms.id,
 			roomName: manualGraphRooms.roomName,
@@ -162,96 +166,121 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			level: manualGraphRooms.level,
 		})
 		.from(manualGraphRooms)
+}
+
+type DashboardSnapshotRow = NonNullable<Awaited<ReturnType<typeof getActiveSnapshot>>>
+type DashboardGroupRow = Awaited<ReturnType<typeof getDashboardGroupRows>>[number]
+type DashboardImportedRow = Awaited<ReturnType<typeof getDashboardImportedRows>>[number]
+type DashboardManualRoomRow = Awaited<ReturnType<typeof getDashboardManualRoomRows>>[number]
+
+function buildCopperMassByGroup(importedRows: DashboardImportedRow[]) {
 	const copperMassByGroup = new Map<string, number>()
 
 	for (const row of importedRows) {
 		const groupKey = getImportedRowGroupKey(row)
 		const currentMass = copperMassByGroup.get(groupKey) ?? 0
-		const nextMass = currentMass + getCableCopperMassKg(row)
-
-		copperMassByGroup.set(groupKey, nextMass)
+		copperMassByGroup.set(groupKey, currentMass + getCableCopperMassKg(row))
 	}
 
+	return copperMassByGroup
+}
+
+function createGraphGroup(
+	row: DashboardGroupRow,
+	copperMassByGroup: Map<string, number>
+): GraphGroupView {
+	return {
+		id: row.groupId,
+		groupKey: row.groupKey,
+		graphSide: row.graphSide,
+		graphSubzone: row.graphSubzone,
+		sourceZone: row.sourceZone,
+		level: row.level,
+		levelOrder: row.levelOrder,
+		cableCount: row.groupCableCount,
+		threadCount: row.groupThreadCount,
+		totalLength: row.groupTotalLength,
+		copperMassKg: copperMassByGroup.get(row.groupKey) ?? 0,
+		averageProgress: 0,
+		primaryRooms: [],
+		secondaryRooms: [],
+		manualRooms: [],
+		buckets: [
+			{
+				shaft: 0,
+				label: shaftBucketLabels[0],
+				threadCount: row.noShaftThreads,
+			},
+			{
+				shaft: 1,
+				label: shaftBucketLabels[1],
+				threadCount: row.shaft1Threads,
+			},
+			{
+				shaft: 2,
+				label: shaftBucketLabels[2],
+				threadCount: row.shaft2Threads,
+			},
+			{
+				shaft: 3,
+				label: shaftBucketLabels[3],
+				threadCount: row.shaft3Threads,
+			},
+			{
+				shaft: 4,
+				label: shaftBucketLabels[4],
+				threadCount: row.shaft4Threads,
+			},
+		],
+	}
+}
+
+function buildGraphRoom(row: DashboardGroupRow): GraphRoomView | null {
+	if (!row.roomId || !row.roomName || !row.roomRole) {
+		return null
+	}
+
+	return {
+		id: row.roomId,
+		roomName: row.roomName,
+		cableCount: row.roomCableCount ?? 0,
+		threadCount: row.roomThreadCount ?? 0,
+		totalLength: row.roomTotalLength ?? 0,
+		progress: row.roomProgress ?? 0,
+		roomRole: row.roomRole,
+		effectiveDate: row.roomEffectiveDate ?? null,
+	}
+}
+
+function appendRoomToGroup(group: GraphGroupView, room: GraphRoomView | null) {
+	if (!room) {
+		return
+	}
+
+	if (room.roomRole === "primary") {
+		group.primaryRooms.push(room)
+		return
+	}
+
+	group.secondaryRooms.push(room)
+}
+
+function buildGroups(rows: DashboardGroupRow[], copperMassByGroup: Map<string, number>) {
 	const groups = new Map<string, GraphGroupView>()
 
 	for (const row of rows) {
-		const existingGroup = groups.get(row.groupId)
-		const group =
-			existingGroup ??
-			({
-				id: row.groupId,
-				groupKey: row.groupKey,
-				graphSide: row.graphSide,
-				graphSubzone: row.graphSubzone,
-				sourceZone: row.sourceZone,
-				level: row.level,
-				levelOrder: row.levelOrder,
-				cableCount: row.groupCableCount,
-				threadCount: row.groupThreadCount,
-				totalLength: row.groupTotalLength,
-				copperMassKg: copperMassByGroup.get(row.groupKey) ?? 0,
-				averageProgress: 0,
-				primaryRooms: [],
-				secondaryRooms: [],
-				manualRooms: [],
-				buckets: [
-					{
-						shaft: 0,
-						label: shaftBucketLabels[0],
-						threadCount: row.noShaftThreads,
-					},
-					{
-						shaft: 1,
-						label: shaftBucketLabels[1],
-						threadCount: row.shaft1Threads,
-					},
-					{
-						shaft: 2,
-						label: shaftBucketLabels[2],
-						threadCount: row.shaft2Threads,
-					},
-					{
-						shaft: 3,
-						label: shaftBucketLabels[3],
-						threadCount: row.shaft3Threads,
-					},
-					{
-						shaft: 4,
-						label: shaftBucketLabels[4],
-						threadCount: row.shaft4Threads,
-					},
-				],
-			} satisfies GraphGroupView)
-
-		if (!existingGroup) {
-			groups.set(row.groupId, group)
-		}
-
-		if (!row.roomId || !row.roomName || !row.roomRole) {
-			continue
-		}
-
-		const room: GraphRoomView = {
-			id: row.roomId,
-			roomName: row.roomName,
-			cableCount: row.roomCableCount ?? 0,
-			threadCount: row.roomThreadCount ?? 0,
-			totalLength: row.roomTotalLength ?? 0,
-			progress: row.roomProgress ?? 0,
-			roomRole: row.roomRole,
-			effectiveDate: row.roomEffectiveDate ?? null,
-		}
-
-		if (row.roomRole === "primary") {
-			group.primaryRooms.push(room)
-		} else {
-			group.secondaryRooms.push(room)
-		}
+		const group = groups.get(row.groupId) ?? createGraphGroup(row, copperMassByGroup)
+		groups.set(row.groupId, group)
+		appendRoomToGroup(group, buildGraphRoom(row))
 	}
 
+	return groups
+}
+
+function buildManualRoomsByGroup(rows: DashboardManualRoomRow[]) {
 	const manualRoomsByGroup = new Map<string, GraphManualRoomView[]>()
 
-	for (const row of manualRoomRows) {
+	for (const row of rows) {
 		const groupKey = `${row.sourceZone}:${row.level}`
 		const rooms = manualRoomsByGroup.get(groupKey) ?? []
 		rooms.push({
@@ -261,15 +290,29 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 		manualRoomsByGroup.set(groupKey, rooms)
 	}
 
-	const levelMap = new Map<
-		string,
-		{
-			level: string
-			levelOrder: number
-			dirtyGroups: GraphGroupView[]
-			cleanGroups: GraphGroupView[]
-		}
-	>()
+	return manualRoomsByGroup
+}
+
+function getAverageProgress(rooms: GraphRoomView[]) {
+	if (rooms.length === 0) {
+		return 0
+	}
+
+	return Math.round(rooms.reduce((total, room) => total + room.progress, 0) / rooms.length)
+}
+
+type LevelEntry = {
+	level: string
+	levelOrder: number
+	dirtyGroups: GraphGroupView[]
+	cleanGroups: GraphGroupView[]
+}
+
+function buildDashboardLevels(
+	groups: Map<string, GraphGroupView>,
+	manualRoomsByGroup: Map<string, GraphManualRoomView[]>
+) {
+	const levelMap = new Map<string, LevelEntry>()
 	const allPrimaryRooms: GraphRoomView[] = []
 
 	for (const group of groups.values()) {
@@ -277,14 +320,7 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			manualRoomsByGroup
 				.get(`${group.sourceZone}:${group.level}`)
 				?.sort((left, right) => compareRoomNames(left.roomName, right.roomName)) ?? []
-		const averageProgress =
-			group.primaryRooms.length > 0
-				? Math.round(
-						group.primaryRooms.reduce((total, room) => total + room.progress, 0) /
-							group.primaryRooms.length
-					)
-				: 0
-		group.averageProgress = averageProgress
+		group.averageProgress = getAverageProgress(group.primaryRooms)
 		allPrimaryRooms.push(...group.primaryRooms)
 
 		const levelEntry = levelMap.get(group.level) ?? {
@@ -303,9 +339,19 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 		levelMap.set(group.level, levelEntry)
 	}
 
-	const levels = [...levelMap.values()].sort((left, right) => right.levelOrder - left.levelOrder)
+	return {
+		levels: [...levelMap.values()].sort((left, right) => right.levelOrder - left.levelOrder),
+		allPrimaryRooms,
+	}
+}
 
-	const snapshotSummary: SnapshotSummaryView = {
+function buildSnapshotSummary(
+	snapshot: DashboardSnapshotRow,
+	levels: LevelEntry[],
+	groupCount: number,
+	allPrimaryRooms: GraphRoomView[]
+): SnapshotSummaryView {
+	return {
 		id: snapshot.id,
 		fileName: snapshot.fileName,
 		fileType: snapshot.fileType,
@@ -313,19 +359,35 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 		createdAt: toIsoString(snapshot.createdAt),
 		importedByLogin: snapshot.importedByLogin,
 		levelCount: levels.length,
-		groupCount: groups.size,
+		groupCount,
 		roomCount: allPrimaryRooms.length,
-		averageProgress:
-			allPrimaryRooms.length > 0
-				? Math.round(
-						allPrimaryRooms.reduce((total, room) => total + room.progress, 0) /
-							allPrimaryRooms.length
-					)
-				: 0,
+		averageProgress: getAverageProgress(allPrimaryRooms),
+	}
+}
+
+export async function getActiveDashboardData(): Promise<DashboardData> {
+	const db = getDb()
+	const snapshot = await getActiveSnapshot(db)
+
+	if (!snapshot) {
+		return {
+			snapshot: null,
+			levels: [],
+		}
 	}
 
+	const [rows, importedRows, manualRoomRows] = await Promise.all([
+		getDashboardGroupRows(db, snapshot.id),
+		getDashboardImportedRows(db, snapshot.id),
+		getDashboardManualRoomRows(db),
+	])
+	const copperMassByGroup = buildCopperMassByGroup(importedRows)
+	const groups = buildGroups(rows, copperMassByGroup)
+	const manualRoomsByGroup = buildManualRoomsByGroup(manualRoomRows)
+	const { levels, allPrimaryRooms } = buildDashboardLevels(groups, manualRoomsByGroup)
+
 	return {
-		snapshot: snapshotSummary,
+		snapshot: buildSnapshotSummary(snapshot, levels, groups.size, allPrimaryRooms),
 		levels,
 	}
 }

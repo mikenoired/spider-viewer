@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer"
 import { describe, expect, it } from "vitest"
-import * as XLSX from "xlsx"
+import * as Xlsx from "xlsx"
 import { ensureUploadFile, hasExpectedWorkbookSignature, parseWorkbookRows } from "./import.server"
 
 const workbookColumnIndexes = {
@@ -26,13 +26,13 @@ function createWorkbookBufferForType(
 	bookType: "ods" | "xlsx",
 	sheetName = "Общ"
 ) {
-	const workbook = XLSX.utils.book_new()
-	const sheet = XLSX.utils.aoa_to_sheet(rows)
+	const workbook = Xlsx.utils.book_new()
+	const sheet = Xlsx.utils.aoa_to_sheet(rows)
 
-	XLSX.utils.book_append_sheet(workbook, sheet, sheetName)
+	Xlsx.utils.book_append_sheet(workbook, sheet, sheetName)
 
 	return Buffer.from(
-		XLSX.write(workbook, {
+		Xlsx.write(workbook, {
 			type: "buffer",
 			bookType,
 		})

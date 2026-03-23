@@ -5,37 +5,40 @@ import { useEffect } from "react"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
+function hasUrlCredentials(url: URL) {
+	return url.username !== "" || url.password !== ""
+}
+
+function sanitizeUrlString(url: URL) {
+	if (!hasUrlCredentials(url)) {
+		return url.toString()
+	}
+
+	const sanitizedUrl = new URL(url.toString())
+	sanitizedUrl.username = ""
+	sanitizedUrl.password = ""
+	return sanitizedUrl.toString()
+}
+
+function normalizeStringFetchInput(input: string) {
+	if (input.startsWith("/")) {
+		return new URL(input, window.location.origin).toString()
+	}
+
+	try {
+		return sanitizeUrlString(new URL(input))
+	} catch {
+		return input
+	}
+}
+
 function normalizeFetchInput(input: RequestInfo | URL) {
 	if (typeof input === "string") {
-		if (input.startsWith("/")) {
-			return new URL(input, window.location.origin).toString()
-		}
-
-		try {
-			const url = new URL(input)
-
-			if (url.username || url.password) {
-				url.username = ""
-				url.password = ""
-				return url.toString()
-			}
-		} catch {
-			return input
-		}
-
-		return input
+		return normalizeStringFetchInput(input)
 	}
 
 	if (input instanceof URL) {
-		const url = new URL(input.toString())
-
-		if (url.username || url.password) {
-			url.username = ""
-			url.password = ""
-			return url.toString()
-		}
-
-		return url.toString()
+		return sanitizeUrlString(input)
 	}
 
 	return input
