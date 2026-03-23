@@ -1,17 +1,17 @@
-import type { GraphGroupView } from "@/lib/cable-map/shared";
-import { GroupProgressSheet } from "../group-progress-sheet";
-import { ManualRoomBlock } from "./manual-room-block";
+import type { GraphGroupView } from "@/lib/cable-map/shared"
+import { GroupProgressSheet } from "../group-progress-sheet"
+import { ManualRoomBlock } from "./manual-room-block"
 
 function formatCopperMass(valueKg: number) {
 	if (valueKg >= 1000) {
-		return `${(valueKg / 1000).toFixed(2).replace(".", ",")} т`;
+		return `${(valueKg / 1000).toFixed(2).replace(".", ",")} т`
 	}
 
 	if (valueKg >= 100) {
-		return `${Math.round(valueKg)} кг`;
+		return `${Math.round(valueKg)} кг`
 	}
 
-	return `${valueKg.toFixed(1).replace(".", ",")} кг`;
+	return `${valueKg.toFixed(1).replace(".", ",")} кг`
 }
 
 export function LeftRoomArea({
@@ -19,22 +19,18 @@ export function LeftRoomArea({
 	canEditProgress,
 	canManageManualRooms,
 }: {
-	group: GraphGroupView | null;
-	canEditProgress: boolean;
-	canManageManualRooms: boolean;
+	group: GraphGroupView | null
+	canEditProgress: boolean
+	canManageManualRooms: boolean
 }) {
-	if (!group) return;
+	if (!group) return
 
 	return (
 		<div className="grid h-full grid-cols-[98px_minmax(0,1fr)] gap-3 py-4">
 			<ManualRoomBlock group={group} canManage={canManageManualRooms} />
-			<GroupProgressSheet
-				group={group}
-				canEdit={canEditProgress}
-				variant="map"
-			/>
+			<GroupProgressSheet group={group} canEdit={canEditProgress} variant="map" />
 		</div>
-	);
+	)
 }
 
 export function RightRoomArea({
@@ -42,38 +38,27 @@ export function RightRoomArea({
 	canEditProgress,
 	canManageManualRooms,
 }: {
-	group: GraphGroupView | null;
-	canEditProgress: boolean;
-	canManageManualRooms: boolean;
+	group: GraphGroupView | null
+	canEditProgress: boolean
+	canManageManualRooms: boolean
 }) {
-	if (!group) return;
+	if (!group) return
 
 	return (
 		<div className="grid h-full grid-cols-[minmax(0,1fr)_98px] gap-3 py-4">
-			<GroupProgressSheet
-				group={group}
-				canEdit={canEditProgress}
-				variant="map"
-				align="right"
-			/>
-			<ManualRoomBlock
-				group={group}
-				canManage={canManageManualRooms}
-				className="h-full"
-			/>
+			<GroupProgressSheet group={group} canEdit={canEditProgress} variant="map" align="right" />
+			<ManualRoomBlock group={group} canManage={canManageManualRooms} className="h-full" />
 		</div>
-	);
+	)
 }
 
 export function TotalThreadsBadge({ group }: { group: GraphGroupView | null }) {
 	if (!group) {
-		return <div className="h-full" />;
+		return <div className="h-full" />
 	}
 
-	const displayThreadCount = group.threadCount;
-	const hasStartedProgress = group.primaryRooms.some(
-		(room) => room.progress > 0,
-	);
+	const displayThreadCount = group.threadCount
+	const hasStartedProgress = group.primaryRooms.some(room => room.progress > 0)
 
 	if (!hasStartedProgress) {
 		return (
@@ -82,7 +67,7 @@ export function TotalThreadsBadge({ group }: { group: GraphGroupView | null }) {
 					{displayThreadCount} н
 				</div>
 			</div>
-		);
+		)
 	}
 
 	return (
@@ -99,5 +84,5 @@ export function TotalThreadsBadge({ group }: { group: GraphGroupView | null }) {
 				</div>
 			</div>
 		</div>
-	);
+	)
 }

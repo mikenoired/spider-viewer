@@ -1,72 +1,47 @@
-"use client";
+"use client"
 
-import { useNavigate, useRouter } from "@tanstack/react-router";
-import {
-	FileSpreadsheetIcon,
-	LoaderCircleIcon,
-	UploadIcon,
-} from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import {
-	Field,
-	FieldDescription,
-	FieldGroup,
-	FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { uploadWorkbook } from "@/lib/cable-map/functions";
-import type { SnapshotSummaryView } from "@/lib/cable-map/shared";
+import { useNavigate, useRouter } from "@tanstack/react-router"
+import { FileSpreadsheetIcon, LoaderCircleIcon, UploadIcon } from "lucide-react"
+import { useState } from "react"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import { uploadWorkbook } from "@/lib/cable-map/functions"
+import type { SnapshotSummaryView } from "@/lib/cable-map/shared"
 
-export function SnapshotImportForm({
-	snapshot,
-}: {
-	snapshot: SnapshotSummaryView | null;
-}) {
-	const router = useRouter();
-	const navigate = useNavigate();
-	const [pending, setPending] = useState(false);
-	const [file, setFile] = useState<File | null>(null);
+export function SnapshotImportForm({ snapshot }: { snapshot: SnapshotSummaryView | null }) {
+	const router = useRouter()
+	const navigate = useNavigate()
+	const [pending, setPending] = useState(false)
+	const [file, setFile] = useState<File | null>(null)
 
 	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-		event.preventDefault();
+		event.preventDefault()
 
 		if (!file) {
-			toast.error("Выберите файл `.ods`, `.xlsx` или `.xls`.");
-			return;
+			toast.error("Выберите файл `.ods`, `.xlsx` или `.xls`.")
+			return
 		}
 
-		setPending(true);
+		setPending(true)
 
 		try {
-			const formData = new FormData();
-			formData.set("file", file);
+			const formData = new FormData()
+			formData.set("file", file)
 
 			const result = await uploadWorkbook({
 				data: formData,
-			});
+			})
 
-			await router.invalidate();
-			toast.success(
-				`Импорт завершён: ${result.rowCount} строк, ${result.groupCount} групп.`,
-			);
-			await navigate({ to: "/app" });
+			await router.invalidate()
+			toast.success(`Импорт завершён: ${result.rowCount} строк, ${result.groupCount} групп.`)
+			await navigate({ to: "/app" })
 		} catch (error) {
-			toast.error(
-				error instanceof Error
-					? error.message
-					: "Не удалось выполнить импорт файла.",
-			);
+			toast.error(error instanceof Error ? error.message : "Не удалось выполнить импорт файла.")
 		} finally {
-			setPending(false);
+			setPending(false)
 		}
 	}
 
@@ -76,8 +51,7 @@ export function SnapshotImportForm({
 				<CardHeader>
 					<CardTitle>Импорт графа из workbook</CardTitle>
 					<CardDescription>
-						Поддерживаются файлы Excel и LibreOffice Calc. В обработку идёт
-						только лист {'"Общ"'}.
+						Поддерживаются файлы Excel и LibreOffice Calc. В обработку идёт только лист {'"Общ"'}.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -89,22 +63,18 @@ export function SnapshotImportForm({
 									id="workbook-file"
 									type="file"
 									accept=".ods,.xlsx,.xls"
-									onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+									onChange={event => setFile(event.target.files?.[0] ?? null)}
 								/>
 								<FieldDescription>
-									После повторного импорта активный snapshot будет заменён
-									новым. Поддерживаются корректные `.ods`, `.xlsx`, `.xls` файлы
-									до 15 МБ.
+									После повторного импорта активный snapshot будет заменён новым. Поддерживаются
+									корректные `.ods`, `.xlsx`, `.xls` файлы до 15 МБ.
 								</FieldDescription>
 							</Field>
 						</FieldGroup>
 
 						<Button type="submit" disabled={!file || pending}>
 							{pending ? (
-								<LoaderCircleIcon
-									data-icon="inline-start"
-									className="animate-spin"
-								/>
+								<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
 							) : (
 								<UploadIcon data-icon="inline-start" />
 							)}
@@ -118,8 +88,7 @@ export function SnapshotImportForm({
 				<CardHeader>
 					<CardTitle>Текущий активный snapshot</CardTitle>
 					<CardDescription>
-						Этот блок помогает быстро сверить, что именно сейчас отображается на
-						карте.
+						Этот блок помогает быстро сверить, что именно сейчас отображается на карте.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="flex flex-col gap-4">
@@ -131,9 +100,7 @@ export function SnapshotImportForm({
 										<FileSpreadsheetIcon />
 									</div>
 									<div className="flex flex-col gap-1">
-										<div className="text-sm font-medium">
-											{snapshot.fileName}
-										</div>
+										<div className="text-sm font-medium">{snapshot.fileName}</div>
 										<div className="text-sm text-muted-foreground">
 											Формат: {snapshot.fileType.toUpperCase()}
 										</div>
@@ -144,10 +111,7 @@ export function SnapshotImportForm({
 								<InfoItem label="Строк" value={String(snapshot.rowCount)} />
 								<InfoItem label="Уровней" value={String(snapshot.levelCount)} />
 								<InfoItem label="Групп" value={String(snapshot.groupCount)} />
-								<InfoItem
-									label="Помещений"
-									value={String(snapshot.roomCount)}
-								/>
+								<InfoItem label="Помещений" value={String(snapshot.roomCount)} />
 							</div>
 						</>
 					) : (
@@ -158,16 +122,14 @@ export function SnapshotImportForm({
 				</CardContent>
 			</Card>
 		</div>
-	);
+	)
 }
 
 function InfoItem({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="rounded-2xl border bg-background px-3 py-2">
-			<div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-				{label}
-			</div>
+			<div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
 			<div className="mt-1 text-lg font-semibold">{value}</div>
 		</div>
-	);
+	)
 }

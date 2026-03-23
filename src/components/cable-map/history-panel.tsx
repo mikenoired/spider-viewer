@@ -1,7 +1,7 @@
-"use client";
+"use client"
 
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
+import { format } from "date-fns"
+import { ru } from "date-fns/locale"
 import {
 	ArrowDownIcon,
 	ArrowUpDownIcon,
@@ -15,26 +15,21 @@ import {
 	RefreshCcwIcon,
 	TagIcon,
 	UserIcon,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import type { DateRange } from "react-day-picker";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-} from "@/components/ui/card";
+} from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import type { DateRange } from "react-day-picker"
+import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import {
 	Popover,
 	PopoverContent,
 	PopoverHeader,
 	PopoverTitle,
 	PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@/components/ui/popover"
 import {
 	Table,
 	TableBody,
@@ -42,34 +37,32 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
 import {
 	downloadBackdatedDocx,
 	downloadHistoryDocx,
 	getBackdatedHistory,
 	getHistory,
-} from "@/lib/cable-map/functions";
-import type { DateRangeInput, HistoryEntryView } from "@/lib/cable-map/shared";
-import { cn, downloadResponseFile } from "@/lib/utils";
+} from "@/lib/cable-map/functions"
+import type { DateRangeInput, HistoryEntryView } from "@/lib/cable-map/shared"
+import { cn, downloadResponseFile } from "@/lib/utils"
 
 function formatRangeLabel(range?: DateRange) {
 	if (!range?.from) {
-		return "Сегодня";
+		return "Сегодня"
 	}
 
 	if (!range.to || dateToIso(range.from) === dateToIso(range.to)) {
-		return format(range.from, "d MMM yyyy", { locale: ru });
+		return format(range.from, "d MMM yyyy", { locale: ru })
 	}
 
-	return `${format(range.from, "d MMM yyyy", { locale: ru })} — ${format(
-		range.to,
-		"d MMM yyyy",
-		{ locale: ru },
-	)}`;
+	return `${format(range.from, "d MMM yyyy", { locale: ru })} — ${format(range.to, "d MMM yyyy", {
+		locale: ru,
+	})}`
 }
 
 function dateToIso(value: Date | undefined) {
-	return value ? format(value, "yyyy-MM-dd") : null;
+	return value ? format(value, "yyyy-MM-dd") : null
 }
 
 function buildExportFileName(range: DateRangeInput, backdatedOnly?: boolean) {
@@ -78,18 +71,18 @@ function buildExportFileName(range: DateRangeInput, backdatedOnly?: boolean) {
 			? range.from === range.to
 				? range.from
 				: `${range.from}_${range.to}`
-			: (range.from ?? range.to ?? format(new Date(), "yyyy-MM-dd"));
+			: (range.from ?? range.to ?? format(new Date(), "yyyy-MM-dd"))
 
-	return `${backdatedOnly ? "backdated-history" : "history-levels"}-${suffix}.docx`;
+	return `${backdatedOnly ? "backdated-history" : "history-levels"}-${suffix}.docx`
 }
 
 function createTodayRange(): DateRange {
-	const today = new Date();
+	const today = new Date()
 
 	return {
 		from: today,
 		to: today,
-	};
+	}
 }
 
 function formatTimestamp(value: string) {
@@ -97,7 +90,7 @@ function formatTimestamp(value: string) {
 		timeZone: "Europe/Moscow",
 		dateStyle: "medium",
 		timeStyle: "short",
-	}).format(new Date(value));
+	}).format(new Date(value))
 }
 
 type SortKey =
@@ -107,14 +100,14 @@ type SortKey =
 	| "roomName"
 	| "oldProgress"
 	| "newProgress"
-	| "isBackdated";
+	| "isBackdated"
 
-type SortDirection = "asc" | "desc";
+type SortDirection = "asc" | "desc"
 
 const sortableColumns: Array<{
-	key: SortKey;
-	label: string;
-	icon: typeof Clock3Icon;
+	key: SortKey
+	label: string
+	icon: typeof Clock3Icon
 }> = [
 	{ key: "changedAt", label: "Изменено", icon: Clock3Icon },
 	{ key: "effectiveDate", label: "Дата действия", icon: CalendarDaysIcon },
@@ -123,68 +116,58 @@ const sortableColumns: Array<{
 	{ key: "oldProgress", label: "Было", icon: PercentIcon },
 	{ key: "newProgress", label: "Стало", icon: PercentIcon },
 	{ key: "isBackdated", label: "Тип", icon: TagIcon },
-];
+]
 
 function compareEntries(
 	left: HistoryEntryView,
 	right: HistoryEntryView,
 	key: SortKey,
-	direction: SortDirection,
+	direction: SortDirection
 ) {
-	const factor = direction === "asc" ? 1 : -1;
+	const factor = direction === "asc" ? 1 : -1
 
 	switch (key) {
 		case "changedAt":
-			return (
-				(new Date(left.changedAt).getTime() -
-					new Date(right.changedAt).getTime()) *
-				factor
-			);
+			return (new Date(left.changedAt).getTime() - new Date(right.changedAt).getTime()) * factor
 		case "effectiveDate":
 			return (
 				left.effectiveDate.localeCompare(right.effectiveDate, "ru", {
 					numeric: true,
 				}) * factor
-			);
+			)
 		case "userLogin":
 			return (
 				left.userLogin.localeCompare(right.userLogin, "ru", {
 					numeric: true,
 					sensitivity: "base",
 				}) * factor
-			);
+			)
 		case "roomName":
 			return (
 				left.roomName.localeCompare(right.roomName, "ru", {
 					numeric: true,
 					sensitivity: "base",
 				}) * factor
-			);
+			)
 		case "oldProgress":
-			return (left.oldProgress - right.oldProgress) * factor;
+			return (left.oldProgress - right.oldProgress) * factor
 		case "newProgress":
-			return (left.newProgress - right.newProgress) * factor;
+			return (left.newProgress - right.newProgress) * factor
 		case "isBackdated":
-			return (Number(left.isBackdated) - Number(right.isBackdated)) * factor;
+			return (Number(left.isBackdated) - Number(right.isBackdated)) * factor
 	}
 }
 
-function SortIcon({
-	active,
-	direction,
-}: {
-	active: boolean;
-	direction: SortDirection;
-}) {
+function SortIcon({ active, direction }: { active: boolean; direction: SortDirection }) {
 	if (!active) {
-		return <ArrowUpDownIcon className="text-muted-foreground/70" />;
+		return <ArrowUpDownIcon className="text-muted-foreground/70" />
 	}
 
 	return direction === "asc" ? (
 		<ArrowUpIcon className="text-foreground" />
 	) : (
 		<ArrowDownIcon className="text-foreground" />
-	);
+	)
 }
 
 export function HistoryPanel({
@@ -192,27 +175,27 @@ export function HistoryPanel({
 	initialEntries,
 	backdatedOnly,
 }: {
-	description: string;
-	initialEntries: HistoryEntryView[];
-	backdatedOnly?: boolean;
+	description: string
+	initialEntries: HistoryEntryView[]
+	backdatedOnly?: boolean
 }) {
-	const [entries, setEntries] = useState(initialEntries);
-	const [pending, setPending] = useState(false);
-	const [exporting, setExporting] = useState(false);
-	const [range, setRange] = useState<DateRange>(createTodayRange);
-	const [sortKey, setSortKey] = useState<SortKey>("changedAt");
-	const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-	const [isCompact, setIsCompact] = useState(false);
+	const [entries, setEntries] = useState(initialEntries)
+	const [pending, setPending] = useState(false)
+	const [exporting, setExporting] = useState(false)
+	const [range, setRange] = useState<DateRange>(createTodayRange)
+	const [sortKey, setSortKey] = useState<SortKey>("changedAt")
+	const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
+	const [isCompact, setIsCompact] = useState(false)
 
 	useEffect(() => {
-		const mediaQuery = window.matchMedia("(max-width: 767px)");
-		const updateIsCompact = () => setIsCompact(mediaQuery.matches);
+		const mediaQuery = window.matchMedia("(max-width: 767px)")
+		const updateIsCompact = () => setIsCompact(mediaQuery.matches)
 
-		updateIsCompact();
-		mediaQuery.addEventListener("change", updateIsCompact);
+		updateIsCompact()
+		mediaQuery.addEventListener("change", updateIsCompact)
 
-		return () => mediaQuery.removeEventListener("change", updateIsCompact);
-	}, []);
+		return () => mediaQuery.removeEventListener("change", updateIsCompact)
+	}, [])
 
 	const rangePayload = useMemo(
 		() =>
@@ -220,28 +203,25 @@ export function HistoryPanel({
 				from: dateToIso(range?.from),
 				to: dateToIso(range?.to),
 			}) satisfies DateRangeInput,
-		[range],
-	);
+		[range]
+	)
 	const sortedEntries = useMemo(
-		() =>
-			[...entries].sort((left, right) =>
-				compareEntries(left, right, sortKey, sortDirection),
-			),
-		[entries, sortDirection, sortKey],
-	);
+		() => [...entries].sort((left, right) => compareEntries(left, right, sortKey, sortDirection)),
+		[entries, sortDirection, sortKey]
+	)
 
 	function handleSort(nextKey: SortKey) {
 		if (sortKey === nextKey) {
-			setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
-			return;
+			setSortDirection(current => (current === "asc" ? "desc" : "asc"))
+			return
 		}
 
-		setSortKey(nextKey);
-		setSortDirection(nextKey === "changedAt" ? "desc" : "asc");
+		setSortKey(nextKey)
+		setSortDirection(nextKey === "changedAt" ? "desc" : "asc")
 	}
 
 	async function reloadEntries(nextRange: DateRangeInput) {
-		setPending(true);
+		setPending(true)
 
 		try {
 			const nextEntries = backdatedOnly
@@ -250,25 +230,23 @@ export function HistoryPanel({
 					})
 				: await getHistory({
 						data: nextRange,
-					});
+					})
 
-			setEntries(nextEntries);
+			setEntries(nextEntries)
 		} catch (error) {
 			toast.error(
-				error instanceof Error
-					? error.message
-					: "Не удалось загрузить историю изменений.",
-			);
+				error instanceof Error ? error.message : "Не удалось загрузить историю изменений."
+			)
 		} finally {
-			setPending(false);
+			setPending(false)
 		}
 	}
 
 	async function handleExport() {
-		setExporting(true);
+		setExporting(true)
 
 		try {
-			const fileName = buildExportFileName(rangePayload, backdatedOnly);
+			const fileName = buildExportFileName(rangePayload, backdatedOnly)
 			const response = backdatedOnly
 				? await downloadBackdatedDocx({
 						data: {
@@ -281,21 +259,17 @@ export function HistoryPanel({
 							...rangePayload,
 							fileName,
 						},
-					});
+					})
 
 			if (!(response instanceof Response)) {
-				throw new Error("Сервер вернул неожиданный ответ при экспорте.");
+				throw new Error("Сервер вернул неожиданный ответ при экспорте.")
 			}
 
-			await downloadResponseFile(response, fileName);
+			await downloadResponseFile(response, fileName)
 		} catch (error) {
-			toast.error(
-				error instanceof Error
-					? error.message
-					: "Не удалось выгрузить docx-отчёт.",
-			);
+			toast.error(error instanceof Error ? error.message : "Не удалось выгрузить docx-отчёт.")
 		} finally {
-			setExporting(false);
+			setExporting(false)
 		}
 	}
 
@@ -312,16 +286,12 @@ export function HistoryPanel({
 							<Button
 								type="button"
 								variant="outline"
-								className="h-10 w-full justify-between sm:h-8 sm:w-auto sm:justify-center"
-							>
+								className="h-10 w-full justify-between sm:h-8 sm:w-auto sm:justify-center">
 								<CalendarDaysIcon data-icon="inline-start" />
 								{formatRangeLabel(range)}
 							</Button>
 						</PopoverTrigger>
-						<PopoverContent
-							align="end"
-							className="w-[min(22rem,calc(100vw-2rem))]"
-						>
+						<PopoverContent align="end" className="w-[min(22rem,calc(100vw-2rem))]">
 							<PopoverHeader>
 								<PopoverTitle>Диапазон дат</PopoverTitle>
 							</PopoverHeader>
@@ -329,7 +299,7 @@ export function HistoryPanel({
 								mode="range"
 								numberOfMonths={isCompact ? 1 : 2}
 								selected={range}
-								onSelect={(value) => setRange(value ?? createTodayRange())}
+								onSelect={value => setRange(value ?? createTodayRange())}
 								className="w-full"
 							/>
 						</PopoverContent>
@@ -340,13 +310,9 @@ export function HistoryPanel({
 						variant="outline"
 						onClick={() => reloadEntries(rangePayload)}
 						disabled={pending}
-						className="h-10 w-full sm:h-8 sm:w-auto"
-					>
+						className="h-10 w-full sm:h-8 sm:w-auto">
 						{pending ? (
-							<LoaderCircleIcon
-								data-icon="inline-start"
-								className="animate-spin"
-							/>
+							<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
 						) : (
 							<RefreshCcwIcon data-icon="inline-start" />
 						)}
@@ -357,18 +323,17 @@ export function HistoryPanel({
 						type="button"
 						variant="ghost"
 						onClick={() => {
-							const todayRange = createTodayRange();
-							setSortKey("changedAt");
-							setSortDirection("desc");
-							setRange(todayRange);
+							const todayRange = createTodayRange()
+							setSortKey("changedAt")
+							setSortDirection("desc")
+							setRange(todayRange)
 							void reloadEntries({
 								from: dateToIso(todayRange.from),
 								to: dateToIso(todayRange.to),
-							});
+							})
 						}}
 						disabled={pending}
-						className="h-10 w-full sm:h-8 sm:w-auto"
-					>
+						className="h-10 w-full sm:h-8 sm:w-auto">
 						Сбросить
 					</Button>
 
@@ -376,13 +341,9 @@ export function HistoryPanel({
 						type="button"
 						onClick={handleExport}
 						disabled={exporting}
-						className="h-10 w-full sm:h-8 sm:w-auto"
-					>
+						className="h-10 w-full sm:h-8 sm:w-auto">
 						{exporting ? (
-							<LoaderCircleIcon
-								data-icon="inline-start"
-								className="animate-spin"
-							/>
+							<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
 						) : (
 							<DownloadIcon data-icon="inline-start" />
 						)}
@@ -394,9 +355,9 @@ export function HistoryPanel({
 				<Table>
 					<TableHeader className="hidden sm:table-header-group">
 						<TableRow>
-							{sortableColumns.map((column) => {
-								const active = sortKey === column.key;
-								const Icon = column.icon;
+							{sortableColumns.map(column => {
+								const active = sortKey === column.key
+								const Icon = column.icon
 
 								return (
 									<TableHead key={column.key}>
@@ -407,75 +368,58 @@ export function HistoryPanel({
 											onClick={() => handleSort(column.key)}
 											className={cn(
 												"-ml-2 h-8 px-2 text-muted-foreground hover:text-foreground",
-												active && "text-foreground",
-											)}
-										>
+												active && "text-foreground"
+											)}>
 											<Icon />
 											{column.label}
 											<SortIcon active={active} direction={sortDirection} />
 										</Button>
 									</TableHead>
-								);
+								)
 							})}
 						</TableRow>
 					</TableHeader>
 					<TableBody className="block space-y-3 sm:table-row-group sm:space-y-0">
 						{sortedEntries.length > 0 ? (
-							sortedEntries.map((entry) => (
+							sortedEntries.map(entry => (
 								<TableRow
 									key={entry.id}
-									className="block rounded-xl border sm:table-row sm:rounded-none sm:border-x-0"
-								>
+									className="block rounded-xl border sm:table-row sm:rounded-none sm:border-x-0">
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Изменено"
-									>
+										data-label="Изменено">
 										<span className="text-right sm:text-left">
 											{formatTimestamp(entry.changedAt)}
 										</span>
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Дата действия"
-									>
-										<span className="text-right sm:text-left">
-											{entry.effectiveDate}
-										</span>
+										data-label="Дата действия">
+										<span className="text-right sm:text-left">{entry.effectiveDate}</span>
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Пользователь"
-									>
-										<span className="text-right sm:text-left">
-											{entry.userLogin}
-										</span>
+										data-label="Пользователь">
+										<span className="text-right sm:text-left">{entry.userLogin}</span>
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 font-medium before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Помещение"
-									>
+										data-label="Помещение">
 										{entry.roomName}
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Было"
-									>
-										<span className="text-right sm:text-left">
-											{entry.oldProgress}%
-										</span>
+										data-label="Было">
+										<span className="text-right sm:text-left">{entry.oldProgress}%</span>
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Стало"
-									>
-										<span className="text-right sm:text-left">
-											{entry.newProgress}%
-										</span>
+										data-label="Стало">
+										<span className="text-right sm:text-left">{entry.newProgress}%</span>
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Тип"
-									>
+										data-label="Тип">
 										{entry.isBackdated ? (
 											<Badge variant="destructive">Задним числом</Badge>
 										) : (
@@ -488,8 +432,7 @@ export function HistoryPanel({
 							<TableRow>
 								<TableCell
 									colSpan={7}
-									className="block h-auto px-4 py-8 text-center text-muted-foreground sm:table-cell sm:h-32"
-								>
+									className="block h-auto px-4 py-8 text-center text-muted-foreground sm:table-cell sm:h-32">
 									За выбранный период записей не найдено.
 								</TableCell>
 							</TableRow>
@@ -498,5 +441,5 @@ export function HistoryPanel({
 				</Table>
 			</CardContent>
 		</Card>
-	);
+	)
 }

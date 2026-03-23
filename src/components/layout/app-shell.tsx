@@ -1,23 +1,23 @@
-"use client";
+"use client"
 
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router"
 import {
 	FileClockIcon,
 	FileSpreadsheetIcon,
 	HistoryIcon,
 	MapIcon,
 	PanelLeftIcon,
-} from "lucide-react";
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from "lucide-react"
+import { useState } from "react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
 	Sheet,
 	SheetContent,
 	SheetDescription,
 	SheetHeader,
 	SheetTitle,
-} from "@/components/ui/sheet";
+} from "@/components/ui/sheet"
 import {
 	Sidebar,
 	SidebarContent,
@@ -33,29 +33,18 @@ import {
 	SidebarProvider,
 	SidebarRail,
 	SidebarTrigger,
-} from "@/components/ui/sidebar";
-import type { AuthSession } from "@/lib/auth/shared";
-import {
-	canUploadSnapshot,
-	canViewAudit,
-	PROJECT_NAME,
-	roleLabels,
-} from "@/lib/auth/shared";
-import { cn } from "@/lib/utils";
-import { LogoutButton } from "./logout-button";
-import { ThemeToggle } from "./theme-toggle";
+} from "@/components/ui/sidebar"
+import type { AuthSession } from "@/lib/auth/shared"
+import { canUploadSnapshot, canViewAudit, PROJECT_NAME, roleLabels } from "@/lib/auth/shared"
+import { cn } from "@/lib/utils"
+import { LogoutButton } from "./logout-button"
+import { ThemeToggle } from "./theme-toggle"
 
-export function AppShell({
-	children,
-	user,
-}: {
-	children: React.ReactNode;
-	user: AuthSession;
-}) {
+export function AppShell({ children, user }: { children: React.ReactNode; user: AuthSession }) {
 	const pathname = useRouterState({
-		select: (state) => state.location.pathname,
-	});
-	const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+		select: state => state.location.pathname,
+	})
+	const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
 
 	return (
 		<SidebarProvider>
@@ -68,8 +57,7 @@ export function AppShell({
 						size="icon-sm"
 						className="md:hidden"
 						onClick={() => setMobileNavigationOpen(true)}
-						aria-label="Открыть навигацию"
-					>
+						aria-label="Открыть навигацию">
 						<PanelLeftIcon />
 					</Button>
 					<SidebarTrigger className="hidden md:inline-flex" />
@@ -86,17 +74,11 @@ export function AppShell({
 				/>
 			</SidebarInset>
 		</SidebarProvider>
-	);
+	)
 }
 
-function AppSidebar({
-	pathname,
-	user,
-}: {
-	pathname: string;
-	user: AuthSession;
-}) {
-	const items = getNavigationItems(user.role);
+function AppSidebar({ pathname, user }: { pathname: string; user: AuthSession }) {
+	const items = getNavigationItems(user.role)
 
 	return (
 		<Sidebar collapsible="icon" className="z-50">
@@ -105,17 +87,14 @@ function AppSidebar({
 					to="/app"
 					className={cn(
 						"flex items-center gap-3 rounded-lg transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-						"group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center",
-					)}
-				>
+						"group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center"
+					)}>
 					<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
 						SV
 					</div>
 					<div className="min-w-0 group-data-[collapsible=icon]:hidden">
 						<div className="truncate text-sm font-semibold">{PROJECT_NAME}</div>
-						<div className="truncate text-xs text-muted-foreground">
-							Рабочее пространство
-						</div>
+						<div className="truncate text-xs text-muted-foreground">Рабочее пространство</div>
 					</div>
 				</Link>
 			</SidebarHeader>
@@ -124,17 +103,14 @@ function AppSidebar({
 					<SidebarGroupLabel>Навигация</SidebarGroupLabel>
 					<SidebarGroupContent>
 						<SidebarMenu className="gap-1">
-							{items.map((item) => (
+							{items.map(item => (
 								<SidebarMenuItem key={item.to}>
 									<SidebarMenuButton
 										asChild
 										isActive={
-											item.to === "/app"
-												? pathname === "/app"
-												: pathname.startsWith(item.to)
+											item.to === "/app" ? pathname === "/app" : pathname.startsWith(item.to)
 										}
-										tooltip={item.label}
-									>
+										tooltip={item.label}>
 										<Link to={item.to}>
 											<item.icon />
 											<span>{item.label}</span>
@@ -152,9 +128,8 @@ function AppSidebar({
 						<div
 							className={cn(
 								"flex items-center gap-3",
-								"group-data-[collapsible=icon]:justify-center",
-							)}
-						>
+								"group-data-[collapsible=icon]:justify-center"
+							)}>
 							<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold">
 								{getInitials(user.login)}
 							</div>
@@ -173,7 +148,7 @@ function AppSidebar({
 			</SidebarFooter>
 			<SidebarRail />
 		</Sidebar>
-	);
+	)
 }
 
 function MobileNavigationSheet({
@@ -182,30 +157,27 @@ function MobileNavigationSheet({
 	open,
 	onOpenChange,
 }: {
-	pathname: string;
-	user: AuthSession;
-	open: boolean;
-	onOpenChange: (open: boolean) => void;
+	pathname: string
+	user: AuthSession
+	open: boolean
+	onOpenChange: (open: boolean) => void
 }) {
-	const items = getNavigationItems(user.role);
+	const items = getNavigationItems(user.role)
 
 	return (
 		<Sheet open={open} onOpenChange={onOpenChange}>
 			<SheetContent
 				side="left"
 				showCloseButton={false}
-				className="w-[min(88vw,20rem)] gap-0 p-0 pb-[env(safe-area-inset-bottom)] sm:max-w-none"
-			>
+				className="w-[min(88vw,20rem)] gap-0 p-0 pb-[env(safe-area-inset-bottom)] sm:max-w-none">
 				<SheetHeader className="gap-1 border-b px-4 py-4 pt-[calc(env(safe-area-inset-top)+1rem)] text-left">
 					<SheetTitle>{PROJECT_NAME}</SheetTitle>
-					<SheetDescription>
-						Навигация по рабочему пространству
-					</SheetDescription>
+					<SheetDescription>Навигация по рабочему пространству</SheetDescription>
 				</SheetHeader>
 
 				<div className="flex min-h-0 flex-1 flex-col overflow-auto px-3 py-3">
 					<nav className="flex flex-col gap-1">
-						{items.map((item) => (
+						{items.map(item => (
 							<Button
 								key={item.to}
 								asChild
@@ -218,8 +190,7 @@ function MobileNavigationSheet({
 											? "secondary"
 											: "ghost"
 								}
-								className="h-11 justify-start px-3"
-							>
+								className="h-11 justify-start px-3">
 								<Link to={item.to} onClick={() => onOpenChange(false)}>
 									<item.icon />
 									<span>{item.label}</span>
@@ -247,32 +218,32 @@ function MobileNavigationSheet({
 				</div>
 			</SheetContent>
 		</Sheet>
-	);
+	)
 }
 
 function getInitials(value: string) {
-	return value.slice(0, 2).toUpperCase();
+	return value.slice(0, 2).toUpperCase()
 }
 
 function getNavigationItems(role: AuthSession["role"]) {
 	const items: Array<{
-		to: "/app" | "/app/import" | "/app/history" | "/app/backdated";
-		label: string;
-		icon: typeof MapIcon;
+		to: "/app" | "/app/import" | "/app/history" | "/app/backdated"
+		label: string
+		icon: typeof MapIcon
 	}> = [
 		{
 			to: "/app" as const,
 			label: "Карта демонтажа",
 			icon: MapIcon,
 		},
-	];
+	]
 
 	if (canUploadSnapshot(role)) {
 		items.push({
 			to: "/app/import" as const,
 			label: "Загрузка данных",
 			icon: FileSpreadsheetIcon,
-		});
+		})
 	}
 
 	if (canViewAudit(role)) {
@@ -286,11 +257,11 @@ function getNavigationItems(role: AuthSession["role"]) {
 				to: "/app/backdated" as const,
 				label: "Задним числом",
 				icon: FileClockIcon,
-			},
-		);
+			}
+		)
 	}
 
-	return items;
+	return items
 }
 
 function getPageTitle(pathname: string) {
@@ -300,5 +271,5 @@ function getPageTitle(pathname: string) {
 			["/app/history", "История изменений"],
 			["/app/backdated", "Изменения задним числом"],
 		].find(([path]) => pathname.startsWith(path))?.[1] ?? "Карта демонтажа"
-	);
+	)
 }

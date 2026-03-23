@@ -1,25 +1,20 @@
-"use client";
+"use client"
 
-import { useForm } from "@tanstack/react-form";
-import { useNavigate, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import {
-	Field,
-	FieldError,
-	FieldGroup,
-	FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
-import { login } from "@/lib/auth/auth.functions";
-import type { LoginInput } from "@/lib/auth/shared";
-import { loginSchema } from "@/lib/auth/shared";
+import { useForm } from "@tanstack/react-form"
+import { useNavigate, useRouter } from "@tanstack/react-router"
+import { useState } from "react"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
+import { login } from "@/lib/auth/auth.functions"
+import type { LoginInput } from "@/lib/auth/shared"
+import { loginSchema } from "@/lib/auth/shared"
 
 function toFieldErrors(errors: Array<unknown>) {
-	return errors.flatMap((error) => {
-		if (typeof error === "string") return [{ message: error }];
+	return errors.flatMap(error => {
+		if (typeof error === "string") return [{ message: error }]
 
 		if (
 			error &&
@@ -27,16 +22,16 @@ function toFieldErrors(errors: Array<unknown>) {
 			"message" in error &&
 			typeof error.message === "string"
 		)
-			return [{ message: error.message }];
+			return [{ message: error.message }]
 
-		return [];
-	});
+		return []
+	})
 }
 
 export function LoginForm() {
-	const [submitError, setSubmitError] = useState<string | null>(null);
-	const navigate = useNavigate();
-	const router = useRouter();
+	const [submitError, setSubmitError] = useState<string | null>(null)
+	const navigate = useNavigate()
+	const router = useRouter()
 
 	const form = useForm({
 		defaultValues: {
@@ -47,38 +42,33 @@ export function LoginForm() {
 			onSubmit: loginSchema,
 		},
 		onSubmit: async ({ value }) => {
-			setSubmitError(null);
+			setSubmitError(null)
 
 			try {
-				await login({ data: value });
-				await router.invalidate();
-				await navigate({ to: "/app" });
+				await login({ data: value })
+				await router.invalidate()
+				await navigate({ to: "/app" })
 			} catch (error) {
-				const message =
-					error instanceof Error ? error.message : "Не удалось выполнить вход.";
+				const message = error instanceof Error ? error.message : "Не удалось выполнить вход."
 
-				setSubmitError(message);
-				toast.error(message);
+				setSubmitError(message)
+				toast.error(message)
 			}
 		},
-	});
+	})
 
 	return (
 		<form
 			className="flex flex-col gap-5"
-			onSubmit={(event) => {
-				event.preventDefault();
-				event.stopPropagation();
-				void form.handleSubmit();
-			}}
-		>
+			onSubmit={event => {
+				event.preventDefault()
+				event.stopPropagation()
+				void form.handleSubmit()
+			}}>
 			<FieldGroup>
-				<form.Field
-					name="login"
-					validators={{ onBlur: loginSchema.shape.login }}
-				>
-					{(field) => {
-						const errors = toFieldErrors(field.state.meta.errors);
+				<form.Field name="login" validators={{ onBlur: loginSchema.shape.login }}>
+					{field => {
+						const errors = toFieldErrors(field.state.meta.errors)
 
 						return (
 							<Field data-invalid={errors.length > 0 || undefined}>
@@ -89,20 +79,17 @@ export function LoginForm() {
 									autoComplete="username"
 									value={field.state.value}
 									onBlur={field.handleBlur}
-									onChange={(event) => field.handleChange(event.target.value)}
+									onChange={event => field.handleChange(event.target.value)}
 									aria-invalid={errors.length > 0}
 								/>
 								<FieldError errors={errors} />
 							</Field>
-						);
+						)
 					}}
 				</form.Field>
-				<form.Field
-					name="password"
-					validators={{ onBlur: loginSchema.shape.password }}
-				>
-					{(field) => {
-						const errors = toFieldErrors(field.state.meta.errors);
+				<form.Field name="password" validators={{ onBlur: loginSchema.shape.password }}>
+					{field => {
+						const errors = toFieldErrors(field.state.meta.errors)
 
 						return (
 							<Field data-invalid={errors.length > 0 || undefined}>
@@ -114,22 +101,21 @@ export function LoginForm() {
 									autoComplete="current-password"
 									value={field.state.value}
 									onBlur={field.handleBlur}
-									onChange={(event) => field.handleChange(event.target.value)}
+									onChange={event => field.handleChange(event.target.value)}
 									aria-invalid={errors.length > 0}
 								/>
 								<FieldError errors={errors} />
 							</Field>
-						);
+						)
 					}}
 				</form.Field>
 			</FieldGroup>
 			{submitError ? <FieldError>{submitError}</FieldError> : null}
 			<form.Subscribe
-				selector={(state) => ({
+				selector={state => ({
 					canSubmit: state.canSubmit,
 					isSubmitting: state.isSubmitting,
-				})}
-			>
+				})}>
 				{({ canSubmit, isSubmitting }) => (
 					<Button type="submit" disabled={!canSubmit || isSubmitting}>
 						{isSubmitting ? <Spinner data-icon="inline-start" /> : null}
@@ -138,5 +124,5 @@ export function LoginForm() {
 				)}
 			</form.Subscribe>
 		</form>
-	);
+	)
 }

@@ -1,16 +1,12 @@
-import { DownloadIcon, LoaderCircleIcon } from "lucide-react";
-import type { CSSProperties } from "react";
-import { Button } from "@/components/ui/button";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { boardColumns } from "./config";
-import { PathArea } from "./path-layer";
-import { LeftRoomArea, RightRoomArea, TotalThreadsBadge } from "./room-blocks";
-import type { LevelBand } from "./types";
+import { DownloadIcon, LoaderCircleIcon } from "lucide-react"
+import type { CSSProperties } from "react"
+import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
+import { boardColumns } from "./config"
+import { PathArea } from "./path-layer"
+import { LeftRoomArea, RightRoomArea, TotalThreadsBadge } from "./room-blocks"
+import type { LevelBand } from "./types"
 
 export function LevelBandView({
 	band,
@@ -23,33 +19,31 @@ export function LevelBandView({
 	onExportDailyReport,
 	isLast,
 }: {
-	band: LevelBand;
-	bandIndex: number;
-	canEditProgress: boolean;
-	canManageManualRooms: boolean;
-	canExportDailyReport: boolean;
-	isExportDisabled: boolean;
-	isExportingReport: boolean;
-	onExportDailyReport: () => void;
-	isLast: boolean;
+	band: LevelBand
+	bandIndex: number
+	canEditProgress: boolean
+	canManageManualRooms: boolean
+	canExportDailyReport: boolean
+	isExportDisabled: boolean
+	isExportingReport: boolean
+	onExportDailyReport: () => void
+	isLast: boolean
 }) {
-	const isFirst = bandIndex === 0;
+	const isFirst = bandIndex === 0
 
 	return (
 		<div
 			className={cn(
 				"relative grid",
 				isLast && "border-b-2",
-				!isFirst &&
-					"border-t-2 border-dashed border-zinc-400/90 dark:border-zinc-700",
+				!isFirst && "border-t-2 border-dashed border-zinc-400/90 dark:border-zinc-700"
 			)}
 			style={
 				{
 					gridTemplateColumns: boardColumns,
-					gridTemplateRows: band.rows.map((row) => `${row.height}px`).join(" "),
+					gridTemplateRows: band.rows.map(row => `${row.height}px`).join(" "),
 				} satisfies CSSProperties
-			}
-		>
+			}>
 			<div
 				className="relative flex items-center justify-center border-x-2 border-dashed border-zinc-400/90 px-2 text-center dark:border-zinc-700"
 				style={
@@ -57,8 +51,7 @@ export function LevelBandView({
 						gridColumn: "4",
 						gridRow: `1 / span ${band.rowCount}`,
 					} satisfies CSSProperties
-				}
-			>
+				}>
 				<div className="flex w-full flex-col items-center gap-3">
 					<div className="text-3xl font-semibold leading-none tracking-[-0.03em] text-zinc-900 dark:text-zinc-100">
 						{band.level}
@@ -72,8 +65,7 @@ export function LevelBandView({
 									variant="outline"
 									onClick={onExportDailyReport}
 									disabled={isExportDisabled}
-									aria-label={`Выгрузить DOCX по уровню ${band.level}`}
-								>
+									aria-label={`Выгрузить DOCX по уровню ${band.level}`}>
 									{isExportingReport ? (
 										<LoaderCircleIcon className="animate-spin" />
 									) : (
@@ -88,7 +80,7 @@ export function LevelBandView({
 			</div>
 
 			{band.rows.map((row, rowIndex) => {
-				const gridRow = String(rowIndex + 1);
+				const gridRow = String(rowIndex + 1)
 
 				return (
 					<LevelBandRowView
@@ -100,10 +92,10 @@ export function LevelBandView({
 						canEditProgress={canEditProgress}
 						canManageManualRooms={canManageManualRooms}
 					/>
-				);
+				)
 			})}
 		</div>
-	);
+	)
 }
 
 function LevelBandRowView({
@@ -114,12 +106,12 @@ function LevelBandRowView({
 	canEditProgress,
 	canManageManualRooms,
 }: {
-	dirtyGroup: LevelBand["rows"][number]["dirtyGroup"];
-	cleanGroup: LevelBand["rows"][number]["cleanGroup"];
-	gridRow: string;
-	rowHeight: number;
-	canEditProgress: boolean;
-	canManageManualRooms: boolean;
+	dirtyGroup: LevelBand["rows"][number]["dirtyGroup"]
+	cleanGroup: LevelBand["rows"][number]["cleanGroup"]
+	gridRow: string
+	rowHeight: number
+	canEditProgress: boolean
+	canManageManualRooms: boolean
 }) {
 	return (
 		<>
@@ -155,5 +147,5 @@ function LevelBandRowView({
 				/>
 			</div>
 		</>
-	);
+	)
 }

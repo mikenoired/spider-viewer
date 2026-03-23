@@ -1,20 +1,14 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { LoginForm } from "@/components/auth/login-form";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import { PROJECT_NAME } from "@/lib/auth/shared";
+import { createFileRoute, redirect } from "@tanstack/react-router"
+import { LoginForm } from "@/components/auth/login-form"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { PROJECT_NAME } from "@/lib/auth/shared"
 
 export const Route = createFileRoute("/login")({
 	beforeLoad: ({ context }) => {
-		if (context.auth) throw redirect({ to: "/app" });
+		if (context.auth) throw redirect({ to: "/app" })
 	},
 	component: LoginPage,
-});
+})
 
 function LoginPage() {
 	return (
@@ -23,8 +17,7 @@ function LoginPage() {
 				<CardHeader>
 					<CardTitle>Вход в {PROJECT_NAME}</CardTitle>
 					<CardDescription>
-						Авторизуйтесь через логин и пароль, чтобы открыть рабочее
-						пространство.
+						Авторизуйтесь через логин и пароль, чтобы открыть рабочее пространство.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -32,5 +25,5 @@ function LoginPage() {
 				</CardContent>
 			</Card>
 		</main>
-	);
+	)
 }
