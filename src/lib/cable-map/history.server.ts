@@ -246,6 +246,7 @@ function createHistoryTable(
 ) {
 	const includeTypeColumn = options?.includeTypeColumn ?? false
 	const columnWidths = includeTypeColumn ? historyReportTableColumnWidths : historyTableColumnWidths
+	const typeColumnWidth = historyReportTableColumnWidths[6]
 
 	return new Table({
 		width: {
@@ -264,7 +265,7 @@ function createHistoryTable(
 					createTableCell("Помещение", columnWidths[3]),
 					createTableCell("Было", columnWidths[4]),
 					createTableCell("Стало", columnWidths[5]),
-					...(includeTypeColumn ? [createTableCell("Тип", columnWidths[6])] : []),
+					...(includeTypeColumn ? [createTableCell("Тип", typeColumnWidth)] : []),
 				],
 			}),
 			...entries.map(
@@ -281,7 +282,7 @@ function createHistoryTable(
 								? [
 										createTableCell(
 											entry.isBackdated ? "Задним числом" : "Обычное",
-											columnWidths[6]
+											typeColumnWidth
 										),
 									]
 								: []),
@@ -343,6 +344,85 @@ type CreateHistoryDocxOptions = {
 	emptyMessage?: string
 }
 
+function createHistoryTitle(rangeLabel: string | null, level: string | null, title?: string) {
+	if (title) {
+		return title
+	}
+
+	if (rangeLabel) {
+		return level
+			? `Отчёт об изменениях по уровню ${level}: ${rangeLabel}`
+			: `Отчёт об изменениях по уровням: ${rangeLabel}`
+	}
+
+	return level ? `Отчёт об изменениях по уровню ${level}` : "Отчёт об изменениях по уровням"
+}
+
+function createHistoryEmptyMessage(level: string | null, emptyMessage?: string) {
+	if (emptyMessage) {
+		return emptyMessage
+	}
+
+	return level
+		? `За выбранный период изменений по уровню ${level} не найдено.`
+		: "За выбранный период изменений по уровням не найдено."
+}
+
+function createHistorySummaryText(level: string | null, entryCount: number, groupCount: number) {
+	return level
+		? `Всего изменений на уровне: ${entryCount}.`
+		: `Всего изменений: ${entryCount}. Уровней с изменениями: ${groupCount}.`
+}
+
+function createHistoryGroupSections(groups: ReturnType<typeof groupHistoryEntriesByLevel>) {
+	return groups.flatMap(group => [
+		new Paragraph({
+			heading: "Heading2",
+			children: [
+				new TextRun(group.level === "Неизвестный уровень" ? group.level : `Уровень ${group.level}`),
+			],
+		}),
+		new Paragraph({
+			children: [new TextRun(`Изменений на уровне: ${group.entries.length}.`)],
+		}),
+		createHistoryTable(group.entries, {
+			includeTypeColumn: true,
+		}),
+	])
+}
+
+function createHistoryDocumentChildren({
+	title,
+	summaryText,
+	groups,
+	emptyMessage,
+}: {
+	title: string
+	summaryText: string
+	groups: ReturnType<typeof groupHistoryEntriesByLevel>
+	emptyMessage: string
+}) {
+	return [
+		new Paragraph({
+			heading: "Heading1",
+			children: [new TextRun(title)],
+		}),
+		new Paragraph({
+			children: [new TextRun(`Сформировано: ${getTimestampLabel(new Date().toISOString())}`)],
+		}),
+		new Paragraph({
+			children: [new TextRun(summaryText)],
+		}),
+		...(groups.length > 0
+			? createHistoryGroupSections(groups)
+			: [
+					new Paragraph({
+						children: [new TextRun(emptyMessage)],
+					}),
+				]),
+	]
+}
+
 export async function createBackdatedDocx(range?: DateRangeInput) {
 	const entries = await getHistoryEntries(range, {
 		backdatedOnly: true,
@@ -387,62 +467,20 @@ export async function createHistoryDocx(
 	const level = options.level?.trim() || null
 	const entries = await getHistoryEntries(range, level ? { level } : {})
 	const rangeLabel = createRangeLabel(range)
-	const title =
-		options.title ??
-		(rangeLabel
-			? level
-				? `Отчёт об изменениях по уровню ${level}: ${rangeLabel}`
-				: `Отчёт об изменениях по уровням: ${rangeLabel}`
-			: level
-				? `Отчёт об изменениях по уровню ${level}`
-				: "Отчёт об изменениях по уровням")
 	const groups = groupHistoryEntriesByLevel(entries)
-	const emptyMessage =
-		options.emptyMessage ??
-		(level
-			? `За выбранный период изменений по уровню ${level} не найдено.`
-			: "За выбранный период изменений по уровням не найдено.")
-	const summaryText = level
-		? `Всего изменений на уровне: ${entries.length}.`
-		: `Всего изменений: ${entries.length}. Уровней с изменениями: ${groups.length}.`
+	const title = createHistoryTitle(rangeLabel, level, options.title)
+	const emptyMessage = createHistoryEmptyMessage(level, options.emptyMessage)
+	const summaryText = createHistorySummaryText(level, entries.length, groups.length)
 
 	const document = new Document({
 		sections: [
 			{
-				children: [
-					new Paragraph({
-						heading: "Heading1",
-						children: [new TextRun(title)],
-					}),
-					new Paragraph({
-						children: [new TextRun(`Сформировано: ${getTimestampLabel(new Date().toISOString())}`)],
-					}),
-					new Paragraph({
-						children: [new TextRun(summaryText)],
-					}),
-					...(groups.length > 0
-						? groups.flatMap(group => [
-								new Paragraph({
-									heading: "Heading2",
-									children: [
-										new TextRun(
-											group.level === "Неизвестный уровень" ? group.level : `Уровень ${group.level}`
-										),
-									],
-								}),
-								new Paragraph({
-									children: [new TextRun(`Изменений на уровне: ${group.entries.length}.`)],
-								}),
-								createHistoryTable(group.entries, {
-									includeTypeColumn: true,
-								}),
-							])
-						: [
-								new Paragraph({
-									children: [new TextRun(emptyMessage)],
-								}),
-							]),
-				],
+				children: createHistoryDocumentChildren({
+					title,
+					summaryText,
+					groups,
+					emptyMessage,
+				}),
 			},
 		],
 	})

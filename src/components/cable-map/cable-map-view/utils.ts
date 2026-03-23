@@ -80,28 +80,39 @@ export function getBoardHeight(bands: LevelBand[]) {
 	}, 0)
 }
 
-export function getShaftExtents(bands: LevelBand[], side: GraphSide, shaft: 1 | 2 | 3 | 4) {
-	let top: number | null = null
-	let bottom: number | null = null
+function getGroupForSide(row: LevelBand["rows"][number], side: GraphSide) {
+	return side === "dirty" ? row.dirtyGroup : row.cleanGroup
+}
 
-	for (const band of bands) {
-		for (const row of band.rows) {
-			const group = side === "dirty" ? row.dirtyGroup : row.cleanGroup
-			if (!group || getBucketThreadCount(group, shaft) <= 0) {
-				continue
-			}
+function getRowShaftExtent(row: LevelBand["rows"][number], side: GraphSide, shaft: 1 | 2 | 3 | 4) {
+	const group = getGroupForSide(row, side)
 
-			const nextTop = row.startY + shaftCapInset
-			const nextBottom = row.startY + row.height - shaftCapInset
-
-			top = top === null ? nextTop : Math.min(top, nextTop)
-			bottom = bottom === null ? nextBottom : Math.max(bottom, nextBottom)
-		}
+	if (!group || getBucketThreadCount(group, shaft) <= 0) {
+		return null
 	}
 
-	if (top === null || bottom === null || bottom <= top) return null
+	return {
+		top: row.startY + shaftCapInset,
+		bottom: row.startY + row.height - shaftCapInset,
+	}
+}
 
-	return { top, bottom }
+export function getShaftExtents(bands: LevelBand[], side: GraphSide, shaft: 1 | 2 | 3 | 4) {
+	const extents = bands.flatMap(band =>
+		band.rows.flatMap(row => {
+			const extent = getRowShaftExtent(row, side, shaft)
+			return extent ? [extent] : []
+		})
+	)
+
+	if (extents.length === 0) {
+		return null
+	}
+
+	const top = Math.min(...extents.map(extent => extent.top))
+	const bottom = Math.max(...extents.map(extent => extent.bottom))
+
+	return bottom > top ? { top, bottom } : null
 }
 
 function getPdfRowHeight(dirtyGroup: GraphGroupView | null, cleanGroup: GraphGroupView | null) {

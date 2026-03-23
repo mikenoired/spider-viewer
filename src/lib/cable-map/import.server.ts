@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import * as XLSX from "xlsx"
+import * as Xlsx from "xlsx"
 import type { AuthSession } from "@/lib/auth/shared"
 import { getDb } from "@/lib/db"
 import {
@@ -72,6 +72,11 @@ type AggregatedGroup = {
 	bucketThreads: Record<0 | 1 | 2 | 3 | 4, number>
 }
 
+type SideSummaryState = {
+	groupCount: number
+	roomNames: Set<string>
+}
+
 const workbookColumnIndexes = {
 	cableLabel: 0,
 	cableJournal: 1,
@@ -121,6 +126,10 @@ function parseLocaleNumber(value: string) {
 
 function parseInteger(value: string) {
 	return Math.round(parseLocaleNumber(value))
+}
+
+function getWorkbookCell(row: string[], columnIndex: number) {
+	return row[columnIndex] ?? ""
 }
 
 function getWorkbookExtension(fileName: string) {
@@ -207,6 +216,86 @@ function extractShaftValues(row: string[], headerRow: string[]) {
 	return shaftValues
 }
 
+function getFarthestShaft(shaftValues: ParsedCableRow["shaftValues"]) {
+	return shaftValues.length > 0 ? Math.max(...shaftValues.map(entry => entry.shaft)) : null
+}
+
+function hasRequiredRowData({
+	cableLabel,
+	level,
+	fromZone,
+	fromRoom,
+	toRoom,
+}: {
+	cableLabel: string
+	level: string
+	fromZone: string
+	fromRoom: string
+	toRoom: string
+}) {
+	return cableLabel !== "" && level !== "" && fromZone !== "" && (fromRoom !== "" || toRoom !== "")
+}
+
+function parseWorkbookDataRow(rawRow: string[], index: number, headerRow: string[]) {
+	const row = rawRow.map(normalizeCellValue)
+	const cableLabel = getWorkbookCell(row, workbookColumnIndexes.cableLabel)
+	const level = getWorkbookCell(row, workbookColumnIndexes.level)
+	const fromZone = getWorkbookCell(row, workbookColumnIndexes.fromZone)
+	const fromRoom = getWorkbookCell(row, workbookColumnIndexes.fromRoom)
+	const toRoom = getWorkbookCell(row, workbookColumnIndexes.toRoom)
+
+	if (!hasRequiredRowData({ cableLabel, level, fromZone, fromRoom, toRoom })) {
+		return null
+	}
+
+	const graphSide = resolveGraphSide(fromZone)
+	const graphSubzone = resolveGraphSubzone(fromZone, graphSide)
+	const shaftValues = extractShaftValues(row, headerRow)
+
+	return {
+		sourceRowIndex: index + 2,
+		cableLabel,
+		cableJournal: getWorkbookCell(row, workbookColumnIndexes.cableJournal),
+		cableNumber: getWorkbookCell(row, workbookColumnIndexes.cableNumber),
+		repeatFrom: getWorkbookCell(row, workbookColumnIndexes.repeatFrom),
+		repeatTo: getWorkbookCell(row, workbookColumnIndexes.repeatTo),
+		repeatKks: getWorkbookCell(row, workbookColumnIndexes.repeatKks),
+		fromRoom: enToRuVisual(fromRoom),
+		fromLocation: getWorkbookCell(row, workbookColumnIndexes.fromLocation),
+		fromEquipment: getWorkbookCell(row, workbookColumnIndexes.fromEquipment),
+		toRoom,
+		threadLength: parseLocaleNumber(getWorkbookCell(row, workbookColumnIndexes.threadLength)),
+		threadCount: parseInteger(getWorkbookCell(row, workbookColumnIndexes.threadCount)),
+		totalLength: parseLocaleNumber(getWorkbookCell(row, workbookColumnIndexes.totalLength)),
+		level,
+		levelOrder: parseLocaleNumber(level),
+		fromZone,
+		toZone: getWorkbookCell(row, workbookColumnIndexes.toZone),
+		graphSide,
+		graphSubzone,
+		farthestShaft: getFarthestShaft(shaftValues),
+		shaftValues,
+		route: getWorkbookCell(row, workbookColumnIndexes.route),
+		rawRow: row,
+	} satisfies ParsedCableRow
+}
+
+function validateWorkbookStructure(headerRow: string[]) {
+	const lastRequiredColumnIndex = Math.max(...requiredWorkbookColumnIndexes)
+
+	if (headerRow.length <= lastRequiredColumnIndex) {
+		throw new Error('Структура листа "Общ" не соответствует ожидаемому шаблону.')
+	}
+}
+
+function validateWorkbookRowCount(dataRowCount: number) {
+	if (dataRowCount > maxWorkbookRowCount) {
+		throw new Error(
+			`Файл содержит слишком много строк для безопасного импорта (${dataRowCount}). Лимит: ${maxWorkbookRowCount}.`
+		)
+	}
+}
+
 function groupKeyForRow(row: ParsedCableRow) {
 	return [row.graphSide, row.graphSubzone ?? "none", row.fromZone || "unknown", row.level].join(":")
 }
@@ -269,7 +358,7 @@ function chunkValues<T>(values: T[], size: number) {
 }
 
 export function parseWorkbookRows(fileName: string, buffer: Buffer) {
-	const workbook = XLSX.read(buffer, {
+	const workbook = Xlsx.read(buffer, {
 		type: "buffer",
 		cellDates: false,
 		raw: false,
@@ -280,7 +369,7 @@ export function parseWorkbookRows(fileName: string, buffer: Buffer) {
 		throw new Error('В файле отсутствует лист "Общ".')
 	}
 
-	const rawRows = XLSX.utils.sheet_to_json<string[]>(sheet, {
+	const rawRows = Xlsx.utils.sheet_to_json<string[]>(sheet, {
 		header: 1,
 		raw: false,
 		defval: "",
@@ -292,67 +381,14 @@ export function parseWorkbookRows(fileName: string, buffer: Buffer) {
 	}
 
 	const headerRow = rawRows[0].map(normalizeCellValue)
-	const lastRequiredColumnIndex = Math.max(...requiredWorkbookColumnIndexes)
-
-	if (headerRow.length <= lastRequiredColumnIndex) {
-		throw new Error('Структура листа "Общ" не соответствует ожидаемому шаблону.')
-	}
+	validateWorkbookStructure(headerRow)
 
 	const dataRowCount = rawRows.length - 1
-
-	if (dataRowCount > maxWorkbookRowCount) {
-		throw new Error(
-			`Файл содержит слишком много строк для безопасного импорта (${dataRowCount}). Лимит: ${maxWorkbookRowCount}.`
-		)
-	}
+	validateWorkbookRowCount(dataRowCount)
 
 	const parsedRows = rawRows
 		.slice(1)
-		.map((rawRow, index) => {
-			const row = rawRow.map(normalizeCellValue)
-			const cableLabel = row[workbookColumnIndexes.cableLabel] ?? ""
-			const level = row[workbookColumnIndexes.level] ?? ""
-			const fromZone = row[workbookColumnIndexes.fromZone] ?? ""
-			const fromRoom = row[workbookColumnIndexes.fromRoom] ?? ""
-			const toRoom = row[workbookColumnIndexes.toRoom] ?? ""
-
-			if (!cableLabel || !level || !fromZone || (!fromRoom && !toRoom)) {
-				return null
-			}
-
-			const graphSide = resolveGraphSide(fromZone)
-			const graphSubzone = resolveGraphSubzone(fromZone, graphSide)
-			const shaftValues = extractShaftValues(row, headerRow)
-			const farthestShaft =
-				shaftValues.length > 0 ? Math.max(...shaftValues.map(entry => entry.shaft)) : null
-
-			return {
-				sourceRowIndex: index + 2,
-				cableLabel,
-				cableJournal: row[workbookColumnIndexes.cableJournal] ?? "",
-				cableNumber: row[workbookColumnIndexes.cableNumber] ?? "",
-				repeatFrom: row[workbookColumnIndexes.repeatFrom] ?? "",
-				repeatTo: row[workbookColumnIndexes.repeatTo] ?? "",
-				repeatKks: row[workbookColumnIndexes.repeatKks] ?? "",
-				fromRoom: enToRuVisual(fromRoom),
-				fromLocation: row[workbookColumnIndexes.fromLocation] ?? "",
-				fromEquipment: row[workbookColumnIndexes.fromEquipment] ?? "",
-				toRoom,
-				threadLength: parseLocaleNumber(row[workbookColumnIndexes.threadLength] ?? ""),
-				threadCount: parseInteger(row[workbookColumnIndexes.threadCount] ?? ""),
-				totalLength: parseLocaleNumber(row[workbookColumnIndexes.totalLength] ?? ""),
-				level,
-				levelOrder: parseLocaleNumber(level),
-				fromZone,
-				toZone: row[workbookColumnIndexes.toZone] ?? "",
-				graphSide,
-				graphSubzone,
-				farthestShaft,
-				shaftValues,
-				route: row[workbookColumnIndexes.route] ?? "",
-				rawRow: row,
-			} satisfies ParsedCableRow
-		})
+		.map((rawRow, index) => parseWorkbookDataRow(rawRow, index, headerRow))
 		.filter((row): row is ParsedCableRow => row !== null)
 
 	if (parsedRows.length === 0) {
@@ -365,13 +401,52 @@ export function parseWorkbookRows(fileName: string, buffer: Buffer) {
 function aggregateGroups(rows: ParsedCableRow[]) {
 	const groups = new Map<string, AggregatedGroup>()
 	const uniqueLevels = new Set<string>()
-	const sideSummary = new Map<
-		GraphSide,
-		{
-			groupCount: number
-			roomNames: Set<string>
+	const sideSummary = new Map<GraphSide, SideSummaryState>()
+
+	function updateGroupTotals(group: AggregatedGroup, row: ParsedCableRow) {
+		group.cableCount += 1
+		group.threadCount += row.threadCount
+		group.totalLength += row.totalLength
+
+		const bucket = (row.farthestShaft ?? 0) as 0 | 1 | 2 | 3 | 4
+		group.bucketThreads[bucket] += row.threadCount
+	}
+
+	function updatePrimaryRoom(group: AggregatedGroup, row: ParsedCableRow) {
+		if (!isMeaningfulValue(row.fromRoom)) {
+			return
 		}
-	>()
+
+		const room = upsertGroupRoom(group.primaryRooms, row.fromRoom, "primary")
+		room.cableCount += 1
+		room.threadCount += row.threadCount
+		room.totalLength += row.totalLength
+	}
+
+	function updateSecondaryRoom(group: AggregatedGroup, row: ParsedCableRow) {
+		if (
+			!isMeaningfulValue(row.toRoom) ||
+			row.toRoom === row.fromRoom ||
+			group.primaryRooms.has(row.toRoom)
+		) {
+			return
+		}
+
+		const room = upsertGroupRoom(group.secondaryRooms, row.toRoom, "secondary")
+		room.cableCount += 1
+		room.threadCount += row.threadCount
+		room.totalLength += row.totalLength
+	}
+
+	function updateSideSummary(row: ParsedCableRow) {
+		const sideState = sideSummary.get(row.graphSide) ?? {
+			groupCount: 0,
+			roomNames: new Set<string>(),
+		}
+
+		sideState.roomNames.add(row.fromRoom)
+		sideSummary.set(row.graphSide, sideState)
+	}
 
 	for (const row of rows) {
 		uniqueLevels.add(row.level)
@@ -380,38 +455,10 @@ function aggregateGroups(rows: ParsedCableRow[]) {
 		const group = groups.get(groupKey) ?? createAggregatedGroup(row)
 		groups.set(groupKey, group)
 
-		group.cableCount += 1
-		group.threadCount += row.threadCount
-		group.totalLength += row.totalLength
-
-		const bucket = (row.farthestShaft ?? 0) as 0 | 1 | 2 | 3 | 4
-		group.bucketThreads[bucket] += row.threadCount
-
-		if (isMeaningfulValue(row.fromRoom)) {
-			const room = upsertGroupRoom(group.primaryRooms, row.fromRoom, "primary")
-			room.cableCount += 1
-			room.threadCount += row.threadCount
-			room.totalLength += row.totalLength
-		}
-
-		if (
-			isMeaningfulValue(row.toRoom) &&
-			row.toRoom !== row.fromRoom &&
-			!group.primaryRooms.has(row.toRoom)
-		) {
-			const room = upsertGroupRoom(group.secondaryRooms, row.toRoom, "secondary")
-			room.cableCount += 1
-			room.threadCount += row.threadCount
-			room.totalLength += row.totalLength
-		}
-
-		const sideState = sideSummary.get(row.graphSide) ?? {
-			groupCount: 0,
-			roomNames: new Set<string>(),
-		}
-
-		sideState.roomNames.add(row.fromRoom)
-		sideSummary.set(row.graphSide, sideState)
+		updateGroupTotals(group, row)
+		updatePrimaryRoom(group, row)
+		updateSecondaryRoom(group, row)
+		updateSideSummary(row)
 	}
 
 	for (const group of groups.values()) {

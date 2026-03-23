@@ -55,20 +55,20 @@ export const manualRoomActionHeight = 50
 export const manualRoomPlaceholderHeight = 140
 
 const levelValuePattern = /^-?\d+(?:,\d+)?$/
-const zonePriority: Record<string, number> = {
-	ГЗ: 0,
-	ЧЗ: 1,
-	ГО: 2,
-	МЗ: 3,
-	РДЭС: 4,
-}
+const zonePriority = new Map<string, number>([
+	["ГЗ", 0],
+	["ЧЗ", 1],
+	["ГО", 2],
+	["МЗ", 3],
+	["РДЭС", 4],
+])
 
 export function isLevelValue(level: string) {
 	return levelValuePattern.test(level)
 }
 
 export function getZonePriority(zone: string) {
-	return zonePriority[zone] ?? 99
+	return zonePriority.get(zone) ?? 99
 }
 
 export function getPdfRoomGridRowCount(roomCount: number) {
