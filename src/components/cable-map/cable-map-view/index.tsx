@@ -1,6 +1,6 @@
-"use client";
+"use client"
 
-import { Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router"
 import {
 	DownloadIcon,
 	FileUpIcon,
@@ -8,35 +8,23 @@ import {
 	LoaderCircleIcon,
 	MapIcon,
 	PercentIcon,
-} from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { canUploadSnapshot, canViewAudit } from "@/lib/auth/shared";
-import { downloadDailyHistoryDocx } from "@/lib/cable-map/functions";
-import { buildDailyHistoryReportFileName } from "@/lib/cable-map/report-utils";
-import type { DashboardData } from "@/lib/cable-map/shared";
-import { downloadResponseFile } from "@/lib/utils";
-import { boardColumns, boardWidth } from "./config";
-import { LevelBandView } from "./level-band-view";
-import {
-	LeftZoneHeader,
-	MapTitle,
-	PathHeader,
-	RightZoneHeader,
-	SummaryCard,
-} from "./map-header";
-import { BoardPathLayer } from "./path-layer";
-import { buildLevelBands } from "./utils";
+} from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { canUploadSnapshot, canViewAudit } from "@/lib/auth/shared"
+import { downloadDailyHistoryDocx } from "@/lib/cable-map/functions"
+import { buildDailyHistoryReportFileName } from "@/lib/cable-map/report-utils"
+import type { DashboardData } from "@/lib/cable-map/shared"
+import { downloadResponseFile } from "@/lib/utils"
+import { boardColumns, boardWidth } from "./config"
+import { LevelBandView } from "./level-band-view"
+import { LeftZoneHeader, MapTitle, PathHeader, RightZoneHeader, SummaryCard } from "./map-header"
+import { BoardPathLayer } from "./path-layer"
+import { buildLevelBands } from "./utils"
 
 export function CableMapView({
 	data,
@@ -44,82 +32,76 @@ export function CableMapView({
 	canManageManualRooms,
 	role,
 }: {
-	data: DashboardData;
-	canEditProgress: boolean;
-	canManageManualRooms: boolean;
-	role: "user" | "admin" | "super-admin";
+	data: DashboardData
+	canEditProgress: boolean
+	canManageManualRooms: boolean
+	role: "user" | "admin" | "super-admin"
 }) {
-	const titleScrollRef = useRef<HTMLDivElement | null>(null);
-	const headerScrollRef = useRef<HTMLDivElement | null>(null);
-	const bodyScrollRef = useRef<HTMLDivElement | null>(null);
-	const activeScrollSourceRef = useRef<"title" | "header" | "body" | null>(
-		null,
-	);
-	const releaseScrollLockFrameRef = useRef<number | null>(null);
-	const [exportingDailyReport, setExportingDailyReport] = useState(false);
-	const [exportingLevel, setExportingLevel] = useState<string | null>(null);
-	const canExportDailyReport = canViewAudit(role);
+	const titleScrollRef = useRef<HTMLDivElement | null>(null)
+	const headerScrollRef = useRef<HTMLDivElement | null>(null)
+	const bodyScrollRef = useRef<HTMLDivElement | null>(null)
+	const activeScrollSourceRef = useRef<"title" | "header" | "body" | null>(null)
+	const releaseScrollLockFrameRef = useRef<number | null>(null)
+	const [exportingDailyReport, setExportingDailyReport] = useState(false)
+	const [exportingLevel, setExportingLevel] = useState<string | null>(null)
+	const canExportDailyReport = canViewAudit(role)
 
 	const syncScroll = useCallback((source: "title" | "header" | "body") => {
-		if (
-			activeScrollSourceRef.current &&
-			activeScrollSourceRef.current !== source
-		) {
-			return;
+		if (activeScrollSourceRef.current && activeScrollSourceRef.current !== source) {
+			return
 		}
 
 		const refs = [
 			["title", titleScrollRef],
 			["header", headerScrollRef],
 			["body", bodyScrollRef],
-		] as const;
-		const sourceElement = refs.find(([key]) => key === source)?.[1].current;
+		] as const
+		const sourceElement = refs.find(([key]) => key === source)?.[1].current
 
-		if (!sourceElement) return;
+		if (!sourceElement) return
 
-		activeScrollSourceRef.current = source;
+		activeScrollSourceRef.current = source
 
 		for (const [key, ref] of refs) {
-			if (key === source || !ref.current) continue;
-			if (Math.abs(ref.current.scrollLeft - sourceElement.scrollLeft) < 1)
-				continue;
+			if (key === source || !ref.current) continue
+			if (Math.abs(ref.current.scrollLeft - sourceElement.scrollLeft) < 1) continue
 
-			ref.current.scrollLeft = sourceElement.scrollLeft;
+			ref.current.scrollLeft = sourceElement.scrollLeft
 		}
 
 		if (releaseScrollLockFrameRef.current !== null) {
-			cancelAnimationFrame(releaseScrollLockFrameRef.current);
+			cancelAnimationFrame(releaseScrollLockFrameRef.current)
 		}
 
 		releaseScrollLockFrameRef.current = requestAnimationFrame(() => {
-			activeScrollSourceRef.current = null;
-			releaseScrollLockFrameRef.current = null;
-		});
-	}, []);
+			activeScrollSourceRef.current = null
+			releaseScrollLockFrameRef.current = null
+		})
+	}, [])
 
 	useEffect(() => {
-		if (!data.snapshot || !bodyScrollRef.current) return;
+		if (!data.snapshot || !bodyScrollRef.current) return
 
-		syncScroll("body");
+		syncScroll("body")
 
 		return () => {
 			if (releaseScrollLockFrameRef.current) {
-				cancelAnimationFrame(releaseScrollLockFrameRef.current);
+				cancelAnimationFrame(releaseScrollLockFrameRef.current)
 			}
-		};
-	}, [data.snapshot, syncScroll]);
+		}
+	}, [data.snapshot, syncScroll])
 
 	async function handleDailyReportExport(level?: string) {
 		if (!canExportDailyReport) {
-			return;
+			return
 		}
 
-		const fileName = buildDailyHistoryReportFileName(level);
+		const fileName = buildDailyHistoryReportFileName(level)
 
 		if (level) {
-			setExportingLevel(level);
+			setExportingLevel(level)
 		} else {
-			setExportingDailyReport(true);
+			setExportingDailyReport(true)
 		}
 
 		try {
@@ -128,26 +110,26 @@ export function CableMapView({
 					fileName,
 					level: level ?? null,
 				},
-			});
+			})
 
 			if (!(response instanceof Response)) {
-				throw new Error("Сервер вернул неожиданный ответ при экспорте.");
+				throw new Error("Сервер вернул неожиданный ответ при экспорте.")
 			}
 
-			await downloadResponseFile(response, fileName);
+			await downloadResponseFile(response, fileName)
 		} catch (error) {
 			toast.error(
 				error instanceof Error
 					? error.message
 					: level
 						? `Не удалось выгрузить отчёт по уровню ${level}.`
-						: "Не удалось выгрузить ежедневный отчёт.",
-			);
+						: "Не удалось выгрузить ежедневный отчёт."
+			)
 		} finally {
 			if (level) {
-				setExportingLevel((current) => (current === level ? null : current));
+				setExportingLevel(current => (current === level ? null : current))
 			} else {
-				setExportingDailyReport(false);
+				setExportingDailyReport(false)
 			}
 		}
 	}
@@ -158,8 +140,8 @@ export function CableMapView({
 				<CardHeader>
 					<CardTitle>Активный граф пока не загружен</CardTitle>
 					<CardDescription>
-						Сначала нужно импортировать файл с листом {'"Общ"'}, после чего
-						появится интерактивная карта демонтажа.
+						Сначала нужно импортировать файл с листом {'"Общ"'}, после чего появится интерактивная
+						карта демонтажа.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="flex flex-wrap items-center gap-3">
@@ -167,19 +149,18 @@ export function CableMapView({
 					{canUploadSnapshot(role) ? (
 						<Link
 							to="/app/import"
-							className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition hover:bg-muted"
-						>
+							className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition hover:bg-muted">
 							<FileUpIcon />
 							Перейти к загрузке
 						</Link>
 					) : null}
 				</CardContent>
 			</Card>
-		);
+		)
 	}
 
-	const levelBands = buildLevelBands(data.levels);
-	const mapCanvasWidth = boardWidth + 16;
+	const levelBands = buildLevelBands(data.levels)
+	const mapCanvasWidth = boardWidth + 16
 
 	return (
 		<div className="flex flex-1 flex-col gap-4">
@@ -224,13 +205,9 @@ export function CableMapView({
 							type="button"
 							variant="outline"
 							onClick={() => void handleDailyReportExport()}
-							disabled={exportingDailyReport || exportingLevel !== null}
-						>
+							disabled={exportingDailyReport || exportingLevel !== null}>
 							{exportingDailyReport ? (
-								<LoaderCircleIcon
-									data-icon="inline-start"
-									className="animate-spin"
-								/>
+								<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
 							) : (
 								<DownloadIcon data-icon="inline-start" />
 							)}
@@ -244,8 +221,7 @@ export function CableMapView({
 				<div
 					ref={titleScrollRef}
 					onScroll={() => syncScroll("title")}
-					className="no-scrollbar overflow-x-auto overflow-y-hidden"
-				>
+					className="no-scrollbar overflow-x-auto overflow-y-hidden">
 					<div className="pl-4" style={{ minWidth: mapCanvasWidth }}>
 						<MapTitle />
 					</div>
@@ -255,20 +231,17 @@ export function CableMapView({
 					className="sticky z-40 mt-5"
 					style={{
 						top: "var(--app-shell-header-height)",
-					}}
-				>
+					}}>
 					<div
 						ref={headerScrollRef}
 						onScroll={() => syncScroll("header")}
-						className="no-scrollbar overflow-x-auto overflow-y-hidden border-b-2 border-dashed border-zinc-400/90 bg-background/95 pb-3 pt-6 shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] backdrop-blur-sm dark:border-zinc-700 dark:bg-background/92"
-					>
+						className="no-scrollbar overflow-x-auto overflow-y-hidden border-b-2 border-dashed border-zinc-400/90 bg-background/95 pb-3 pt-6 shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] backdrop-blur-sm dark:border-zinc-700 dark:bg-background/92">
 						<div className="pl-4" style={{ minWidth: mapCanvasWidth }}>
 							<div
 								className="grid items-center"
 								style={{
 									gridTemplateColumns: boardColumns,
-								}}
-							>
+								}}>
 								<LeftZoneHeader />
 								<div />
 								<PathHeader side="dirty" />
@@ -286,8 +259,7 @@ export function CableMapView({
 				<div
 					ref={bodyScrollRef}
 					onScroll={() => syncScroll("body")}
-					className="w-full overflow-x-auto overflow-y-visible"
-				>
+					className="w-full overflow-x-auto overflow-y-visible">
 					<div className="pl-4" style={{ minWidth: mapCanvasWidth }}>
 						<div className="relative overflow-hidden">
 							<BoardPathLayer bands={levelBands} />
@@ -300,13 +272,9 @@ export function CableMapView({
 										canEditProgress={canEditProgress}
 										canManageManualRooms={canManageManualRooms}
 										canExportDailyReport={canExportDailyReport}
-										isExportDisabled={
-											exportingDailyReport || exportingLevel !== null
-										}
+										isExportDisabled={exportingDailyReport || exportingLevel !== null}
 										isExportingReport={exportingLevel === band.level}
-										onExportDailyReport={() =>
-											void handleDailyReportExport(band.level)
-										}
+										onExportDailyReport={() => void handleDailyReportExport(band.level)}
 										isLast={index === levelBands.length - 1}
 									/>
 								))}
@@ -316,5 +284,5 @@ export function CableMapView({
 				</div>
 			</div>
 		</div>
-	);
+	)
 }

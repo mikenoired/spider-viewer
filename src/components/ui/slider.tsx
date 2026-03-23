@@ -1,9 +1,9 @@
-"use client";
+"use client"
 
-import { Slider as SliderPrimitive } from "radix-ui";
-import * as React from "react";
+import { Slider as SliderPrimitive } from "radix-ui"
+import * as React from "react"
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 function Slider({
 	className,
@@ -14,24 +14,19 @@ function Slider({
 	...props
 }: React.ComponentProps<typeof SliderPrimitive.Root>) {
 	const _values = React.useMemo(
-		() =>
-			Array.isArray(value)
-				? value
-				: Array.isArray(defaultValue)
-					? defaultValue
-					: [min, max],
-		[value, defaultValue, min, max],
-	);
+		() => (Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max]),
+		[value, defaultValue, min, max]
+	)
 	const thumbKeys = React.useMemo(() => {
-		const seen = new Map<number, number>();
+		const seen = new Map<number, number>()
 
-		return _values.map((currentValue) => {
-			const occurrence = seen.get(currentValue) ?? 0;
-			seen.set(currentValue, occurrence + 1);
+		return _values.map(currentValue => {
+			const occurrence = seen.get(currentValue) ?? 0
+			seen.set(currentValue, occurrence + 1)
 
-			return `thumb-${currentValue}-${occurrence}`;
-		});
-	}, [_values]);
+			return `thumb-${currentValue}-${occurrence}`
+		})
+	}, [_values])
 
 	return (
 		<SliderPrimitive.Root
@@ -42,20 +37,18 @@ function Slider({
 			max={max}
 			className={cn(
 				"relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col",
-				className,
+				className
 			)}
-			{...props}
-		>
+			{...props}>
 			<SliderPrimitive.Track
 				data-slot="slider-track"
-				className="relative grow overflow-hidden rounded-full bg-muted data-horizontal:h-1 data-horizontal:w-full data-vertical:h-full data-vertical:w-1"
-			>
+				className="relative grow overflow-hidden rounded-full bg-muted data-horizontal:h-1 data-horizontal:w-full data-vertical:h-full data-vertical:w-1">
 				<SliderPrimitive.Range
 					data-slot="slider-range"
 					className="absolute bg-primary select-none data-horizontal:h-full data-vertical:w-full"
 				/>
 			</SliderPrimitive.Track>
-			{thumbKeys.map((thumbKey) => (
+			{thumbKeys.map(thumbKey => (
 				<SliderPrimitive.Thumb
 					data-slot="slider-thumb"
 					key={thumbKey}
@@ -63,7 +56,7 @@ function Slider({
 				/>
 			))}
 		</SliderPrimitive.Root>
-	);
+	)
 }
 
-export { Slider };
+export { Slider }

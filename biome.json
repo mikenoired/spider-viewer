@@ -18,7 +18,8 @@
 	},
 	"formatter": {
 		"enabled": true,
-		"indentStyle": "tab"
+		"indentStyle": "tab",
+		"lineWidth": 100
 	},
 	"assist": { "actions": { "source": { "organizeImports": "on" } } },
 	"linter": {
@@ -29,7 +30,12 @@
 	},
 	"javascript": {
 		"formatter": {
-			"quoteStyle": "double"
+			"quoteStyle": "double",
+			"arrowParentheses": "asNeeded",
+			"semicolons": "asNeeded",
+			"trailingCommas": "es5",
+			"quoteProperties": "asNeeded",
+			"bracketSameLine": true
 		}
 	}
 }

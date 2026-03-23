@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { sql } from "drizzle-orm"
 import {
 	boolean,
 	date,
@@ -12,19 +12,19 @@ import {
 	timestamp,
 	uniqueIndex,
 	uuid,
-} from "drizzle-orm/pg-core";
-import { userRoles } from "@/lib/auth/shared";
+} from "drizzle-orm/pg-core"
+import { userRoles } from "@/lib/auth/shared"
 
-export const userRoleEnum = pgEnum("user_role", userRoles);
+export const userRoleEnum = pgEnum("user_role", userRoles)
 export const snapshotSourceTypeEnum = pgEnum("snapshot_source_type", [
 	// Keep ODS for already stored snapshots; new uploads are limited in app code.
 	"ods",
 	"xlsx",
 	"xls",
-]);
-export const graphSideEnum = pgEnum("graph_side", ["dirty", "clean"]);
-export const graphSubzoneEnum = pgEnum("graph_subzone", ["dirty", "clean"]);
-export const roomRoleEnum = pgEnum("graph_room_role", ["primary", "secondary"]);
+])
+export const graphSideEnum = pgEnum("graph_side", ["dirty", "clean"])
+export const graphSubzoneEnum = pgEnum("graph_subzone", ["dirty", "clean"])
+export const roomRoleEnum = pgEnum("graph_room_role", ["primary", "secondary"])
 
 export const users = pgTable(
 	"users",
@@ -33,18 +33,14 @@ export const users = pgTable(
 		login: text("login").notNull(),
 		passwordHash: text("password_hash").notNull(),
 		role: userRoleEnum("role").notNull().default("user"),
-		createdAt: timestamp("created_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 	},
-	(table) => [uniqueIndex("users_login_unique").on(table.login)],
-);
+	table => [uniqueIndex("users_login_unique").on(table.login)]
+)
 
-export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect
+export type NewUser = typeof users.$inferInsert
 
 export const importSnapshots = pgTable(
 	"import_snapshots",
@@ -60,32 +56,28 @@ export const importSnapshots = pgTable(
 		isActive: boolean("is_active").notNull().default(false),
 		summary: jsonb("summary")
 			.$type<{
-				levels: string[];
+				levels: string[]
 				sides: Array<{
-					side: "dirty" | "clean";
-					groupCount: number;
-					roomCount: number;
-				}>;
+					side: "dirty" | "clean"
+					groupCount: number
+					roomCount: number
+				}>
 			}>()
 			.notNull()
 			.default({
 				levels: [],
 				sides: [],
 			}),
-		createdAt: timestamp("created_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 	},
-	(table) => [
+	table => [
 		index("import_snapshots_active_idx").on(table.isActive),
 		uniqueIndex("import_snapshots_single_active_unique")
 			.on(table.isActive)
 			.where(sql`${table.isActive} = true`),
-	],
-);
+	]
+)
 
 export const importedCableRows = pgTable(
 	"imported_cable_rows",
@@ -118,24 +110,20 @@ export const importedCableRows = pgTable(
 		shaftValues: jsonb("shaft_values")
 			.$type<
 				Array<{
-					column: number;
-					label: string;
-					value: string;
-					shaft: number;
+					column: number
+					label: string
+					value: string
+					shaft: number
 				}>
 			>()
 			.notNull()
 			.default([]),
 		route: text("route").notNull().default(""),
 		rawRow: jsonb("raw_row").$type<string[]>().notNull().default([]),
-		createdAt: timestamp("created_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
-	(table) => [
-		index("imported_cable_rows_snapshot_id_idx").on(table.snapshotId),
-	],
-);
+	table => [index("imported_cable_rows_snapshot_id_idx").on(table.snapshotId)]
+)
 
 export const graphGroups = pgTable(
 	"graph_groups",
@@ -150,14 +138,8 @@ export const graphGroups = pgTable(
 		sourceZone: text("source_zone").notNull().default(""),
 		level: text("level").notNull(),
 		levelOrder: doublePrecision("level_order").notNull().default(0),
-		primaryRooms: jsonb("primary_rooms")
-			.$type<string[]>()
-			.notNull()
-			.default([]),
-		secondaryRooms: jsonb("secondary_rooms")
-			.$type<string[]>()
-			.notNull()
-			.default([]),
+		primaryRooms: jsonb("primary_rooms").$type<string[]>().notNull().default([]),
+		secondaryRooms: jsonb("secondary_rooms").$type<string[]>().notNull().default([]),
 		cableCount: integer("cable_count").notNull().default(0),
 		threadCount: integer("thread_count").notNull().default(0),
 		totalLength: doublePrecision("total_length").notNull().default(0),
@@ -166,23 +148,18 @@ export const graphGroups = pgTable(
 		shaft2Threads: integer("shaft2_threads").notNull().default(0),
 		shaft3Threads: integer("shaft3_threads").notNull().default(0),
 		shaft4Threads: integer("shaft4_threads").notNull().default(0),
-		createdAt: timestamp("created_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
-	(table) => [
+	table => [
 		index("graph_groups_snapshot_sort_idx").on(
 			table.snapshotId,
 			table.levelOrder,
 			table.graphSide,
-			table.sourceZone,
+			table.sourceZone
 		),
-		uniqueIndex("graph_groups_snapshot_group_key_unique").on(
-			table.snapshotId,
-			table.groupKey,
-		),
-	],
-);
+		uniqueIndex("graph_groups_snapshot_group_key_unique").on(table.snapshotId, table.groupKey),
+	]
+)
 
 export const graphGroupRooms = pgTable(
 	"graph_group_rooms",
@@ -205,27 +182,19 @@ export const graphGroupRooms = pgTable(
 		updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
 			onDelete: "set null",
 		}),
-		updatedAt: timestamp("updated_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
-		createdAt: timestamp("created_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
-	(table) => [
+	table => [
 		index("graph_group_rooms_snapshot_group_sort_idx").on(
 			table.snapshotId,
 			table.groupId,
 			table.roomRole,
-			table.sortOrder,
+			table.sortOrder
 		),
-		uniqueIndex("graph_group_rooms_unique").on(
-			table.groupId,
-			table.roomRole,
-			table.roomName,
-		),
-	],
-);
+		uniqueIndex("graph_group_rooms_unique").on(table.groupId, table.roomRole, table.roomName),
+	]
+)
 
 export const manualGraphRooms = pgTable(
 	"manual_graph_rooms",
@@ -237,21 +206,13 @@ export const manualGraphRooms = pgTable(
 		createdByUserId: uuid("created_by_user_id").references(() => users.id, {
 			onDelete: "set null",
 		}),
-		updatedAt: timestamp("updated_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
-		createdAt: timestamp("created_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
-	(table) => [
-		uniqueIndex("manual_graph_rooms_unique").on(
-			table.sourceZone,
-			table.level,
-			table.roomName,
-		),
-	],
-);
+	table => [
+		uniqueIndex("manual_graph_rooms_unique").on(table.sourceZone, table.level, table.roomName),
+	]
+)
 
 export const changeAuditLogs = pgTable(
 	"change_audit_logs",
@@ -271,31 +232,27 @@ export const changeAuditLogs = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "restrict" }),
 		userLogin: text("user_login").notNull(),
-		changedAt: timestamp("changed_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
+		changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
 		effectiveDate: date("effective_date", { mode: "string" }).notNull(),
 		isBackdated: boolean("is_backdated").notNull().default(false),
 		oldProgress: integer("old_progress").notNull(),
 		newProgress: integer("new_progress").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
-	(table) => [
+	table => [
 		index("change_audit_logs_changed_at_idx").on(table.changedAt),
 		index("change_audit_logs_effective_date_idx").on(table.effectiveDate),
 		index("change_audit_logs_backdated_effective_changed_idx").on(
 			table.isBackdated,
 			table.effectiveDate,
-			table.changedAt,
+			table.changedAt
 		),
-	],
-);
+	]
+)
 
-export type ImportSnapshot = typeof importSnapshots.$inferSelect;
-export type ImportedCableRow = typeof importedCableRows.$inferSelect;
-export type GraphGroup = typeof graphGroups.$inferSelect;
-export type GraphGroupRoom = typeof graphGroupRooms.$inferSelect;
-export type ManualGraphRoom = typeof manualGraphRooms.$inferSelect;
-export type ChangeAuditLog = typeof changeAuditLogs.$inferSelect;
+export type ImportSnapshot = typeof importSnapshots.$inferSelect
+export type ImportedCableRow = typeof importedCableRows.$inferSelect
+export type GraphGroup = typeof graphGroups.$inferSelect
+export type GraphGroupRoom = typeof graphGroupRooms.$inferSelect
+export type ManualGraphRoom = typeof manualGraphRooms.$inferSelect
+export type ChangeAuditLog = typeof changeAuditLogs.$inferSelect

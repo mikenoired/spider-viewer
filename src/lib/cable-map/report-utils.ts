@@ -1,7 +1,7 @@
 export function getTodayIsoInMoscow(date = new Date()) {
 	return new Intl.DateTimeFormat("sv-SE", {
 		timeZone: "Europe/Moscow",
-	}).format(date);
+	}).format(date)
 }
 
 function sanitizeFileNamePart(value: string) {
@@ -9,16 +9,16 @@ function sanitizeFileNamePart(value: string) {
 		.trim()
 		.replace(/[<>:"/\\|?*]/g, "")
 		.split("")
-		.filter((char) => char.charCodeAt(0) >= 32)
+		.filter(char => char.charCodeAt(0) >= 32)
 		.join("")
-		.replace(/\s+/g, "_");
+		.replace(/\s+/g, "_")
 }
 
 export function buildDailyHistoryReportFileName(level?: string | null) {
-	const dateLabel = getTodayIsoInMoscow();
-	const levelLabel = level ? sanitizeFileNamePart(level) : null;
+	const dateLabel = getTodayIsoInMoscow()
+	const levelLabel = level ? sanitizeFileNamePart(level) : null
 
 	return levelLabel
 		? `daily-history-level-${levelLabel}-${dateLabel}.docx`
-		: `daily-history-${dateLabel}.docx`;
+		: `daily-history-${dateLabel}.docx`
 }

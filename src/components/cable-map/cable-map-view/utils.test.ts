@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
-import type { GraphGroupView } from "@/lib/cable-map/shared";
-import { buildLevelBands } from "./utils";
+import { describe, expect, it } from "vitest"
+import type { GraphGroupView } from "@/lib/cable-map/shared"
+import { buildLevelBands } from "./utils"
 
 function createGroup(overrides: Partial<GraphGroupView> = {}): GraphGroupView {
 	return {
@@ -27,7 +27,7 @@ function createGroup(overrides: Partial<GraphGroupView> = {}): GraphGroupView {
 			{ shaft: 4, label: "В КШ 4", threadCount: 0 },
 		],
 		...overrides,
-	};
+	}
 }
 
 describe("buildLevelBands", () => {
@@ -39,9 +39,9 @@ describe("buildLevelBands", () => {
 				dirtyGroups: [createGroup()],
 				cleanGroups: [],
 			},
-		]);
+		])
 
-		expect(bands).toHaveLength(1);
-		expect(bands[0]?.level).toBe("Техэтаж");
-	});
-});
+		expect(bands).toHaveLength(1)
+		expect(bands[0]?.level).toBe("Техэтаж")
+	})
+})

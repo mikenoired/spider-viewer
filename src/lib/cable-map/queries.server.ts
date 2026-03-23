@@ -1,5 +1,5 @@
-import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { and, asc, desc, eq, gte, lte } from "drizzle-orm"
+import { getDb } from "@/lib/db"
 import {
 	changeAuditLogs,
 	graphGroupRooms,
@@ -8,7 +8,7 @@ import {
 	importSnapshots,
 	manualGraphRooms,
 	users,
-} from "@/lib/db/schema";
+} from "@/lib/db/schema"
 import type {
 	DashboardData,
 	DateRangeInput,
@@ -17,81 +17,73 @@ import type {
 	GraphRoomView,
 	HistoryEntryView,
 	SnapshotSummaryView,
-} from "./shared";
-import { shaftBucketLabels } from "./shared";
+} from "./shared"
+import { shaftBucketLabels } from "./shared"
 
 type HistoryQueryOptions = {
-	backdatedOnly?: boolean;
-	level?: string | null;
-};
+	backdatedOnly?: boolean
+	level?: string | null
+}
 
 function toIsoString(value: Date | string | null | undefined) {
 	if (!value) {
-		return "";
+		return ""
 	}
 
 	if (typeof value === "string") {
-		return value;
+		return value
 	}
 
-	return value.toISOString();
+	return value.toISOString()
 }
 
 function compareRoomNames(left: string, right: string) {
 	return left.localeCompare(right, "ru", {
 		numeric: true,
 		sensitivity: "base",
-	});
+	})
 }
 
-const copperDensityKgPerMeterPerMm2 = 0.00889;
-const cableSectionPattern = /(\d+)\s*[xх×]\s*(\d+(?:[.,]\d+)?)/gi;
+const copperDensityKgPerMeterPerMm2 = 0.00889
+const cableSectionPattern = /(\d+)\s*[xх×]\s*(\d+(?:[.,]\d+)?)/gi
 
 function getImportedRowGroupKey(row: {
-	graphSide: GraphGroupView["graphSide"];
-	graphSubzone: GraphGroupView["graphSubzone"];
-	sourceZone: string;
-	level: string;
+	graphSide: GraphGroupView["graphSide"]
+	graphSubzone: GraphGroupView["graphSubzone"]
+	sourceZone: string
+	level: string
 }) {
-	return [
-		row.graphSide,
-		row.graphSubzone ?? "none",
-		row.sourceZone || "unknown",
-		row.level,
-	].join(":");
+	return [row.graphSide, row.graphSubzone ?? "none", row.sourceZone || "unknown", row.level].join(
+		":"
+	)
 }
 
 function parseCableCrossSection(cableLabel: string) {
-	const matches = [...cableLabel.matchAll(cableSectionPattern)];
-	const sectionValue = matches.at(-1)?.[2]?.replace(",", ".") ?? "";
-	const parsedSection = Number(sectionValue);
+	const matches = [...cableLabel.matchAll(cableSectionPattern)]
+	const sectionValue = matches.at(-1)?.[2]?.replace(",", ".") ?? ""
+	const parsedSection = Number(sectionValue)
 
-	return Number.isFinite(parsedSection) ? parsedSection : 0;
+	return Number.isFinite(parsedSection) ? parsedSection : 0
 }
 
 function getCableCopperMassKg(row: {
-	cableLabel: string;
-	threadLength: number | null;
-	threadCount: number | null;
+	cableLabel: string
+	threadLength: number | null
+	threadCount: number | null
 }) {
-	const cableCrossSection = parseCableCrossSection(row.cableLabel);
-	const threadLength = row.threadLength ?? 0;
-	const threadCount = row.threadCount ?? 0;
+	const cableCrossSection = parseCableCrossSection(row.cableLabel)
+	const threadLength = row.threadLength ?? 0
+	const threadCount = row.threadCount ?? 0
 
 	if (cableCrossSection <= 0 || threadLength <= 0 || threadCount <= 0) {
-		return 0;
+		return 0
 	}
 
-	return (
-		threadLength *
-		threadCount *
-		cableCrossSection *
-		copperDensityKgPerMeterPerMm2
-	);
+	return threadLength * threadCount * cableCrossSection * copperDensityKgPerMeterPerMm2
 }
 
 export async function getActiveDashboardData(): Promise<DashboardData> {
-	const db = getDb();
+	const db = getDb()
 	const [snapshot] = await db
 		.select({
 			id: importSnapshots.id,
@@ -105,13 +97,13 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 		.innerJoin(users, eq(users.id, importSnapshots.importedByUserId))
 		.where(eq(importSnapshots.isActive, true))
 		.orderBy(desc(importSnapshots.createdAt))
-		.limit(1);
+		.limit(1)
 
 	if (!snapshot) {
 		return {
 			snapshot: null,
 			levels: [],
-		};
+		}
 	}
 
 	const rows = await db
@@ -148,8 +140,8 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			asc(graphGroups.graphSide),
 			asc(graphGroups.sourceZone),
 			asc(graphGroupRooms.roomRole),
-			asc(graphGroupRooms.sortOrder),
-		);
+			asc(graphGroupRooms.sortOrder)
+		)
 	const importedRows = await db
 		.select({
 			graphSide: importedCableRows.graphSide,
@@ -161,7 +153,7 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			threadCount: importedCableRows.threadCount,
 		})
 		.from(importedCableRows)
-		.where(eq(importedCableRows.snapshotId, snapshot.id));
+		.where(eq(importedCableRows.snapshotId, snapshot.id))
 	const manualRoomRows = await db
 		.select({
 			id: manualGraphRooms.id,
@@ -169,21 +161,21 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			sourceZone: manualGraphRooms.sourceZone,
 			level: manualGraphRooms.level,
 		})
-		.from(manualGraphRooms);
-	const copperMassByGroup = new Map<string, number>();
+		.from(manualGraphRooms)
+	const copperMassByGroup = new Map<string, number>()
 
 	for (const row of importedRows) {
-		const groupKey = getImportedRowGroupKey(row);
-		const currentMass = copperMassByGroup.get(groupKey) ?? 0;
-		const nextMass = currentMass + getCableCopperMassKg(row);
+		const groupKey = getImportedRowGroupKey(row)
+		const currentMass = copperMassByGroup.get(groupKey) ?? 0
+		const nextMass = currentMass + getCableCopperMassKg(row)
 
-		copperMassByGroup.set(groupKey, nextMass);
+		copperMassByGroup.set(groupKey, nextMass)
 	}
 
-	const groups = new Map<string, GraphGroupView>();
+	const groups = new Map<string, GraphGroupView>()
 
 	for (const row of rows) {
-		const existingGroup = groups.get(row.groupId);
+		const existingGroup = groups.get(row.groupId)
 		const group =
 			existingGroup ??
 			({
@@ -229,14 +221,14 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 						threadCount: row.shaft4Threads,
 					},
 				],
-			} satisfies GraphGroupView);
+			} satisfies GraphGroupView)
 
 		if (!existingGroup) {
-			groups.set(row.groupId, group);
+			groups.set(row.groupId, group)
 		}
 
 		if (!row.roomId || !row.roomName || !row.roomRole) {
-			continue;
+			continue
 		}
 
 		const room: GraphRoomView = {
@@ -248,76 +240,70 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			progress: row.roomProgress ?? 0,
 			roomRole: row.roomRole,
 			effectiveDate: row.roomEffectiveDate ?? null,
-		};
+		}
 
 		if (row.roomRole === "primary") {
-			group.primaryRooms.push(room);
+			group.primaryRooms.push(room)
 		} else {
-			group.secondaryRooms.push(room);
+			group.secondaryRooms.push(room)
 		}
 	}
 
-	const manualRoomsByGroup = new Map<string, GraphManualRoomView[]>();
+	const manualRoomsByGroup = new Map<string, GraphManualRoomView[]>()
 
 	for (const row of manualRoomRows) {
-		const groupKey = `${row.sourceZone}:${row.level}`;
-		const rooms = manualRoomsByGroup.get(groupKey) ?? [];
+		const groupKey = `${row.sourceZone}:${row.level}`
+		const rooms = manualRoomsByGroup.get(groupKey) ?? []
 		rooms.push({
 			id: row.id,
 			roomName: row.roomName,
-		});
-		manualRoomsByGroup.set(groupKey, rooms);
+		})
+		manualRoomsByGroup.set(groupKey, rooms)
 	}
 
 	const levelMap = new Map<
 		string,
 		{
-			level: string;
-			levelOrder: number;
-			dirtyGroups: GraphGroupView[];
-			cleanGroups: GraphGroupView[];
+			level: string
+			levelOrder: number
+			dirtyGroups: GraphGroupView[]
+			cleanGroups: GraphGroupView[]
 		}
-	>();
-	const allPrimaryRooms: GraphRoomView[] = [];
+	>()
+	const allPrimaryRooms: GraphRoomView[] = []
 
 	for (const group of groups.values()) {
 		group.manualRooms =
 			manualRoomsByGroup
 				.get(`${group.sourceZone}:${group.level}`)
-				?.sort((left, right) =>
-					compareRoomNames(left.roomName, right.roomName),
-				) ?? [];
+				?.sort((left, right) => compareRoomNames(left.roomName, right.roomName)) ?? []
 		const averageProgress =
 			group.primaryRooms.length > 0
 				? Math.round(
-						group.primaryRooms.reduce(
-							(total, room) => total + room.progress,
-							0,
-						) / group.primaryRooms.length,
+						group.primaryRooms.reduce((total, room) => total + room.progress, 0) /
+							group.primaryRooms.length
 					)
-				: 0;
-		group.averageProgress = averageProgress;
-		allPrimaryRooms.push(...group.primaryRooms);
+				: 0
+		group.averageProgress = averageProgress
+		allPrimaryRooms.push(...group.primaryRooms)
 
 		const levelEntry = levelMap.get(group.level) ?? {
 			level: group.level,
 			levelOrder: group.levelOrder,
 			dirtyGroups: [],
 			cleanGroups: [],
-		};
-
-		if (group.graphSide === "dirty") {
-			levelEntry.dirtyGroups.push(group);
-		} else {
-			levelEntry.cleanGroups.push(group);
 		}
 
-		levelMap.set(group.level, levelEntry);
+		if (group.graphSide === "dirty") {
+			levelEntry.dirtyGroups.push(group)
+		} else {
+			levelEntry.cleanGroups.push(group)
+		}
+
+		levelMap.set(group.level, levelEntry)
 	}
 
-	const levels = [...levelMap.values()].sort(
-		(left, right) => right.levelOrder - left.levelOrder,
-	);
+	const levels = [...levelMap.values()].sort((left, right) => right.levelOrder - left.levelOrder)
 
 	const snapshotSummary: SnapshotSummaryView = {
 		id: snapshot.id,
@@ -333,48 +319,42 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 			allPrimaryRooms.length > 0
 				? Math.round(
 						allPrimaryRooms.reduce((total, room) => total + room.progress, 0) /
-							allPrimaryRooms.length,
+							allPrimaryRooms.length
 					)
 				: 0,
-	};
+	}
 
 	return {
 		snapshot: snapshotSummary,
 		levels,
-	};
+	}
 }
 
-function buildHistoryConditions(
-	range?: DateRangeInput,
-	options: HistoryQueryOptions = {},
-) {
-	const conditions = [];
+function buildHistoryConditions(range?: DateRangeInput, options: HistoryQueryOptions = {}) {
+	const conditions = []
 
 	if (options.backdatedOnly) {
-		conditions.push(eq(changeAuditLogs.isBackdated, true));
+		conditions.push(eq(changeAuditLogs.isBackdated, true))
 	}
 
 	if (range?.from) {
-		conditions.push(gte(changeAuditLogs.effectiveDate, range.from));
+		conditions.push(gte(changeAuditLogs.effectiveDate, range.from))
 	}
 
 	if (range?.to) {
-		conditions.push(lte(changeAuditLogs.effectiveDate, range.to));
+		conditions.push(lte(changeAuditLogs.effectiveDate, range.to))
 	}
 
 	if (options.level?.trim()) {
-		conditions.push(eq(graphGroups.level, options.level.trim()));
+		conditions.push(eq(graphGroups.level, options.level.trim()))
 	}
 
-	return conditions;
+	return conditions
 }
 
-export async function getHistoryEntries(
-	range?: DateRangeInput,
-	options: HistoryQueryOptions = {},
-) {
-	const db = getDb();
-	const conditions = buildHistoryConditions(range, options);
+export async function getHistoryEntries(range?: DateRangeInput, options: HistoryQueryOptions = {}) {
+	const db = getDb()
+	const conditions = buildHistoryConditions(range, options)
 	const result = await db
 		.select({
 			id: changeAuditLogs.id,
@@ -392,10 +372,10 @@ export async function getHistoryEntries(
 		.from(changeAuditLogs)
 		.leftJoin(graphGroups, eq(graphGroups.id, changeAuditLogs.groupId))
 		.where(conditions.length > 0 ? and(...conditions) : undefined)
-		.orderBy(desc(changeAuditLogs.changedAt));
+		.orderBy(desc(changeAuditLogs.changedAt))
 
 	return result.map(
-		(entry) =>
+		entry =>
 			({
 				id: entry.id,
 				roomName: entry.roomName,
@@ -408,6 +388,6 @@ export async function getHistoryEntries(
 				groupId: entry.groupId,
 				level: entry.level ?? null,
 				levelOrder: entry.levelOrder ?? null,
-			}) satisfies HistoryEntryView,
-	);
+			}) satisfies HistoryEntryView
+	)
 }
