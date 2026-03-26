@@ -12,6 +12,7 @@
 		"types": ["vite/client"],
 
 		"moduleResolution": "bundler",
+		"ignoreDeprecations": "6.0",
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,
 		"noEmit": true,
