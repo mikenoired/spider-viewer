@@ -57,7 +57,7 @@ PORT=$inactive_port
 RELEASE_ID=$release_id
 EOF
 
-sudo -u "$APP_USER" bash -lc "set -a && source '$shared_env_file' && set +a && cd '$release_dir' && bun install --frozen-lockfile && bun run build && bun run db:migrate"
+sudo -u "$APP_USER" bash -lc "set -a && source '$shared_env_file' && set +a && cd '$release_dir' && bun install --frozen-lockfile && bun run build && bun run db:push"
 sudo ln -sfn "$release_dir" "$current_link"
 sudo install -m 0644 "$SOURCE_DIR/ops/systemd/spider-viewer-db-backup.service" "$DB_BACKUP_SERVICE_PATH"
 sudo install -m 0644 "$SOURCE_DIR/ops/systemd/spider-viewer-db-backup.timer" "$DB_BACKUP_TIMER_PATH"
