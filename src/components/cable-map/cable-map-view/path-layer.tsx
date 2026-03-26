@@ -121,7 +121,8 @@ function PathBucketRow({ side, bucket, y }: { side: GraphSide; bucket: GraphBuck
 				fontSize="12"
 				fontWeight="500"
 				fill="currentColor"
-				textAnchor={layout.labelAnchor}>
+				textAnchor={layout.labelAnchor}
+				className="select-none">
 				{bucket.label}
 			</text>
 			<line
@@ -155,7 +156,7 @@ function PathBucketRow({ side, bucket, y }: { side: GraphSide; bucket: GraphBuck
 				fontSize="12"
 				fontWeight="700"
 				fill="white"
-				className={cn(bucket.shaft === 0 ? "dark:fill-black" : "")}
+				className={cn("select-none", bucket.shaft === 0 ? "dark:fill-black" : "")}
 				textAnchor="middle">
 				{countLabel}
 			</text>
