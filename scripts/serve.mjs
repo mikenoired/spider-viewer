@@ -1,24 +1,21 @@
 import { createServer } from "node:http";
+import path from "node:path";
 import { Readable } from "node:stream";
 import { pathToFileURL } from "node:url";
-import path from "node:path";
+
 import postgres from "postgres";
 import { createClient } from "redis";
+
 import { logger } from "./logger.mjs";
 
 const port = Number.parseInt(process.env.PORT ?? "3000", 10);
 const host = process.env.HOST ?? "127.0.0.1";
-const shutdownTimeoutMs = Number.parseInt(
-	process.env.SHUTDOWN_TIMEOUT_MS ?? "30000",
-	10,
-);
+const shutdownTimeoutMs = Number.parseInt(process.env.SHUTDOWN_TIMEOUT_MS ?? "30000", 10);
 const healthcheckRedisRequired = process.env.HEALTHCHECK_REDIS_REQUIRED === "true";
 const releaseId = process.env.RELEASE_ID ?? "dev";
 const serverLogger = logger.child({ module: "http-server", releaseId });
 
-const entryUrl = pathToFileURL(
-	path.join(process.cwd(), "dist", "server", "server.js"),
-).href;
+const entryUrl = pathToFileURL(path.join(process.cwd(), "dist", "server", "server.js")).href;
 const { default: serverEntry } = await import(entryUrl);
 
 let isShuttingDown = false;
@@ -166,10 +163,7 @@ const server = createServer(async (req, res) => {
 		const response = await serverEntry.fetch(request);
 		await sendFetchResponse(res, response);
 	} catch (error) {
-		serverLogger.error(
-			{ err: error, method: req.method, url: req.url },
-			"Unhandled server error",
-		);
+		serverLogger.error({ err: error, method: req.method, url: req.url }, "Unhandled server error");
 		sendJson(res, 500, { ok: false, error: "Internal server error." });
 	}
 });
@@ -192,10 +186,7 @@ function shutdown(signal) {
 	}
 
 	isShuttingDown = true;
-	serverLogger.info(
-		{ signal, shutdownTimeoutMs },
-		"Starting graceful shutdown",
-	);
+	serverLogger.info({ signal, shutdownTimeoutMs }, "Starting graceful shutdown");
 
 	server.close((error) => {
 		if (error) {
@@ -225,8 +216,5 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 server.listen(port, host, () => {
-	serverLogger.info(
-		{ host, port, url: `http://${host}:${port}` },
-		"Spider Viewer listening",
-	);
+	serverLogger.info({ host, port, url: `http://${host}:${port}` }, "Spider Viewer listening");
 });

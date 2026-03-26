@@ -1,17 +1,12 @@
-"use client"
+"use client";
 
-import { useRouter } from "@tanstack/react-router"
-import { format } from "date-fns"
-import { ru } from "date-fns/locale"
-import {
-	CalendarIcon,
-	LoaderCircleIcon,
-	RotateCcwIcon,
-	SaveIcon,
-	TriangleAlertIcon,
-} from "lucide-react"
-import { memo, useCallback, useEffect, useMemo, useState } from "react"
-import { toast } from "sonner"
+import { useRouter } from "@tanstack/react-router";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
+import { CalendarIcon, LoaderCircleIcon, RotateCcwIcon, SaveIcon, TriangleAlertIcon } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -22,129 +17,113 @@ import {
 	AlertDialogHeader,
 	AlertDialogMedia,
 	AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
 import {
 	Popover,
 	PopoverContent,
 	PopoverHeader,
 	PopoverTitle,
 	PopoverTrigger,
-} from "@/components/ui/popover"
-import { Separator } from "@/components/ui/separator"
-import {
-	Sheet,
-	SheetContent,
-	SheetDescription,
-	SheetHeader,
-	SheetTitle,
-} from "@/components/ui/sheet"
-import { Slider } from "@/components/ui/slider"
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table"
-import { saveRoomProgress } from "@/lib/cable-map/functions"
-import type { GraphGroupView } from "@/lib/cable-map/shared"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Slider } from "@/components/ui/slider";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { saveRoomProgress } from "@/lib/cable-map/functions";
+import type { GraphGroupView } from "@/lib/cable-map/shared";
+import { cn } from "@/lib/utils";
 
 type DraftRoom = {
-	id: string
-	roomName: string
-	cableCount: number
-	threadCount: number
-	totalLength: number
-	progress: number
-}
+	id: string;
+	roomName: string;
+	cableCount: number;
+	threadCount: number;
+	totalLength: number;
+	progress: number;
+};
 
 function getTodayInMoscow() {
 	return new Intl.DateTimeFormat("sv-SE", {
 		timeZone: "Europe/Moscow",
-	}).format(new Date())
+	}).format(new Date());
 }
 
 function parseIsoDate(value: string | null) {
-	if (!value) return undefined
+	if (!value) return undefined;
 
-	const date = new Date(`${value}T12:00:00+03:00`)
-	return Number.isNaN(date.getTime()) ? undefined : date
+	const date = new Date(`${value}T12:00:00+03:00`);
+	return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 function createDraftRooms(group: GraphGroupView): DraftRoom[] {
-	return group.primaryRooms.map(room => ({
+	return group.primaryRooms.map((room) => ({
 		id: room.id,
 		roomName: room.roomName,
 		cableCount: room.cableCount,
 		threadCount: room.threadCount,
 		totalLength: room.totalLength,
 		progress: room.progress,
-	}))
+	}));
 }
 
 function clampProgress(value: number) {
-	if (Number.isNaN(value)) return 0
+	if (Number.isNaN(value)) return 0;
 
-	return Math.min(100, Math.max(0, Math.round(value)))
+	return Math.min(100, Math.max(0, Math.round(value)));
 }
 
 function getInitialEffectiveDate(group: GraphGroupView) {
-	return group.primaryRooms[0]?.effectiveDate ?? getTodayInMoscow()
+	return group.primaryRooms[0]?.effectiveDate ?? getTodayInMoscow();
 }
 
 function buildRoomProgressById(primaryRooms: GraphGroupView["primaryRooms"]) {
-	return new Map(primaryRooms.map(room => [room.id, room.progress]))
+	return new Map(primaryRooms.map((room) => [room.id, room.progress]));
 }
 
 function buildChangedRooms(draftRooms: DraftRoom[], roomProgressById: Map<string, number>) {
-	return draftRooms.flatMap(room => {
-		const sourceProgress = roomProgressById.get(room.id)
+	return draftRooms.flatMap((room) => {
+		const sourceProgress = roomProgressById.get(room.id);
 
-		if (sourceProgress === undefined || sourceProgress === room.progress) return []
+		if (sourceProgress === undefined || sourceProgress === room.progress) return [];
 
 		return [
 			{
 				roomId: room.id,
 				progress: room.progress,
 			},
-		]
-	})
+		];
+	});
 }
 
 function useGroupProgressDraft(group: GraphGroupView, open: boolean) {
-	const [draftRooms, setDraftRooms] = useState<DraftRoom[]>(() => createDraftRooms(group))
-	const [effectiveDate, setEffectiveDate] = useState<string | null>(getInitialEffectiveDate(group))
+	const [draftRooms, setDraftRooms] = useState<DraftRoom[]>(() => createDraftRooms(group));
+	const [effectiveDate, setEffectiveDate] = useState<string | null>(getInitialEffectiveDate(group));
 
 	const reset = useCallback(() => {
-		setDraftRooms(createDraftRooms(group))
-		setEffectiveDate(getInitialEffectiveDate(group))
-	}, [group])
+		setDraftRooms(createDraftRooms(group));
+		setEffectiveDate(getInitialEffectiveDate(group));
+	}, [group]);
 
 	useEffect(() => {
 		if (!open) {
-			reset()
+			reset();
 		}
-	}, [open, reset])
+	}, [open, reset]);
 
-	const roomProgressById = useMemo(
-		() => buildRoomProgressById(group.primaryRooms),
-		[group.primaryRooms]
-	)
+	const roomProgressById = useMemo(() => buildRoomProgressById(group.primaryRooms), [group.primaryRooms]);
 
 	const changedRooms = useMemo(
 		() => buildChangedRooms(draftRooms, roomProgressById),
 		[draftRooms, roomProgressById]
-	)
+	);
 
 	function updateRoomProgress(roomId: string, progress: number) {
-		setDraftRooms(current =>
-			current.map(room =>
+		setDraftRooms((current) =>
+			current.map((room) =>
 				room.id === roomId
 					? {
 							...room,
@@ -152,7 +131,7 @@ function useGroupProgressDraft(group: GraphGroupView, open: boolean) {
 						}
 					: room
 			)
-		)
+		);
 	}
 
 	return {
@@ -163,7 +142,7 @@ function useGroupProgressDraft(group: GraphGroupView, open: boolean) {
 		isDirty: changedRooms.length > 0,
 		updateRoomProgress,
 		reset,
-	}
+	};
 }
 
 function GroupProgressTrigger({
@@ -174,12 +153,12 @@ function GroupProgressTrigger({
 	hasRooms,
 	onOpen,
 }: {
-	group: GraphGroupView
-	variant: "default" | "map"
-	align: "left" | "right"
-	className?: string
-	hasRooms: boolean
-	onOpen: () => void
+	group: GraphGroupView;
+	variant: "default" | "map";
+	align: "left" | "right";
+	className?: string;
+	hasRooms: boolean;
+	onOpen: () => void;
 }) {
 	return (
 		<div className="flex w-full items-center justify-center">
@@ -200,7 +179,7 @@ function GroupProgressTrigger({
 							"grid grid-cols-2 gap-x-2 gap-y-1 overflow-hidden text-xs font-medium leading-4 text-zinc-700 dark:text-zinc-200",
 							align === "right" && "text-right"
 						)}>
-						{group.primaryRooms.map(room => (
+						{group.primaryRooms.map((room) => (
 							<div key={room.id}>
 								{room.roomName.length > 15 ? `${room.roomName.slice(0, 15)}...` : room.roomName}
 							</div>
@@ -218,7 +197,7 @@ function GroupProgressTrigger({
 							<Badge variant="secondary">{group.averageProgress}%</Badge>
 						</div>
 						<div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-							{group.primaryRooms.slice(0, 8).map(room => (
+							{group.primaryRooms.slice(0, 8).map((room) => (
 								<div key={room.id} className="truncate rounded-lg bg-muted/60 px-2 py-1.5">
 									{room.roomName}
 								</div>
@@ -233,7 +212,7 @@ function GroupProgressTrigger({
 				)}
 			</button>
 		</div>
-	)
+	);
 }
 
 function GroupProgressControls({
@@ -245,20 +224,20 @@ function GroupProgressControls({
 	onReset,
 	onDateChange,
 }: {
-	canEdit: boolean
-	pending: boolean
-	isDirty: boolean
-	effectiveDate: string | null
-	onSave: () => void
-	onReset: () => void
-	onDateChange: (value: string | null) => void
+	canEdit: boolean;
+	pending: boolean;
+	isDirty: boolean;
+	effectiveDate: string | null;
+	onSave: () => void;
+	onReset: () => void;
+	onDateChange: (value: string | null) => void;
 }) {
 	if (!canEdit) {
 		return (
 			<div className="rounded-2xl border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
 				Режим просмотра: редактирование доступно только админам и супер-админам.
 			</div>
-		)
+		);
 	}
 
 	return (
@@ -274,10 +253,7 @@ function GroupProgressControls({
 
 			<Popover>
 				<PopoverTrigger asChild>
-					<Button
-						type="button"
-						variant="outline"
-						className="h-10 justify-between sm:h-8 sm:justify-center">
+					<Button type="button" variant="outline" className="h-10 justify-between sm:h-8 sm:justify-center">
 						<CalendarIcon data-icon="inline-start" />
 						{effectiveDate
 							? format(parseIsoDate(effectiveDate) ?? new Date(), "d MMMM yyyy", {
@@ -293,9 +269,7 @@ function GroupProgressControls({
 					<Calendar
 						mode="single"
 						selected={parseIsoDate(effectiveDate)}
-						onSelect={value =>
-							onDateChange(value ? format(value, "yyyy-MM-dd") : getTodayInMoscow())
-						}
+						onSelect={(value) => onDateChange(value ? format(value, "yyyy-MM-dd") : getTodayInMoscow())}
 						className="w-full"
 					/>
 				</PopoverContent>
@@ -311,7 +285,7 @@ function GroupProgressControls({
 				Отменить изменения
 			</Button>
 		</div>
-	)
+	);
 }
 
 function GroupProgressTable({
@@ -320,10 +294,10 @@ function GroupProgressTable({
 	pending,
 	onProgressChange,
 }: {
-	draftRooms: DraftRoom[]
-	canEdit: boolean
-	pending: boolean
-	onProgressChange: (roomId: string, progress: number) => void
+	draftRooms: DraftRoom[];
+	canEdit: boolean;
+	pending: boolean;
+	onProgressChange: (roomId: string, progress: number) => void;
 }) {
 	return (
 		<Table>
@@ -337,7 +311,7 @@ function GroupProgressTable({
 				</TableRow>
 			</TableHeader>
 			<TableBody className="block space-y-3 sm:table-row-group sm:space-y-0">
-				{draftRooms.map(room => (
+				{draftRooms.map((room) => (
 					<TableRow
 						key={room.id}
 						className="block rounded-xl border sm:table-row sm:rounded-none sm:border-x-0">
@@ -367,7 +341,7 @@ function GroupProgressTable({
 							<div className="grid min-w-0 gap-3 sm:min-w-64 sm:grid-cols-[1fr_84px] sm:items-center">
 								<Slider
 									value={[room.progress]}
-									onValueChange={value => onProgressChange(room.id, value[0] ?? 0)}
+									onValueChange={(value) => onProgressChange(room.id, value[0] ?? 0)}
 									disabled={!canEdit || pending}
 									max={100}
 									min={0}
@@ -379,7 +353,7 @@ function GroupProgressTable({
 									max={100}
 									value={room.progress}
 									className="h-10 sm:h-8"
-									onChange={event => onProgressChange(room.id, Number(event.target.value))}
+									onChange={(event) => onProgressChange(room.id, Number(event.target.value))}
 									disabled={!canEdit || pending}
 								/>
 							</div>
@@ -388,7 +362,7 @@ function GroupProgressTable({
 				))}
 			</TableBody>
 		</Table>
-	)
+	);
 }
 
 export const GroupProgressSheet = memo(function GroupProgressSheet({
@@ -398,41 +372,34 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 	align = "left",
 	className,
 }: {
-	group: GraphGroupView
-	canEdit: boolean
-	variant?: "default" | "map"
-	align?: "left" | "right"
-	className?: string
+	group: GraphGroupView;
+	canEdit: boolean;
+	variant?: "default" | "map";
+	align?: "left" | "right";
+	className?: string;
 }) {
-	const router = useRouter()
-	const [open, setOpen] = useState(false)
-	const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
-	const [pending, setPending] = useState(false)
-	const {
-		draftRooms,
-		effectiveDate,
-		setEffectiveDate,
-		changedRooms,
-		isDirty,
-		updateRoomProgress,
-		reset,
-	} = useGroupProgressDraft(group, open)
+	const router = useRouter();
+	const [open, setOpen] = useState(false);
+	const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+	const [pending, setPending] = useState(false);
+	const { draftRooms, effectiveDate, setEffectiveDate, changedRooms, isDirty, updateRoomProgress, reset } =
+		useGroupProgressDraft(group, open);
 
-	const hasRooms = group.primaryRooms.length > 0
+	const hasRooms = group.primaryRooms.length > 0;
 
 	function handleOpenChange(nextOpen: boolean) {
 		if (!nextOpen && isDirty) {
-			setConfirmDiscardOpen(true)
-			return
+			setConfirmDiscardOpen(true);
+			return;
 		}
 
-		setOpen(nextOpen)
+		setOpen(nextOpen);
 	}
 
 	async function handleSave() {
-		if (!canEdit || changedRooms.length === 0) return
+		if (!canEdit || changedRooms.length === 0) return;
 
-		setPending(true)
+		setPending(true);
 
 		try {
 			await saveRoomProgress({
@@ -441,16 +408,14 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 					effectiveDate,
 					rooms: changedRooms,
 				},
-			})
-			await router.invalidate()
-			toast.success("Прогресс по помещениям сохранён.")
-			setOpen(false)
+			});
+			await router.invalidate();
+			toast.success("Прогресс по помещениям сохранён.");
+			setOpen(false);
 		} catch (error) {
-			toast.error(
-				error instanceof Error ? error.message : "Не удалось сохранить изменения по помещениям."
-			)
+			toast.error(error instanceof Error ? error.message : "Не удалось сохранить изменения по помещениям.");
 		} finally {
-			setPending(false)
+			setPending(false);
 		}
 	}
 
@@ -523,8 +488,8 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 						<AlertDialogCancel>Продолжить редактирование</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={() => {
-								setConfirmDiscardOpen(false)
-								setOpen(false)
+								setConfirmDiscardOpen(false);
+								setOpen(false);
 							}}>
 							Сбросить
 						</AlertDialogAction>
@@ -532,7 +497,7 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 				</AlertDialogContent>
 			</AlertDialog>
 		</>
-	)
-})
+	);
+});
 
-GroupProgressSheet.displayName = "GroupProgressSheet"
+GroupProgressSheet.displayName = "GroupProgressSheet";

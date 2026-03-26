@@ -1,41 +1,39 @@
-import { memo } from "react"
-import type { GraphBucketView, GraphGroupView } from "@/lib/cable-map/shared"
-import { cn } from "@/lib/utils"
-import { cleanPathColumnStart, dirtyPathColumnStart, pathColumnWidth, shaftPalette } from "./config"
-import type { BoardMetrics, GraphSide } from "./types"
-import { getBucketY, getShaftX } from "./utils"
+import { memo } from "react";
+
+import type { GraphBucketView, GraphGroupView } from "@/lib/cable-map/shared";
+import { cn } from "@/lib/utils";
+
+import { cleanPathColumnStart, dirtyPathColumnStart, pathColumnWidth, shaftPalette } from "./config";
+import type { BoardMetrics, GraphSide } from "./types";
+import { getBucketY, getShaftX } from "./utils";
 
 export const BoardPathLayer = memo(function BoardPathLayer({ metrics }: { metrics: BoardMetrics }) {
-	const { height } = metrics
+	const { height } = metrics;
 
-	if (height <= 0) return
+	if (height <= 0) return;
 
 	return (
 		<div className="pointer-events-none absolute inset-0 z-0">
-			<div
-				className="absolute inset-y-0"
-				style={{ left: dirtyPathColumnStart, width: pathColumnWidth }}>
+			<div className="absolute inset-y-0" style={{ left: dirtyPathColumnStart, width: pathColumnWidth }}>
 				<PathColumnBackdrop side="dirty" metrics={metrics} height={height} />
 			</div>
-			<div
-				className="absolute inset-y-0"
-				style={{ left: cleanPathColumnStart, width: pathColumnWidth }}>
+			<div className="absolute inset-y-0" style={{ left: cleanPathColumnStart, width: pathColumnWidth }}>
 				<PathColumnBackdrop side="clean" metrics={metrics} height={height} />
 			</div>
 		</div>
-	)
-})
+	);
+});
 
 function PathColumnBackdrop({
 	side,
 	metrics,
 	height,
 }: {
-	side: GraphSide
-	metrics: BoardMetrics
-	height: number
+	side: GraphSide;
+	metrics: BoardMetrics;
+	height: number;
 }) {
-	const shaftX = getShaftX(side)
+	const shaftX = getShaftX(side);
 
 	return (
 		<svg
@@ -47,10 +45,10 @@ function PathColumnBackdrop({
 				<line x1={132} y1={0} x2={132} y2={height} stroke="currentColor" strokeWidth="3" />
 			) : null}
 
-			{([1, 2, 3, 4] as const).map(shaft => {
-				const extent = metrics.shaftExtents[side][shaft]
+			{([1, 2, 3, 4] as const).map((shaft) => {
+				const extent = metrics.shaftExtents[side][shaft];
 
-				if (!extent) return null
+				if (!extent) return null;
 
 				return (
 					<rect
@@ -64,10 +62,10 @@ function PathColumnBackdrop({
 						strokeWidth="1.5"
 						opacity="0.96"
 					/>
-				)
+				);
 			})}
 
-			{([1, 2, 3, 4] as const).map(shaft => (
+			{([1, 2, 3, 4] as const).map((shaft) => (
 				<line
 					key={`shaft-guide:${shaft}`}
 					x1={shaftX[shaft]}
@@ -81,7 +79,7 @@ function PathColumnBackdrop({
 				/>
 			))}
 		</svg>
-	)
+	);
 }
 
 export const PathArea = memo(function PathArea({
@@ -89,12 +87,12 @@ export const PathArea = memo(function PathArea({
 	group,
 	height,
 }: {
-	side: GraphSide
-	group: GraphGroupView | null
-	height: number
+	side: GraphSide;
+	group: GraphGroupView | null;
+	height: number;
 }) {
-	const visibleBuckets = group ? group.buckets.filter(bucket => bucket.threadCount > 0) : []
-	const bucketY = getBucketY(visibleBuckets.length, height)
+	const visibleBuckets = group ? group.buckets.filter((bucket) => bucket.threadCount > 0) : [];
+	const bucketY = getBucketY(visibleBuckets.length, height);
 
 	return (
 		<svg
@@ -105,23 +103,15 @@ export const PathArea = memo(function PathArea({
 				<PathBucketRow key={bucket.shaft} side={side} bucket={bucket} y={bucketY[index] ?? 70} />
 			))}
 		</svg>
-	)
-})
+	);
+});
 
-function PathBucketRow({
-	side,
-	bucket,
-	y,
-}: {
-	side: GraphSide
-	bucket: GraphBucketView
-	y: number
-}) {
-	const shaftX = getShaftX(side)
-	const color = shaftPalette[bucket.shaft].line
-	const layout = getBucketLayout(side, bucket, shaftX)
-	const countLabel = `${bucket.threadCount} н`
-	const countWidth = Math.max(34, countLabel.length * 7 + 12)
+function PathBucketRow({ side, bucket, y }: { side: GraphSide; bucket: GraphBucketView; y: number }) {
+	const shaftX = getShaftX(side);
+	const color = shaftPalette[bucket.shaft].line;
+	const layout = getBucketLayout(side, bucket, shaftX);
+	const countLabel = `${bucket.threadCount} н`;
+	const countWidth = Math.max(34, countLabel.length * 7 + 12);
 
 	return (
 		<>
@@ -170,14 +160,10 @@ function PathBucketRow({
 				{countLabel}
 			</text>
 		</>
-	)
+	);
 }
 
-function getBucketLayout(
-	side: GraphSide,
-	bucket: GraphBucketView,
-	shaftX: ReturnType<typeof getShaftX>
-) {
+function getBucketLayout(side: GraphSide, bucket: GraphBucketView, shaftX: ReturnType<typeof getShaftX>) {
 	if (side === "dirty") {
 		if (bucket.shaft === 0) {
 			return {
@@ -187,7 +173,7 @@ function getBucketLayout(
 				lineEnd: 126,
 				countX: 118,
 				arrowHead: "right" as const,
-			}
+			};
 		}
 
 		return {
@@ -197,7 +183,7 @@ function getBucketLayout(
 			lineEnd: shaftX[bucket.shaft] - 14,
 			countX: (84 + shaftX[bucket.shaft] - 14) / 2,
 			arrowHead: "right" as const,
-		}
+		};
 	}
 
 	if (bucket.shaft === 0) {
@@ -208,7 +194,7 @@ function getBucketLayout(
 			lineEnd: 206,
 			countX: 197,
 			arrowHead: "left" as const,
-		}
+		};
 	}
 
 	return {
@@ -218,7 +204,7 @@ function getBucketLayout(
 		lineEnd: 256,
 		countX: (shaftX[bucket.shaft] + 14 + 236) / 2,
 		arrowHead: "left" as const,
-	}
+	};
 }
 
 function ArrowHead({
@@ -228,22 +214,20 @@ function ArrowHead({
 	color,
 	shaft,
 }: {
-	direction: "left" | "right"
-	x: number
-	y: number
-	color: string
-	shaft: 0 | 1 | 2 | 3 | 4
+	direction: "left" | "right";
+	x: number;
+	y: number;
+	color: string;
+	shaft: 0 | 1 | 2 | 3 | 4;
 }) {
-	const size = 6
+	const size = 6;
 	const points =
 		direction === "right"
 			? `${x - size},${y - size / 1.3} ${x},${y} ${x - size},${y + size / 1.3}`
-			: `${x + size},${y - size / 1.3} ${x},${y} ${x + size},${y + size / 1.3}`
+			: `${x + size},${y - size / 1.3} ${x},${y} ${x + size},${y + size / 1.3}`;
 
-	return (
-		<polygon points={points} fill={color} className={cn(shaft === 0 ? "dark:fill-white" : "")} />
-	)
+	return <polygon points={points} fill={color} className={cn(shaft === 0 ? "dark:fill-white" : "")} />;
 }
 
-BoardPathLayer.displayName = "BoardPathLayer"
-PathArea.displayName = "PathArea"
+BoardPathLayer.displayName = "BoardPathLayer";
+PathArea.displayName = "PathArea";

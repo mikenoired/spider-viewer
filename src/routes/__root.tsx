@@ -1,17 +1,18 @@
-import { TanStackDevtools } from "@tanstack/react-devtools"
-import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router"
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
-import { getCurrentSession } from "@/lib/auth/auth.functions"
-import type { AuthSession } from "@/lib/auth/shared"
-import { PROJECT_NAME } from "@/lib/auth/shared"
+import { TanStackDevtools } from "@tanstack/react-devtools";
+import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
+import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 
-import appCss from "../styles.css?url"
+import { getCurrentSession } from "@/lib/auth/auth.functions";
+import type { AuthSession } from "@/lib/auth/shared";
+import { PROJECT_NAME } from "@/lib/auth/shared";
+
+import appCss from "../styles.css?url";
 
 type RouterContext = {
-	auth: AuthSession | null
-}
+	auth: AuthSession | null;
+};
 
-const THEME_INIT_SCRIPT = `(function(){try{var stored=window.localStorage.getItem('theme');var resolved=stored==='dark'?'dark':'light';var root=document.documentElement;root.classList.remove('light','dark');root.classList.add(resolved);root.setAttribute('data-theme',resolved);root.style.colorScheme=resolved;}catch(e){}})();`
+const THEME_INIT_SCRIPT = `(function(){try{var stored=window.localStorage.getItem('theme');var resolved=stored==='dark'?'dark':'light';var root=document.documentElement;root.classList.remove('light','dark');root.classList.add(resolved);root.setAttribute('data-theme',resolved);root.style.colorScheme=resolved;}catch(e){}})();`;
 
 export const Route = createRootRouteWithContext<RouterContext>()({
 	beforeLoad: async () => ({
@@ -39,7 +40,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 		],
 	}),
 	shellComponent: RootDocument,
-})
+});
 
 function RootDocument({ children }: { children: React.ReactNode }) {
 	return (
@@ -64,5 +65,5 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<Scripts />
 			</body>
 		</html>
-	)
+	);
 }

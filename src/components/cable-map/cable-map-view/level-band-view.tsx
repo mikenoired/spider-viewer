@@ -1,12 +1,14 @@
-import { DownloadIcon, LoaderCircleIcon } from "lucide-react"
-import { type CSSProperties, memo } from "react"
-import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
-import { boardColumns } from "./config"
-import { PathArea } from "./path-layer"
-import { LeftRoomArea, RightRoomArea, TotalThreadsBadge } from "./room-blocks"
-import type { LevelBand } from "./types"
+import { DownloadIcon, LoaderCircleIcon } from "lucide-react";
+import { type CSSProperties, memo } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+
+import { boardColumns } from "./config";
+import { PathArea } from "./path-layer";
+import { LeftRoomArea, RightRoomArea, TotalThreadsBadge } from "./room-blocks";
+import type { LevelBand } from "./types";
 
 export const LevelBandView = memo(function LevelBandView({
 	band,
@@ -19,17 +21,17 @@ export const LevelBandView = memo(function LevelBandView({
 	onExportDailyReport,
 	isLast,
 }: {
-	band: LevelBand
-	bandIndex: number
-	canEditProgress: boolean
-	canManageManualRooms: boolean
-	canExportDailyReport: boolean
-	isExportDisabled: boolean
-	isExportingReport: boolean
-	onExportDailyReport: (level: string) => void
-	isLast: boolean
+	band: LevelBand;
+	bandIndex: number;
+	canEditProgress: boolean;
+	canManageManualRooms: boolean;
+	canExportDailyReport: boolean;
+	isExportDisabled: boolean;
+	isExportingReport: boolean;
+	onExportDailyReport: (level: string) => void;
+	isLast: boolean;
 }) {
-	const isFirst = bandIndex === 0
+	const isFirst = bandIndex === 0;
 
 	return (
 		<div
@@ -41,7 +43,7 @@ export const LevelBandView = memo(function LevelBandView({
 			style={
 				{
 					gridTemplateColumns: boardColumns,
-					gridTemplateRows: band.rows.map(row => `${row.height}px`).join(" "),
+					gridTemplateRows: band.rows.map((row) => `${row.height}px`).join(" "),
 				} satisfies CSSProperties
 			}>
 			<div
@@ -66,11 +68,7 @@ export const LevelBandView = memo(function LevelBandView({
 									onClick={() => void onExportDailyReport(band.level)}
 									disabled={isExportDisabled}
 									aria-label={`Выгрузить DOCX по уровню ${band.level}`}>
-									{isExportingReport ? (
-										<LoaderCircleIcon className="animate-spin" />
-									) : (
-										<DownloadIcon />
-									)}
+									{isExportingReport ? <LoaderCircleIcon className="animate-spin" /> : <DownloadIcon />}
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent>Выгрузить DOCX</TooltipContent>
@@ -80,7 +78,7 @@ export const LevelBandView = memo(function LevelBandView({
 			</div>
 
 			{band.rows.map((row, rowIndex) => {
-				const gridRow = String(rowIndex + 1)
+				const gridRow = String(rowIndex + 1);
 
 				return (
 					<LevelBandRowView
@@ -92,11 +90,11 @@ export const LevelBandView = memo(function LevelBandView({
 						canEditProgress={canEditProgress}
 						canManageManualRooms={canManageManualRooms}
 					/>
-				)
+				);
 			})}
 		</div>
-	)
-})
+	);
+});
 
 const LevelBandRowView = memo(function LevelBandRowView({
 	dirtyGroup,
@@ -106,12 +104,12 @@ const LevelBandRowView = memo(function LevelBandRowView({
 	canEditProgress,
 	canManageManualRooms,
 }: {
-	dirtyGroup: LevelBand["rows"][number]["dirtyGroup"]
-	cleanGroup: LevelBand["rows"][number]["cleanGroup"]
-	gridRow: string
-	rowHeight: number
-	canEditProgress: boolean
-	canManageManualRooms: boolean
+	dirtyGroup: LevelBand["rows"][number]["dirtyGroup"];
+	cleanGroup: LevelBand["rows"][number]["cleanGroup"];
+	gridRow: string;
+	rowHeight: number;
+	canEditProgress: boolean;
+	canManageManualRooms: boolean;
 }) {
 	return (
 		<>
@@ -147,8 +145,8 @@ const LevelBandRowView = memo(function LevelBandRowView({
 				/>
 			</div>
 		</>
-	)
-})
+	);
+});
 
-LevelBandView.displayName = "LevelBandView"
-LevelBandRowView.displayName = "LevelBandRowView"
+LevelBandView.displayName = "LevelBandView";
+LevelBandRowView.displayName = "LevelBandRowView";

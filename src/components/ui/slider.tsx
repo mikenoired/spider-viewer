@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { Slider as SliderPrimitive } from "radix-ui"
-import * as React from "react"
+import { Slider as SliderPrimitive } from "radix-ui";
+import * as React from "react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 function Slider({
 	className,
@@ -16,17 +16,17 @@ function Slider({
 	const _values = React.useMemo(
 		() => (Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max]),
 		[value, defaultValue, min, max]
-	)
+	);
 	const thumbKeys = React.useMemo(() => {
-		const seen = new Map<number, number>()
+		const seen = new Map<number, number>();
 
-		return _values.map(currentValue => {
-			const occurrence = seen.get(currentValue) ?? 0
-			seen.set(currentValue, occurrence + 1)
+		return _values.map((currentValue) => {
+			const occurrence = seen.get(currentValue) ?? 0;
+			seen.set(currentValue, occurrence + 1);
 
-			return `thumb-${currentValue}-${occurrence}`
-		})
-	}, [_values])
+			return `thumb-${currentValue}-${occurrence}`;
+		});
+	}, [_values]);
 
 	return (
 		<SliderPrimitive.Root
@@ -48,7 +48,7 @@ function Slider({
 					className="absolute bg-primary select-none data-horizontal:h-full data-vertical:w-full"
 				/>
 			</SliderPrimitive.Track>
-			{thumbKeys.map(thumbKey => (
+			{thumbKeys.map((thumbKey) => (
 				<SliderPrimitive.Thumb
 					data-slot="slider-thumb"
 					key={thumbKey}
@@ -56,7 +56,7 @@ function Slider({
 				/>
 			))}
 		</SliderPrimitive.Root>
-	)
+	);
 }
 
-export { Slider }
+export { Slider };

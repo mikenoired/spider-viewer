@@ -1,14 +1,6 @@
 import pino from "pino";
 
-const LOG_LEVELS = new Set([
-	"fatal",
-	"error",
-	"warn",
-	"info",
-	"debug",
-	"trace",
-	"silent",
-]);
+const LOG_LEVELS = new Set(["fatal", "error", "warn", "info", "debug", "trace", "silent"]);
 
 function getLogLevel() {
 	const configuredLevel = process.env.LOG_LEVEL?.trim().toLowerCase();

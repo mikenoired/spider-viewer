@@ -1,31 +1,32 @@
-import { createFileRoute, redirect } from "@tanstack/react-router"
-import { format } from "date-fns"
-import { HistoryPanel } from "@/components/cable-map/history-panel"
-import { getBackdatedHistory } from "@/lib/cable-map/functions"
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { format } from "date-fns";
+
+import { HistoryPanel } from "@/components/cable-map/history-panel";
+import { getBackdatedHistory } from "@/lib/cable-map/functions";
 
 function getTodayIso() {
-	return format(new Date(), "yyyy-MM-dd")
+	return format(new Date(), "yyyy-MM-dd");
 }
 
 export const Route = createFileRoute("/app/backdated")({
 	beforeLoad: ({ context }) => {
-		if (context.auth?.role !== "super-admin") throw redirect({ to: "/app" })
+		if (context.auth?.role !== "super-admin") throw redirect({ to: "/app" });
 	},
 	loader: async () => {
-		const today = getTodayIso()
+		const today = getTodayIso();
 
 		return getBackdatedHistory({
 			data: {
 				from: today,
 				to: today,
 			},
-		})
+		});
 	},
 	component: BackdatedPage,
-})
+});
 
 function BackdatedPage() {
-	const entries = Route.useLoaderData()
+	const entries = Route.useLoaderData();
 
 	return (
 		<HistoryPanel
@@ -33,5 +34,5 @@ function BackdatedPage() {
 			initialEntries={entries}
 			backdatedOnly
 		/>
-	)
+	);
 }
