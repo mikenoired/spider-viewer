@@ -180,9 +180,9 @@ function GroupProgressTrigger({
 							align === "right" && "text-right"
 						)}>
 						{group.primaryRooms.map((room) => (
-							<div key={room.id}>
+							<span key={room.id} className="select-none">
 								{room.roomName.length > 15 ? `${room.roomName.slice(0, 15)}...` : room.roomName}
-							</div>
+							</span>
 						))}
 					</div>
 				) : (
