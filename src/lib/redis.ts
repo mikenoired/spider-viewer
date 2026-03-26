@@ -1,63 +1,64 @@
-import { createClient } from "redis"
-import { createLogger } from "@/lib/logger"
+import { createClient } from "redis";
 
-type SpiderViewerRedisClient = ReturnType<typeof createClient>
+import { createLogger } from "@/lib/logger";
 
-const logger = createLogger({ module: "redis" })
+type SpiderViewerRedisClient = ReturnType<typeof createClient>;
+
+const logger = createLogger({ module: "redis" });
 
 declare global {
-	var __spiderViewerRedis__: SpiderViewerRedisClient | undefined
-	var __spiderViewerRedisConnectPromise__: Promise<SpiderViewerRedisClient> | undefined
+	var __spiderViewerRedis__: SpiderViewerRedisClient | undefined;
+	var __spiderViewerRedisConnectPromise__: Promise<SpiderViewerRedisClient> | undefined;
 }
 
 function getRedisUrl() {
-	return process.env.REDIS_URL ?? "redis://localhost:6379/0"
+	return process.env.REDIS_URL ?? "redis://localhost:6379/0";
 }
 
 async function connectRedisClient() {
 	if (globalThis.__spiderViewerRedis__?.isOpen) {
-		return globalThis.__spiderViewerRedis__
+		return globalThis.__spiderViewerRedis__;
 	}
 
 	if (!globalThis.__spiderViewerRedis__) {
 		const client = createClient({
 			url: getRedisUrl(),
-		})
+		});
 
-		client.on("error", error => {
-			logger.error({ err: error }, "Redis client error")
-		})
+		client.on("error", (error) => {
+			logger.error({ err: error }, "Redis client error");
+		});
 
-		globalThis.__spiderViewerRedis__ = client
+		globalThis.__spiderViewerRedis__ = client;
 	}
 
 	if (!globalThis.__spiderViewerRedisConnectPromise__) {
-		const client = globalThis.__spiderViewerRedis__
+		const client = globalThis.__spiderViewerRedis__;
 
 		if (!client) {
-			throw new Error("Redis client is not initialized.")
+			throw new Error("Redis client is not initialized.");
 		}
 
 		globalThis.__spiderViewerRedisConnectPromise__ = client
 			.connect()
 			.then(() => client)
 			.finally(() => {
-				globalThis.__spiderViewerRedisConnectPromise__ = undefined
-			})
+				globalThis.__spiderViewerRedisConnectPromise__ = undefined;
+			});
 	}
 
-	return globalThis.__spiderViewerRedisConnectPromise__
+	return globalThis.__spiderViewerRedisConnectPromise__;
 }
 
 export async function getRedis() {
-	return connectRedisClient()
+	return connectRedisClient();
 }
 
 export async function closeRedisConnection() {
 	if (globalThis.__spiderViewerRedis__?.isOpen) {
-		await globalThis.__spiderViewerRedis__.quit()
+		await globalThis.__spiderViewerRedis__.quit();
 	}
 
-	globalThis.__spiderViewerRedis__ = undefined
-	globalThis.__spiderViewerRedisConnectPromise__ = undefined
+	globalThis.__spiderViewerRedis__ = undefined;
+	globalThis.__spiderViewerRedisConnectPromise__ = undefined;
 }

@@ -1,0 +1,18 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "oxc", "unicorn", "react"],
+	"env": {
+		"browser": true,
+		"node": true
+	},
+	"ignorePatterns": ["src/routeTree.gen.ts"],
+	"rules": {
+		"no-console": "warn",
+		"no-unused-vars": "error",
+		"no-useless-constructor": "error",
+		"prefer-const": "error",
+		"react/exhaustive-deps": "off",
+		"react/jsx-no-useless-fragment": "error",
+		"typescript/consistent-type-imports": "error"
+	}
+}

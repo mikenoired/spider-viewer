@@ -1,9 +1,10 @@
-"use client"
+"use client";
 
-import { useRouter } from "@tanstack/react-router"
-import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react"
-import { memo, useEffect, useState } from "react"
-import { toast } from "sonner"
+import { useRouter } from "@tanstack/react-router";
+import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { memo, useEffect, useState } from "react";
+import { toast } from "sonner";
+
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -14,8 +15,8 @@ import {
 	AlertDialogHeader,
 	AlertDialogMedia,
 	AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -23,11 +24,11 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { createManualRoom, deleteManualRoom } from "@/lib/cable-map/functions"
-import type { GraphGroupView, GraphManualRoomView } from "@/lib/cable-map/shared"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { createManualRoom, deleteManualRoom } from "@/lib/cable-map/functions";
+import type { GraphGroupView, GraphManualRoomView } from "@/lib/cable-map/shared";
+import { cn } from "@/lib/utils";
 
 function ManualRoomAddButton({ onClick }: { onClick: () => void }) {
 	return (
@@ -38,7 +39,7 @@ function ManualRoomAddButton({ onClick }: { onClick: () => void }) {
 			className="h-10 border-dashed border-amber-800 bg-white/20 text-amber-950 hover:bg-white/35 dark:border-amber-200 dark:bg-transparent dark:text-amber-100 dark:hover:bg-white/10">
 			<PlusIcon data-icon="inline-start" />
 		</Button>
-	)
+	);
 }
 
 function ManualRoomBlockContent({
@@ -48,23 +49,23 @@ function ManualRoomBlockContent({
 	onAdd,
 	onDeleteCandidateSelect,
 }: {
-	hasRooms: boolean
-	rooms: GraphManualRoomView[]
-	canManage: boolean
-	onAdd: () => void
-	onDeleteCandidateSelect: (room: GraphManualRoomView) => void
+	hasRooms: boolean;
+	rooms: GraphManualRoomView[];
+	canManage: boolean;
+	onAdd: () => void;
+	onDeleteCandidateSelect: (room: GraphManualRoomView) => void;
 }) {
 	if (hasRooms) {
 		return (
 			<div className="flex w-full flex-col gap-2 rounded-[8px] border border-[#d2b55a] bg-amber-200 px-2 py-2 text-amber-950 shadow-sm dark:bg-amber-700 dark:text-amber-100">
 				<div className="flex flex-col gap-1">
-					{rooms.map(room => (
+					{rooms.map((room) => (
 						<button
 							key={room.id}
 							type="button"
 							onClick={() => {
 								if (canManage) {
-									onDeleteCandidateSelect(room)
+									onDeleteCandidateSelect(room);
 								}
 							}}
 							className={cn(
@@ -78,14 +79,14 @@ function ManualRoomBlockContent({
 
 				{canManage ? <ManualRoomAddButton onClick={onAdd} /> : null}
 			</div>
-		)
+		);
 	}
 
 	return (
 		<div className="flex h-full min-h-35 w-full flex-col items-center justify-center gap-3 rounded-[10px] border-2 border-dashed border-[#c6a643] bg-amber-200/50 px-3 py-4 text-center text-amber-950 shadow-sm dark:bg-amber-600/50 dark:text-amber-100">
 			{canManage ? <ManualRoomAddButton onClick={onAdd} /> : null}
 		</div>
-	)
+	);
 }
 
 export const ManualRoomBlock = memo(function ManualRoomBlock({
@@ -93,29 +94,29 @@ export const ManualRoomBlock = memo(function ManualRoomBlock({
 	canManage,
 	className,
 }: {
-	group: GraphGroupView
-	canManage: boolean
-	className?: string
+	group: GraphGroupView;
+	canManage: boolean;
+	className?: string;
 }) {
-	const router = useRouter()
-	const [addDialogOpen, setAddDialogOpen] = useState(false)
-	const [pendingAction, setPendingAction] = useState<"create" | "delete" | null>(null)
-	const [draftRoomName, setDraftRoomName] = useState("")
-	const [deleteCandidate, setDeleteCandidate] = useState<GraphManualRoomView | null>(null)
-	const canSave = draftRoomName.trim().length > 0 && pendingAction !== "create"
+	const router = useRouter();
+	const [addDialogOpen, setAddDialogOpen] = useState(false);
+	const [pendingAction, setPendingAction] = useState<"create" | "delete" | null>(null);
+	const [draftRoomName, setDraftRoomName] = useState("");
+	const [deleteCandidate, setDeleteCandidate] = useState<GraphManualRoomView | null>(null);
+	const canSave = draftRoomName.trim().length > 0 && pendingAction !== "create";
 
 	useEffect(() => {
 		if (!addDialogOpen) {
-			setDraftRoomName("")
+			setDraftRoomName("");
 		}
-	}, [addDialogOpen])
+	}, [addDialogOpen]);
 
 	async function handleCreateRoom() {
 		if (!canManage || !draftRoomName.trim()) {
-			return
+			return;
 		}
 
-		setPendingAction("create")
+		setPendingAction("create");
 
 		try {
 			await createManualRoom({
@@ -123,37 +124,37 @@ export const ManualRoomBlock = memo(function ManualRoomBlock({
 					groupId: group.id,
 					roomName: draftRoomName,
 				},
-			})
-			toast.success("Помещение добавлено в ручной жёлтый блок.")
-			setAddDialogOpen(false)
-			await router.invalidate()
+			});
+			toast.success("Помещение добавлено в ручной жёлтый блок.");
+			setAddDialogOpen(false);
+			await router.invalidate();
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Не удалось добавить ручное помещение.")
+			toast.error(error instanceof Error ? error.message : "Не удалось добавить ручное помещение.");
 		} finally {
-			setPendingAction(null)
+			setPendingAction(null);
 		}
 	}
 
 	async function handleDeleteRoom() {
 		if (!canManage || !deleteCandidate) {
-			return
+			return;
 		}
 
-		setPendingAction("delete")
+		setPendingAction("delete");
 
 		try {
 			await deleteManualRoom({
 				data: {
 					roomId: deleteCandidate.id,
 				},
-			})
-			toast.success("Ручное помещение удалено.")
-			setDeleteCandidate(null)
-			await router.invalidate()
+			});
+			toast.success("Ручное помещение удалено.");
+			setDeleteCandidate(null);
+			await router.invalidate();
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Не удалось удалить ручное помещение.")
+			toast.error(error instanceof Error ? error.message : "Не удалось удалить ручное помещение.");
 		} finally {
-			setPendingAction(null)
+			setPendingAction(null);
 		}
 	}
 
@@ -174,8 +175,7 @@ export const ManualRoomBlock = memo(function ManualRoomBlock({
 					<DialogHeader>
 						<DialogTitle>Новое ручное помещение</DialogTitle>
 						<DialogDescription>
-							Помещение будет привязано к зоне {group.sourceZone || "Без зоны"} и отметке{" "}
-							{group.level}.
+							Помещение будет привязано к зоне {group.sourceZone || "Без зоны"} и отметке {group.level}.
 						</DialogDescription>
 					</DialogHeader>
 
@@ -184,7 +184,7 @@ export const ManualRoomBlock = memo(function ManualRoomBlock({
 							autoFocus
 							placeholder="Например, АВ1107/1"
 							value={draftRoomName}
-							onChange={event => setDraftRoomName(event.target.value)}
+							onChange={(event) => setDraftRoomName(event.target.value)}
 							disabled={pendingAction === "create"}
 						/>
 					</div>
@@ -211,9 +211,9 @@ export const ManualRoomBlock = memo(function ManualRoomBlock({
 
 			<AlertDialog
 				open={deleteCandidate !== null}
-				onOpenChange={open => {
+				onOpenChange={(open) => {
 					if (!open && pendingAction !== "delete") {
-						setDeleteCandidate(null)
+						setDeleteCandidate(null);
 					}
 				}}>
 				<AlertDialogContent>
@@ -241,7 +241,7 @@ export const ManualRoomBlock = memo(function ManualRoomBlock({
 				</AlertDialogContent>
 			</AlertDialog>
 		</>
-	)
-})
+	);
+});
 
-ManualRoomBlock.displayName = "ManualRoomBlock"
+ManualRoomBlock.displayName = "ManualRoomBlock";

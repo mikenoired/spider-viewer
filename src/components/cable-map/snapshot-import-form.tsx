@@ -1,47 +1,48 @@
-"use client"
+"use client";
 
-import { useNavigate, useRouter } from "@tanstack/react-router"
-import { FileSpreadsheetIcon, LoaderCircleIcon, UploadIcon } from "lucide-react"
-import { useState } from "react"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { uploadWorkbook } from "@/lib/cable-map/functions"
-import type { SnapshotSummaryView } from "@/lib/cable-map/shared"
+import { useNavigate, useRouter } from "@tanstack/react-router";
+import { FileSpreadsheetIcon, LoaderCircleIcon, UploadIcon } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { uploadWorkbook } from "@/lib/cable-map/functions";
+import type { SnapshotSummaryView } from "@/lib/cable-map/shared";
 
 export function SnapshotImportForm({ snapshot }: { snapshot: SnapshotSummaryView | null }) {
-	const router = useRouter()
-	const navigate = useNavigate()
-	const [pending, setPending] = useState(false)
-	const [file, setFile] = useState<File | null>(null)
+	const router = useRouter();
+	const navigate = useNavigate();
+	const [pending, setPending] = useState(false);
+	const [file, setFile] = useState<File | null>(null);
 
 	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-		event.preventDefault()
+		event.preventDefault();
 
 		if (!file) {
-			toast.error("Выберите файл `.ods`, `.xlsx` или `.xls`.")
-			return
+			toast.error("Выберите файл `.ods`, `.xlsx` или `.xls`.");
+			return;
 		}
 
-		setPending(true)
+		setPending(true);
 
 		try {
-			const formData = new FormData()
-			formData.set("file", file)
+			const formData = new FormData();
+			formData.set("file", file);
 
 			const result = await uploadWorkbook({
 				data: formData,
-			})
+			});
 
-			await router.invalidate()
-			toast.success(`Импорт завершён: ${result.rowCount} строк, ${result.groupCount} групп.`)
-			await navigate({ to: "/app" })
+			await router.invalidate();
+			toast.success(`Импорт завершён: ${result.rowCount} строк, ${result.groupCount} групп.`);
+			await navigate({ to: "/app" });
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Не удалось выполнить импорт файла.")
+			toast.error(error instanceof Error ? error.message : "Не удалось выполнить импорт файла.");
 		} finally {
-			setPending(false)
+			setPending(false);
 		}
 	}
 
@@ -63,11 +64,11 @@ export function SnapshotImportForm({ snapshot }: { snapshot: SnapshotSummaryView
 									id="workbook-file"
 									type="file"
 									accept=".ods,.xlsx,.xls"
-									onChange={event => setFile(event.target.files?.[0] ?? null)}
+									onChange={(event) => setFile(event.target.files?.[0] ?? null)}
 								/>
 								<FieldDescription>
-									После повторного импорта активный snapshot будет заменён новым. Поддерживаются
-									корректные `.ods`, `.xlsx`, `.xls` файлы до 15 МБ.
+									После повторного импорта активный snapshot будет заменён новым. Поддерживаются корректные
+									`.ods`, `.xlsx`, `.xls` файлы до 15 МБ.
 								</FieldDescription>
 							</Field>
 						</FieldGroup>
@@ -122,7 +123,7 @@ export function SnapshotImportForm({ snapshot }: { snapshot: SnapshotSummaryView
 				</CardContent>
 			</Card>
 		</div>
-	)
+	);
 }
 
 function InfoItem({ label, value }: { label: string; value: string }) {
@@ -131,5 +132,5 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 			<div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
 			<div className="mt-1 text-lg font-semibold">{value}</div>
 		</div>
-	)
+	);
 }

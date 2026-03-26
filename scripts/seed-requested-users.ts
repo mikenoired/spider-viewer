@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 
 import { sql } from "drizzle-orm";
-import { createLogger } from "../src/lib/logger";
-import type { UserRole } from "../src/lib/auth/shared";
+
 import { hashPassword } from "../src/lib/auth/password";
+import type { UserRole } from "../src/lib/auth/shared";
 import { closeDbConnection, getDb } from "../src/lib/db";
 import { users } from "../src/lib/db/schema";
+import { createLogger } from "../src/lib/logger";
 
 const logger = createLogger({ script: "seed-requested-users" });
 
@@ -48,9 +49,7 @@ function validateRequestedUsers() {
 
 	for (const user of requestedUsers) {
 		if (user.password.length !== 5) {
-			throw new Error(
-				`Password for ${user.login} must be exactly 5 characters long.`,
-			);
+			throw new Error(`Password for ${user.login} must be exactly 5 characters long.`);
 		}
 
 		if (logins.has(user.login)) {
@@ -78,7 +77,7 @@ async function seedRequestedUsers() {
 			passwordHash: await hashPassword(password),
 			createdAt: now,
 			updatedAt: now,
-		})),
+		}))
 	);
 
 	await db
@@ -93,10 +92,7 @@ async function seedRequestedUsers() {
 			},
 		});
 
-	logger.info(
-		{ count: requestedUsers.length },
-		"Created or updated requested users",
-	);
+	logger.info({ count: requestedUsers.length }, "Created or updated requested users");
 	for (const { login, password, role } of requestedUsers) {
 		logger.info({ login, password, role }, "Requested user credential");
 	}

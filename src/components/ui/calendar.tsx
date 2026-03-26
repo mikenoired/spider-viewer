@@ -1,8 +1,9 @@
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
-import * as React from "react"
-import { type DayButton, DayPicker, getDefaultClassNames, type Locale } from "react-day-picker"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import * as React from "react";
+import { type DayButton, DayPicker, getDefaultClassNames, type Locale } from "react-day-picker";
+
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const calendarClassNameKeys = {
 	buttonPrevious: "button_previous",
@@ -15,14 +16,14 @@ const calendarClassNameKeys = {
 	rangeStart: "range_start",
 	rangeMiddle: "range_middle",
 	rangeEnd: "range_end",
-} as const
+} as const;
 
 const calendarComponentKeys = {
 	root: "Root",
 	chevron: "Chevron",
 	dayButton: "DayButton",
 	weekNumber: "WeekNumber",
-} as const
+} as const;
 
 function Calendar({
 	className,
@@ -35,9 +36,9 @@ function Calendar({
 	components,
 	...props
 }: React.ComponentProps<typeof DayPicker> & {
-	buttonVariant?: React.ComponentProps<typeof Button>["variant"]
+	buttonVariant?: React.ComponentProps<typeof Button>["variant"];
 }) {
-	const defaultClassNames = getDefaultClassNames()
+	const defaultClassNames = getDefaultClassNames();
 
 	return (
 		<DayPicker
@@ -51,7 +52,7 @@ function Calendar({
 			captionLayout={captionLayout}
 			locale={locale}
 			formatters={{
-				formatMonthDropdown: date => date.toLocaleString(locale?.code, { month: "short" }),
+				formatMonthDropdown: (date) => date.toLocaleString(locale?.code, { month: "short" }),
 				...formatters,
 			}}
 			classNames={{
@@ -127,32 +128,27 @@ function Calendar({
 					"rounded-(--cell-radius) bg-muted text-foreground data-[selected=true]:rounded-none",
 					defaultClassNames.today
 				),
-				outside: cn(
-					"text-muted-foreground aria-selected:text-muted-foreground",
-					defaultClassNames.outside
-				),
+				outside: cn("text-muted-foreground aria-selected:text-muted-foreground", defaultClassNames.outside),
 				disabled: cn("text-muted-foreground opacity-50", defaultClassNames.disabled),
 				hidden: cn("invisible", defaultClassNames.hidden),
 				...classNames,
 			}}
 			components={{
 				[calendarComponentKeys.root]: ({ className, rootRef, ...props }) => {
-					return <div data-slot="calendar" ref={rootRef} className={cn(className)} {...props} />
+					return <div data-slot="calendar" ref={rootRef} className={cn(className)} {...props} />;
 				},
 				[calendarComponentKeys.chevron]: ({ className, orientation, ...props }) => {
 					if (orientation === "left") {
-						return <ChevronLeftIcon className={cn("size-4", className)} {...props} />
+						return <ChevronLeftIcon className={cn("size-4", className)} {...props} />;
 					}
 
 					if (orientation === "right") {
-						return <ChevronRightIcon className={cn("size-4", className)} {...props} />
+						return <ChevronRightIcon className={cn("size-4", className)} {...props} />;
 					}
 
-					return <ChevronDownIcon className={cn("size-4", className)} {...props} />
+					return <ChevronDownIcon className={cn("size-4", className)} {...props} />;
 				},
-				[calendarComponentKeys.dayButton]: ({ ...props }) => (
-					<CalendarDayButton locale={locale} {...props} />
-				),
+				[calendarComponentKeys.dayButton]: ({ ...props }) => <CalendarDayButton locale={locale} {...props} />,
 				[calendarComponentKeys.weekNumber]: ({ children, ...props }) => {
 					return (
 						<td {...props}>
@@ -160,13 +156,13 @@ function Calendar({
 								{children}
 							</div>
 						</td>
-					)
+					);
 				},
 				...components,
 			}}
 			{...props}
 		/>
-	)
+	);
 }
 
 function CalendarDayButton({
@@ -176,12 +172,12 @@ function CalendarDayButton({
 	locale,
 	...props
 }: React.ComponentProps<typeof DayButton> & { locale?: Partial<Locale> }) {
-	const defaultClassNames = getDefaultClassNames()
+	const defaultClassNames = getDefaultClassNames();
 
-	const ref = React.useRef<HTMLButtonElement>(null)
+	const ref = React.useRef<HTMLButtonElement>(null);
 	React.useEffect(() => {
-		if (modifiers.focused) ref.current?.focus()
-	}, [modifiers.focused])
+		if (modifiers.focused) ref.current?.focus();
+	}, [modifiers.focused]);
 
 	return (
 		<Button
@@ -190,10 +186,7 @@ function CalendarDayButton({
 			size="icon"
 			data-day={day.date.toLocaleDateString(locale?.code)}
 			data-selected-single={
-				modifiers.selected &&
-				!modifiers.range_start &&
-				!modifiers.range_end &&
-				!modifiers.range_middle
+				modifiers.selected && !modifiers.range_start && !modifiers.range_end && !modifiers.range_middle
 			}
 			data-range-start={modifiers.range_start}
 			data-range-end={modifiers.range_end}
@@ -205,7 +198,7 @@ function CalendarDayButton({
 			)}
 			{...props}
 		/>
-	)
+	);
 }
 
-export { Calendar, CalendarDayButton }
+export { Calendar, CalendarDayButton };
