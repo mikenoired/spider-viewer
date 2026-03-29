@@ -30,7 +30,7 @@ function HistoryPage() {
 
 	return (
 		<HistoryPanel
-			description="Все зафиксированные изменения прогресса по помещениям."
+			description="Все зафиксированные изменения прогресса по кабелям."
 			initialEntries={entries}
 		/>
 	);

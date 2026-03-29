@@ -197,6 +197,36 @@ export const graphGroupRooms = pgTable(
 	]
 );
 
+export const cableProgress = pgTable(
+	"cable_progress",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		snapshotId: uuid("snapshot_id")
+			.notNull()
+			.references(() => importSnapshots.id, { onDelete: "cascade" }),
+		groupId: uuid("group_id")
+			.notNull()
+			.references(() => graphGroups.id, { onDelete: "cascade" }),
+		roomId: uuid("room_id")
+			.notNull()
+			.references(() => graphGroupRooms.id, { onDelete: "cascade" }),
+		cableRowId: uuid("cable_row_id")
+			.notNull()
+			.references(() => importedCableRows.id, { onDelete: "cascade" }),
+		progress: integer("progress").notNull().default(0),
+		effectiveDate: date("effective_date", { mode: "string" }),
+		updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("cable_progress_snapshot_room_idx").on(table.snapshotId, table.roomId),
+		uniqueIndex("cable_progress_snapshot_cable_unique").on(table.snapshotId, table.cableRowId),
+	]
+);
+
 export const manualGraphRooms = pgTable(
 	"manual_graph_rooms",
 	{
@@ -249,9 +279,53 @@ export const changeAuditLogs = pgTable(
 	]
 );
 
+export const cableChangeAuditLogs = pgTable(
+	"cable_change_audit_logs",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		snapshotId: uuid("snapshot_id").references(() => importSnapshots.id, {
+			onDelete: "set null",
+		}),
+		groupId: uuid("group_id").references(() => graphGroups.id, {
+			onDelete: "set null",
+		}),
+		roomId: uuid("room_id").references(() => graphGroupRooms.id, {
+			onDelete: "set null",
+		}),
+		cableRowId: uuid("cable_row_id").references(() => importedCableRows.id, {
+			onDelete: "set null",
+		}),
+		roomName: text("room_name").notNull(),
+		cableLabel: text("cable_label").notNull(),
+		shaft: integer("shaft").notNull().default(0),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		userLogin: text("user_login").notNull(),
+		changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
+		effectiveDate: date("effective_date", { mode: "string" }).notNull(),
+		isBackdated: boolean("is_backdated").notNull().default(false),
+		oldProgress: integer("old_progress").notNull(),
+		newProgress: integer("new_progress").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("cable_change_audit_logs_changed_at_idx").on(table.changedAt),
+		index("cable_change_audit_logs_effective_date_idx").on(table.effectiveDate),
+		index("cable_change_audit_logs_backdated_effective_changed_idx").on(
+			table.isBackdated,
+			table.effectiveDate,
+			table.changedAt
+		),
+		index("cable_change_audit_logs_cable_row_idx").on(table.cableRowId),
+	]
+);
+
 export type ImportSnapshot = typeof importSnapshots.$inferSelect;
 export type ImportedCableRow = typeof importedCableRows.$inferSelect;
 export type GraphGroup = typeof graphGroups.$inferSelect;
 export type GraphGroupRoom = typeof graphGroupRooms.$inferSelect;
+export type CableProgress = typeof cableProgress.$inferSelect;
 export type ManualGraphRoom = typeof manualGraphRooms.$inferSelect;
 export type ChangeAuditLog = typeof changeAuditLogs.$inferSelect;
+export type CableChangeAuditLog = typeof cableChangeAuditLogs.$inferSelect;

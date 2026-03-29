@@ -91,7 +91,9 @@ type SortKey =
 	| "changedAt"
 	| "effectiveDate"
 	| "userLogin"
+	| "cableLabel"
 	| "roomName"
+	| "shaft"
 	| "oldProgress"
 	| "newProgress"
 	| "isBackdated";
@@ -106,7 +108,9 @@ const sortableColumns: Array<{
 	{ key: "changedAt", label: "Изменено", icon: Clock3Icon },
 	{ key: "effectiveDate", label: "Дата действия", icon: CalendarDaysIcon },
 	{ key: "userLogin", label: "Пользователь", icon: UserIcon },
+	{ key: "cableLabel", label: "Кабель", icon: TagIcon },
 	{ key: "roomName", label: "Помещение", icon: FolderIcon },
+	{ key: "shaft", label: "КШ", icon: TagIcon },
 	{ key: "oldProgress", label: "Было", icon: PercentIcon },
 	{ key: "newProgress", label: "Стало", icon: PercentIcon },
 	{ key: "isBackdated", label: "Тип", icon: TagIcon },
@@ -136,6 +140,13 @@ function compareEntries(
 					sensitivity: "base",
 				}) * factor
 			);
+		case "cableLabel":
+			return (
+				left.cableLabel.localeCompare(right.cableLabel, "ru", {
+					numeric: true,
+					sensitivity: "base",
+				}) * factor
+			);
 		case "roomName":
 			return (
 				left.roomName.localeCompare(right.roomName, "ru", {
@@ -143,6 +154,8 @@ function compareEntries(
 					sensitivity: "base",
 				}) * factor
 			);
+		case "shaft":
+			return (left.shaft - right.shaft) * factor;
 		case "oldProgress":
 			return (left.oldProgress - right.oldProgress) * factor;
 		case "newProgress":
@@ -394,8 +407,20 @@ export function HistoryPanel({
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 font-medium before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+										data-label="Кабель">
+										{entry.cableLabel}
+									</TableCell>
+									<TableCell
+										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 font-medium before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
 										data-label="Помещение">
 										{entry.roomName}
+									</TableCell>
+									<TableCell
+										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+										data-label="КШ">
+										<span className="text-right sm:text-left">
+											{entry.shaft > 0 ? `КШ ${entry.shaft}` : "Без КШ"}
+										</span>
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"

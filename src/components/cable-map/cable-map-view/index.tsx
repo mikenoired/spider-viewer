@@ -228,7 +228,9 @@ export function CableMapView({
 	const [workspaceHeight, setWorkspaceHeight] = useState(0);
 	const [isDragging, setIsDragging] = useState(false);
 	const [isFullscreen, setIsFullscreen] = useState(false);
+	const [overlayLocks, setOverlayLocks] = useState<Record<string, boolean>>({});
 	const canExportDailyReport = canViewAudit(role);
+	const isOverlayOpen = Object.keys(overlayLocks).length > 0;
 	const levelBands = useMemo(() => buildLevelBands(data.levels), [data.levels]);
 	const boardMetrics = useMemo(() => buildBoardMetrics(levelBands), [levelBands]);
 	const canvasSidePadding = isFullscreen ? MAP_FULLSCREEN_EDGE_PADDING : 32;
@@ -260,6 +262,22 @@ export function CableMapView({
 		if (suppressClick) {
 			suppressNextClick();
 		}
+	}, []);
+
+	const handleOverlayOpenChange = useCallback((overlayId: string, open: boolean) => {
+		setOverlayLocks((current) => {
+			if (open) {
+				return current[overlayId] ? current : { ...current, [overlayId]: true };
+			}
+
+			if (!(overlayId in current)) {
+				return current;
+			}
+
+			const next = { ...current };
+			delete next[overlayId];
+			return next;
+		});
 	}, []);
 
 	const cancelInertia = useCallback(() => {
@@ -394,6 +412,19 @@ export function CableMapView({
 		},
 		[cancelInertia, cancelWheelZoomFrame, cancelZoomAnimation]
 	);
+
+	useEffect(() => {
+		if (!isOverlayOpen) {
+			return;
+		}
+
+		cancelInertia();
+		cancelWheelZoomFrame();
+		cancelZoomAnimation();
+		activePointersRef.current.clear();
+		pinchStateRef.current = null;
+		restoreDragSession(undefined, false);
+	}, [cancelInertia, cancelWheelZoomFrame, cancelZoomAnimation, isOverlayOpen, restoreDragSession]);
 
 	useEffect(() => {
 		setChromeHidden(isFullscreen);
@@ -656,6 +687,10 @@ export function CableMapView({
 
 	const handleViewportPointerDown = useCallback(
 		(event: React.PointerEvent<HTMLDivElement>) => {
+			if (isOverlayOpen) {
+				return;
+			}
+
 			cancelInertia();
 			cancelZoomAnimation();
 
@@ -714,11 +749,15 @@ export function CableMapView({
 			};
 			inertiaVelocityRef.current = { x: 0, y: 0 };
 		},
-		[cancelInertia, cancelZoomAnimation, restoreDragSession, zoom]
+		[cancelInertia, cancelZoomAnimation, isOverlayOpen, restoreDragSession, zoom]
 	);
 
 	const handleViewportPointerMove = useCallback(
 		(event: React.PointerEvent<HTMLDivElement>) => {
+			if (isOverlayOpen) {
+				return;
+			}
+
 			const viewport = viewportRef.current;
 			const dragState = dragStateRef.current;
 
@@ -800,7 +839,7 @@ export function CableMapView({
 			};
 			event.preventDefault();
 		},
-		[applyZoom, clampOffset]
+		[applyZoom, clampOffset, isOverlayOpen]
 	);
 
 	const handleViewportPointerUp = useCallback(
@@ -864,6 +903,10 @@ export function CableMapView({
 
 	const handleViewportWheel = useCallback(
 		(event: React.WheelEvent<HTMLDivElement>) => {
+			if (isOverlayOpen) {
+				return;
+			}
+
 			if (!event.ctrlKey) {
 				return;
 			}
@@ -905,7 +948,7 @@ export function CableMapView({
 				applyZoom(nextZoom, pendingState.anchor);
 			});
 		},
-		[applyZoom]
+		[applyZoom, isOverlayOpen]
 	);
 
 	const handleDailyReportExport = useCallback(
@@ -1218,7 +1261,7 @@ export function CableMapView({
 							className={cn(
 								"relative overflow-hidden overscroll-contain bg-background touch-none",
 								isFullscreen ? "h-full min-h-0" : "h-[min(72vh,48rem)] min-h-[26rem]",
-								isDragging ? "cursor-grabbing" : "cursor-grab"
+								isOverlayOpen ? "cursor-default" : isDragging ? "cursor-grabbing" : "cursor-grab"
 							)}>
 							<div
 								ref={contentMeasureRef}
@@ -1266,6 +1309,7 @@ export function CableMapView({
 													bandIndex={index}
 													canEditProgress={canEditProgress}
 													canManageManualRooms={canManageManualRooms}
+													onOverlayOpenChange={handleOverlayOpenChange}
 													canExportDailyReport={canExportDailyReport}
 													isExportDisabled={exportingDailyReport || exportingLevel !== null}
 													isExportingReport={exportingLevel === band.level}

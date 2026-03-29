@@ -13,20 +13,25 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import type { AuthSession } from "@/lib/auth/shared";
 import { getDb } from "@/lib/db";
-import { changeAuditLogs, graphGroupRooms, graphGroups, importSnapshots } from "@/lib/db/schema";
+import {
+	cableChangeAuditLogs,
+	cableProgress,
+	graphGroupRooms,
+	graphGroups,
+	importSnapshots,
+	importedCableRows,
+} from "@/lib/db/schema";
 import { getRedis } from "@/lib/redis";
 
 import { getHistoryEntries } from "./queries.server";
 import { getTodayIsoInMoscow } from "./report-utils";
-import type { DateRangeInput, HistoryEntryView, SaveRoomProgressInput } from "./shared";
+import type { DateRangeInput, HistoryEntryView, SaveCableProgressInput } from "./shared";
 
-const historyTableColumnWidths = [1700, 1400, 1600, 2800, 900, 900] as const;
-const historyReportTableColumnWidths = [1700, 1400, 1600, 2400, 900, 900, 1200] as const;
+const historyTableColumnWidths = [1500, 1300, 1400, 2600, 1500, 900, 900, 900] as const;
+const historyReportTableColumnWidths = [1500, 1300, 1400, 2400, 1400, 900, 900, 900, 1200] as const;
 
 function getTodayInMoscow() {
-	return new Intl.DateTimeFormat("ru-RU", {
-		timeZone: "Europe/Moscow",
-	}).format(new Date());
+	return getTodayIsoInMoscow();
 }
 
 function getTimestampLabel(value: string) {
@@ -83,7 +88,7 @@ async function pushAuditEntriesToRedis(entries: HistoryEntryView[]) {
 	}
 }
 
-export async function saveRoomProgressChanges(input: SaveRoomProgressInput, session: AuthSession) {
+export async function saveCableProgressChanges(input: SaveCableProgressInput, session: AuthSession) {
 	const db = getDb();
 	const now = new Date();
 	const effectiveDate = getEffectiveDate(input.effectiveDate);
@@ -105,6 +110,7 @@ export async function saveRoomProgressChanges(input: SaveRoomProgressInput, sess
 		.select({
 			id: graphGroups.id,
 			snapshotId: graphGroups.snapshotId,
+			groupKey: graphGroups.groupKey,
 		})
 		.from(graphGroups)
 		.where(and(eq(graphGroups.id, input.groupId), eq(graphGroups.snapshotId, activeSnapshot.id)))
@@ -114,12 +120,11 @@ export async function saveRoomProgressChanges(input: SaveRoomProgressInput, sess
 		throw new Error("Группа помещений не найдена в активном снимке.");
 	}
 
-	const roomIds = input.rooms.map((room) => room.roomId);
+	const roomIds = [...new Set(input.cables.map((cable) => cable.roomId))];
 	const persistedRooms = await db
 		.select({
 			id: graphGroupRooms.id,
 			roomName: graphGroupRooms.roomName,
-			progress: graphGroupRooms.progress,
 		})
 		.from(graphGroupRooms)
 		.where(and(eq(graphGroupRooms.groupId, group.id), inArray(graphGroupRooms.id, roomIds)));
@@ -128,20 +133,76 @@ export async function saveRoomProgressChanges(input: SaveRoomProgressInput, sess
 		throw new Error("Не все помещения найдены для сохранения прогресса.");
 	}
 
-	const roomById = new Map(persistedRooms.map((room) => [room.id, room]));
-	const auditRows = input.rooms
-		.map((roomPatch) => {
-			const persistedRoom = roomById.get(roomPatch.roomId);
+	const cableIds = [...new Set(input.cables.map((cable) => cable.cableId))];
+	const persistedCables = await db
+		.select({
+			id: importedCableRows.id,
+			cableLabel: importedCableRows.cableLabel,
+			fromRoom: importedCableRows.fromRoom,
+			fromZone: importedCableRows.fromZone,
+			level: importedCableRows.level,
+			graphSide: importedCableRows.graphSide,
+			graphSubzone: importedCableRows.graphSubzone,
+			farthestShaft: importedCableRows.farthestShaft,
+		})
+		.from(importedCableRows)
+		.where(and(eq(importedCableRows.snapshotId, activeSnapshot.id), inArray(importedCableRows.id, cableIds)));
 
-			if (!persistedRoom || persistedRoom.progress === roomPatch.progress) {
+	if (persistedCables.length !== cableIds.length) {
+		throw new Error("Не все кабели найдены для сохранения прогресса.");
+	}
+
+	const persistedProgressRows = cableIds.length
+		? await db
+				.select({
+					cableRowId: cableProgress.cableRowId,
+					progress: cableProgress.progress,
+				})
+				.from(cableProgress)
+				.where(
+					and(eq(cableProgress.snapshotId, activeSnapshot.id), inArray(cableProgress.cableRowId, cableIds))
+				)
+		: [];
+
+	const roomById = new Map(persistedRooms.map((room) => [room.id, room]));
+	const cableById = new Map(persistedCables.map((cable) => [cable.id, cable]));
+	const progressByCableId = new Map(
+		persistedProgressRows.map((progressRow) => [progressRow.cableRowId, progressRow.progress])
+	);
+	const auditRows = input.cables
+		.map((cablePatch) => {
+			const persistedRoom = roomById.get(cablePatch.roomId);
+			const persistedCable = cableById.get(cablePatch.cableId);
+
+			if (!persistedRoom || !persistedCable) {
+				return null;
+			}
+
+			const cableGroupKey = [
+				persistedCable.graphSide,
+				persistedCable.graphSubzone ?? "none",
+				persistedCable.fromZone || "unknown",
+				persistedCable.level,
+			].join(":");
+
+			if (cableGroupKey !== group.groupKey || persistedCable.fromRoom !== persistedRoom.roomName) {
+				throw new Error(`Кабель ${persistedCable.cableLabel} не принадлежит выбранному помещению.`);
+			}
+
+			const oldProgress = progressByCableId.get(cablePatch.cableId) ?? 0;
+
+			if (oldProgress === cablePatch.progress) {
 				return null;
 			}
 
 			return {
-				roomId: roomPatch.roomId,
+				roomId: cablePatch.roomId,
 				roomName: persistedRoom.roomName,
-				oldProgress: persistedRoom.progress,
-				newProgress: roomPatch.progress,
+				cableRowId: cablePatch.cableId,
+				cableLabel: persistedCable.cableLabel,
+				shaft: persistedCable.farthestShaft ?? 0,
+				oldProgress,
+				newProgress: cablePatch.progress,
 			};
 		})
 		.filter((row): row is NonNullable<typeof row> => row !== null);
@@ -155,24 +216,42 @@ export async function saveRoomProgressChanges(input: SaveRoomProgressInput, sess
 	const historyEntries = await db.transaction(async (tx) => {
 		for (const auditRow of auditRows) {
 			await tx
-				.update(graphGroupRooms)
-				.set({
+				.insert(cableProgress)
+				.values({
+					snapshotId: activeSnapshot.id,
+					groupId: group.id,
+					roomId: auditRow.roomId,
+					cableRowId: auditRow.cableRowId,
 					progress: auditRow.newProgress,
 					effectiveDate,
 					updatedByUserId: session.id,
 					updatedAt: now,
+					createdAt: now,
 				})
-				.where(eq(graphGroupRooms.id, auditRow.roomId));
+				.onConflictDoUpdate({
+					target: [cableProgress.snapshotId, cableProgress.cableRowId],
+					set: {
+						groupId: group.id,
+						roomId: auditRow.roomId,
+						progress: auditRow.newProgress,
+						effectiveDate,
+						updatedByUserId: session.id,
+						updatedAt: now,
+					},
+				});
 		}
 
 		const insertedRows = await tx
-			.insert(changeAuditLogs)
+			.insert(cableChangeAuditLogs)
 			.values(
 				auditRows.map((auditRow) => ({
 					snapshotId: activeSnapshot.id,
 					groupId: group.id,
 					roomId: auditRow.roomId,
+					cableRowId: auditRow.cableRowId,
 					roomName: auditRow.roomName,
+					cableLabel: auditRow.cableLabel,
+					shaft: auditRow.shaft,
 					userId: session.id,
 					userLogin: session.login,
 					changedAt: now,
@@ -184,22 +263,28 @@ export async function saveRoomProgressChanges(input: SaveRoomProgressInput, sess
 				}))
 			)
 			.returning({
-				id: changeAuditLogs.id,
-				roomName: changeAuditLogs.roomName,
-				userLogin: changeAuditLogs.userLogin,
-				oldProgress: changeAuditLogs.oldProgress,
-				newProgress: changeAuditLogs.newProgress,
-				changedAt: changeAuditLogs.changedAt,
-				effectiveDate: changeAuditLogs.effectiveDate,
-				isBackdated: changeAuditLogs.isBackdated,
-				groupId: changeAuditLogs.groupId,
+				id: cableChangeAuditLogs.id,
+				cableId: cableChangeAuditLogs.cableRowId,
+				cableLabel: cableChangeAuditLogs.cableLabel,
+				roomName: cableChangeAuditLogs.roomName,
+				shaft: cableChangeAuditLogs.shaft,
+				userLogin: cableChangeAuditLogs.userLogin,
+				oldProgress: cableChangeAuditLogs.oldProgress,
+				newProgress: cableChangeAuditLogs.newProgress,
+				changedAt: cableChangeAuditLogs.changedAt,
+				effectiveDate: cableChangeAuditLogs.effectiveDate,
+				isBackdated: cableChangeAuditLogs.isBackdated,
+				groupId: cableChangeAuditLogs.groupId,
 			});
 
 		return insertedRows.map(
 			(entry) =>
 				({
 					id: entry.id,
+					cableId: entry.cableId,
+					cableLabel: entry.cableLabel,
 					roomName: entry.roomName,
+					shaft: entry.shaft,
 					userLogin: entry.userLogin,
 					oldProgress: entry.oldProgress,
 					newProgress: entry.newProgress,
@@ -242,7 +327,7 @@ function createHistoryTable(
 ) {
 	const includeTypeColumn = options?.includeTypeColumn ?? false;
 	const columnWidths = includeTypeColumn ? historyReportTableColumnWidths : historyTableColumnWidths;
-	const typeColumnWidth = historyReportTableColumnWidths[6];
+	const typeColumnWidth = historyReportTableColumnWidths[8];
 
 	return new Table({
 		width: {
@@ -258,9 +343,11 @@ function createHistoryTable(
 					createTableCell("Дата изменения", columnWidths[0]),
 					createTableCell("Дата действия", columnWidths[1]),
 					createTableCell("Пользователь", columnWidths[2]),
-					createTableCell("Помещение", columnWidths[3]),
-					createTableCell("Было", columnWidths[4]),
-					createTableCell("Стало", columnWidths[5]),
+					createTableCell("Кабель", columnWidths[3]),
+					createTableCell("Помещение", columnWidths[4]),
+					createTableCell("КШ", columnWidths[5]),
+					createTableCell("Было", columnWidths[6]),
+					createTableCell("Стало", columnWidths[7]),
 					...(includeTypeColumn ? [createTableCell("Тип", typeColumnWidth)] : []),
 				],
 			}),
@@ -271,9 +358,11 @@ function createHistoryTable(
 							createTableCell(getTimestampLabel(entry.changedAt), columnWidths[0]),
 							createTableCell(entry.effectiveDate, columnWidths[1]),
 							createTableCell(entry.userLogin, columnWidths[2]),
-							createTableCell(entry.roomName, columnWidths[3]),
-							createTableCell(`${entry.oldProgress}%`, columnWidths[4]),
-							createTableCell(`${entry.newProgress}%`, columnWidths[5]),
+							createTableCell(entry.cableLabel, columnWidths[3]),
+							createTableCell(entry.roomName, columnWidths[4]),
+							createTableCell(entry.shaft > 0 ? `КШ ${entry.shaft}` : "Без КШ", columnWidths[5]),
+							createTableCell(`${entry.oldProgress}%`, columnWidths[6]),
+							createTableCell(`${entry.newProgress}%`, columnWidths[7]),
 							...(includeTypeColumn
 								? [createTableCell(entry.isBackdated ? "Задним числом" : "Обычное", typeColumnWidth)]
 								: []),
