@@ -3,8 +3,16 @@
 import { useRouter } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { CalendarIcon, LoaderCircleIcon, RotateCcwIcon, SaveIcon, TriangleAlertIcon } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import {
+	CalendarIcon,
+	ChevronDownIcon,
+	ChevronRightIcon,
+	LoaderCircleIcon,
+	RotateCcwIcon,
+	SaveIcon,
+	TriangleAlertIcon,
+} from "lucide-react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -33,9 +41,12 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { saveRoomProgress } from "@/lib/cable-map/functions";
-import type { GraphGroupView } from "@/lib/cable-map/shared";
+import { saveCableProgress } from "@/lib/cable-map/functions";
+import type { GraphCableView, GraphGroupView } from "@/lib/cable-map/shared";
+import { shaftBucketLabels } from "@/lib/cable-map/shared";
 import { cn } from "@/lib/utils";
+
+type DraftCable = GraphCableView;
 
 type DraftRoom = {
 	id: string;
@@ -43,7 +54,7 @@ type DraftRoom = {
 	cableCount: number;
 	threadCount: number;
 	totalLength: number;
-	progress: number;
+	cables: DraftCable[];
 };
 
 function getTodayInMoscow() {
@@ -59,6 +70,12 @@ function parseIsoDate(value: string | null) {
 	return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+function clampProgress(value: number) {
+	if (Number.isNaN(value)) return 0;
+
+	return Math.min(100, Math.max(0, Math.round(value)));
+}
+
 function createDraftRooms(group: GraphGroupView): DraftRoom[] {
 	return group.primaryRooms.map((room) => ({
 		id: room.id,
@@ -66,46 +83,59 @@ function createDraftRooms(group: GraphGroupView): DraftRoom[] {
 		cableCount: room.cableCount,
 		threadCount: room.threadCount,
 		totalLength: room.totalLength,
-		progress: room.progress,
+		cables: room.cables.map((cable) => ({ ...cable })),
 	}));
 }
 
-function clampProgress(value: number) {
-	if (Number.isNaN(value)) return 0;
+function getRoomProgress(room: DraftRoom | GraphGroupView["primaryRooms"][number]) {
+	if (room.cables.length === 0) {
+		return 0;
+	}
 
-	return Math.min(100, Math.max(0, Math.round(value)));
+	return Math.round(room.cables.reduce((total, cable) => total + cable.progress, 0) / room.cables.length);
 }
 
-function getInitialEffectiveDate(group: GraphGroupView) {
-	return group.primaryRooms[0]?.effectiveDate ?? getTodayInMoscow();
+function getAverageProgress(rooms: DraftRoom[]) {
+	if (rooms.length === 0) {
+		return 0;
+	}
+
+	return Math.round(rooms.reduce((total, room) => total + getRoomProgress(room), 0) / rooms.length);
 }
 
-function buildRoomProgressById(primaryRooms: GraphGroupView["primaryRooms"]) {
-	return new Map(primaryRooms.map((room) => [room.id, room.progress]));
+function buildCableProgressById(primaryRooms: GraphGroupView["primaryRooms"]) {
+	return new Map(
+		primaryRooms.flatMap((room) => room.cables.map((cable) => [cable.id, cable.progress] as const))
+	);
 }
 
-function buildChangedRooms(draftRooms: DraftRoom[], roomProgressById: Map<string, number>) {
-	return draftRooms.flatMap((room) => {
-		const sourceProgress = roomProgressById.get(room.id);
+function buildChangedCables(draftRooms: DraftRoom[], cableProgressById: Map<string, number>) {
+	return draftRooms.flatMap((room) =>
+		room.cables.flatMap((cable) => {
+			const sourceProgress = cableProgressById.get(cable.id);
 
-		if (sourceProgress === undefined || sourceProgress === room.progress) return [];
+			if (sourceProgress === undefined || sourceProgress === cable.progress) {
+				return [];
+			}
 
-		return [
-			{
-				roomId: room.id,
-				progress: room.progress,
-			},
-		];
-	});
+			return [
+				{
+					roomId: room.id,
+					cableId: cable.id,
+					progress: cable.progress,
+				},
+			];
+		})
+	);
 }
 
 function useGroupProgressDraft(group: GraphGroupView, open: boolean) {
 	const [draftRooms, setDraftRooms] = useState<DraftRoom[]>(() => createDraftRooms(group));
-	const [effectiveDate, setEffectiveDate] = useState<string | null>(getInitialEffectiveDate(group));
+	const [effectiveDate, setEffectiveDate] = useState<string | null>(getTodayInMoscow());
 
 	const reset = useCallback(() => {
 		setDraftRooms(createDraftRooms(group));
-		setEffectiveDate(getInitialEffectiveDate(group));
+		setEffectiveDate(getTodayInMoscow());
 	}, [group]);
 
 	useEffect(() => {
@@ -114,20 +144,27 @@ function useGroupProgressDraft(group: GraphGroupView, open: boolean) {
 		}
 	}, [open, reset]);
 
-	const roomProgressById = useMemo(() => buildRoomProgressById(group.primaryRooms), [group.primaryRooms]);
+	const cableProgressById = useMemo(() => buildCableProgressById(group.primaryRooms), [group.primaryRooms]);
 
-	const changedRooms = useMemo(
-		() => buildChangedRooms(draftRooms, roomProgressById),
-		[draftRooms, roomProgressById]
+	const changedCables = useMemo(
+		() => buildChangedCables(draftRooms, cableProgressById),
+		[draftRooms, cableProgressById]
 	);
 
-	function updateRoomProgress(roomId: string, progress: number) {
+	function updateCableProgress(roomId: string, cableId: string, progress: number) {
 		setDraftRooms((current) =>
 			current.map((room) =>
 				room.id === roomId
 					? {
 							...room,
-							progress: clampProgress(progress),
+							cables: room.cables.map((cable) =>
+								cable.id === cableId
+									? {
+											...cable,
+											progress: clampProgress(progress),
+										}
+									: cable
+							),
 						}
 					: room
 			)
@@ -138,9 +175,9 @@ function useGroupProgressDraft(group: GraphGroupView, open: boolean) {
 		draftRooms,
 		effectiveDate,
 		setEffectiveDate,
-		changedRooms,
-		isDirty: changedRooms.length > 0,
-		updateRoomProgress,
+		changedCables,
+		isDirty: changedCables.length > 0,
+		updateCableProgress,
 		reset,
 	};
 }
@@ -288,16 +325,75 @@ function GroupProgressControls({
 	);
 }
 
-function GroupProgressTable({
-	draftRooms,
+function CableProgressEditor({
+	roomId,
+	cable,
 	canEdit,
 	pending,
 	onProgressChange,
 }: {
+	roomId: string;
+	cable: DraftCable;
+	canEdit: boolean;
+	pending: boolean;
+	onProgressChange: (roomId: string, cableId: string, progress: number) => void;
+}) {
+	const metaParts = [cable.cableNumber, cable.cableJournal].filter(Boolean);
+
+	return (
+		<div className="grid gap-3 rounded-xl border bg-background/80 p-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-center">
+			<div className="min-w-0 space-y-2">
+				<div className="flex flex-wrap items-center gap-2">
+					<div className="min-w-0 flex-1 text-sm font-medium break-words text-foreground">
+						{cable.cableLabel}
+					</div>
+					<Badge variant="outline">{shaftBucketLabels[cable.shaft]}</Badge>
+				</div>
+				<div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+					{metaParts.length > 0 ? <span>{metaParts.join(" / ")}</span> : null}
+					<span>Куда: {cable.toRoom || "-"}</span>
+					<span>Ниток: {cable.threadCount}</span>
+					<span>Длина: {Math.round(cable.totalLength)} м</span>
+				</div>
+			</div>
+
+			<div className="grid min-w-0 gap-3 sm:grid-cols-[1fr_84px] sm:items-center">
+				<Slider
+					value={[cable.progress]}
+					onValueChange={(value) => onProgressChange(roomId, cable.id, value[0] ?? 0)}
+					disabled={!canEdit || pending}
+					max={100}
+					min={0}
+					step={1}
+				/>
+				<Input
+					type="number"
+					min={0}
+					max={100}
+					value={cable.progress}
+					className="h-10 sm:h-8"
+					onChange={(event) => onProgressChange(roomId, cable.id, Number(event.target.value))}
+					disabled={!canEdit || pending}
+				/>
+			</div>
+		</div>
+	);
+}
+
+function GroupProgressTable({
+	draftRooms,
+	canEdit,
+	pending,
+	expandedRoomIds,
+	onRoomToggle,
+	onCableProgressChange,
+}: {
 	draftRooms: DraftRoom[];
 	canEdit: boolean;
 	pending: boolean;
-	onProgressChange: (roomId: string, progress: number) => void;
+	expandedRoomIds: Set<string>;
+	onRoomToggle: (roomId: string) => void;
+	onCableProgressChange: (roomId: string, cableId: string, progress: number) => void;
 }) {
 	return (
 		<Table>
@@ -311,55 +407,86 @@ function GroupProgressTable({
 				</TableRow>
 			</TableHeader>
 			<TableBody className="block space-y-3 sm:table-row-group sm:space-y-0">
-				{draftRooms.map((room) => (
-					<TableRow
-						key={room.id}
-						className="block rounded-xl border sm:table-row sm:rounded-none sm:border-x-0">
-						<TableCell
-							className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 font-medium before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-							data-label="Помещение">
-							{room.roomName}
-						</TableCell>
-						<TableCell
-							className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-							data-label="Длина, общая">
-							<span className="text-right sm:text-left">{Math.round(room.totalLength)} м</span>
-						</TableCell>
-						<TableCell
-							className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-							data-label="Кол-во ниток">
-							<span className="text-right sm:text-left">{room.threadCount}</span>
-						</TableCell>
-						<TableCell
-							className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-							data-label="Кабелей">
-							<span className="text-right sm:text-left">{room.cableCount}</span>
-						</TableCell>
-						<TableCell
-							className="whitespace-normal px-3 py-3 before:mb-2 before:block before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:sticky sm:right-0 sm:table-cell sm:bg-background sm:p-2 sm:before:hidden"
-							data-label="Прогресс">
-							<div className="grid min-w-0 gap-3 sm:min-w-64 sm:grid-cols-[1fr_84px] sm:items-center">
-								<Slider
-									value={[room.progress]}
-									onValueChange={(value) => onProgressChange(room.id, value[0] ?? 0)}
-									disabled={!canEdit || pending}
-									max={100}
-									min={0}
-									step={1}
-								/>
-								<Input
-									type="number"
-									min={0}
-									max={100}
-									value={room.progress}
-									className="h-10 sm:h-8"
-									onChange={(event) => onProgressChange(room.id, Number(event.target.value))}
-									disabled={!canEdit || pending}
-								/>
-							</div>
-						</TableCell>
-					</TableRow>
-				))}
+				{draftRooms.map((room) => {
+					const roomProgress = getRoomProgress(room);
+					const isExpanded = expandedRoomIds.has(room.id);
+
+					return (
+						<Fragment key={room.id}>
+							<TableRow className="block rounded-xl border sm:table-row sm:rounded-none sm:border-x-0">
+								<TableCell className="px-3 py-2 font-medium sm:table-cell sm:p-2" data-label="Помещение">
+									<button
+										type="button"
+										onClick={() => onRoomToggle(room.id)}
+										className="flex w-full items-center justify-between gap-3 text-left">
+										<span className="flex min-w-0 items-center gap-2">
+											<span className="rounded-md border bg-muted/40 p-1 text-muted-foreground">
+												{isExpanded ? (
+													<ChevronDownIcon className="size-4" />
+												) : (
+													<ChevronRightIcon className="size-4" />
+												)}
+											</span>
+											<span className="truncate">{room.roomName}</span>
+										</span>
+										<Badge variant="secondary" className="shrink-0 sm:hidden">
+											{roomProgress}%
+										</Badge>
+									</button>
+								</TableCell>
+								<TableCell
+									className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+									data-label="Длина, общая">
+									<span className="text-right sm:text-left">{Math.round(room.totalLength)} м</span>
+								</TableCell>
+								<TableCell
+									className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+									data-label="Кол-во ниток">
+									<span className="text-right sm:text-left">{room.threadCount}</span>
+								</TableCell>
+								<TableCell
+									className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+									data-label="Кабелей">
+									<span className="text-right sm:text-left">{room.cables.length}</span>
+								</TableCell>
+								<TableCell
+									className="whitespace-normal px-3 py-3 before:mb-2 before:block before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:sticky sm:right-0 sm:table-cell sm:bg-background sm:p-2 sm:before:hidden"
+									data-label="Прогресс">
+									<div className="flex flex-wrap items-center justify-between gap-2 sm:min-w-52">
+										<Badge variant="outline">{roomProgress}%</Badge>
+										<span className="text-xs text-muted-foreground">
+											Среднее по {room.cables.length} кабелям
+										</span>
+									</div>
+								</TableCell>
+							</TableRow>
+							{isExpanded ? (
+								<TableRow className="block border-0 sm:table-row">
+									<TableCell colSpan={5} className="px-0 pt-0 pb-3 sm:p-3">
+										<div className="mx-3 grid gap-2 rounded-2xl border bg-muted/20 p-3 sm:mx-0">
+											{room.cables.length > 0 ? (
+												room.cables.map((cable) => (
+													<CableProgressEditor
+														key={cable.id}
+														roomId={room.id}
+														cable={cable}
+														canEdit={canEdit}
+														pending={pending}
+														onProgressChange={onCableProgressChange}
+													/>
+												))
+											) : (
+												<div className="rounded-xl border border-dashed px-4 py-6 text-sm text-muted-foreground">
+													Для этого помещения кабели не найдены.
+												</div>
+											)}
+										</div>
+									</TableCell>
+								</TableRow>
+							) : null}
+						</Fragment>
+					);
+				})}
 			</TableBody>
 		</Table>
 	);
@@ -371,21 +498,37 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 	variant = "default",
 	align = "left",
 	className,
+	onOverlayOpenChange,
 }: {
 	group: GraphGroupView;
 	canEdit: boolean;
 	variant?: "default" | "map";
 	align?: "left" | "right";
 	className?: string;
+	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
 }) {
 	const router = useRouter();
 	const [open, setOpen] = useState(false);
 	const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
 	const [pending, setPending] = useState(false);
-	const { draftRooms, effectiveDate, setEffectiveDate, changedRooms, isDirty, updateRoomProgress, reset } =
+	const [expandedRoomIds, setExpandedRoomIds] = useState<Set<string>>(() => new Set());
+	const { draftRooms, effectiveDate, setEffectiveDate, changedCables, isDirty, updateCableProgress, reset } =
 		useGroupProgressDraft(group, open);
 
 	const hasRooms = group.primaryRooms.length > 0;
+	const draftAverageProgress = useMemo(() => getAverageProgress(draftRooms), [draftRooms]);
+
+	useEffect(() => {
+		onOverlayOpenChange?.(`sheet:${group.id}`, open || confirmDiscardOpen);
+
+		return () => onOverlayOpenChange?.(`sheet:${group.id}`, false);
+	}, [confirmDiscardOpen, group.id, onOverlayOpenChange, open]);
+
+	useEffect(() => {
+		if (!open) {
+			setExpandedRoomIds(new Set());
+		}
+	}, [open]);
 
 	function handleOpenChange(nextOpen: boolean) {
 		if (!nextOpen && isDirty) {
@@ -396,24 +539,38 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 		setOpen(nextOpen);
 	}
 
+	function handleRoomToggle(roomId: string) {
+		setExpandedRoomIds((current) => {
+			const next = new Set(current);
+
+			if (next.has(roomId)) {
+				next.delete(roomId);
+			} else {
+				next.add(roomId);
+			}
+
+			return next;
+		});
+	}
+
 	async function handleSave() {
-		if (!canEdit || changedRooms.length === 0) return;
+		if (!canEdit || changedCables.length === 0) return;
 
 		setPending(true);
 
 		try {
-			await saveRoomProgress({
+			await saveCableProgress({
 				data: {
 					groupId: group.id,
 					effectiveDate,
-					rooms: changedRooms,
+					cables: changedCables,
 				},
 			});
 			await router.invalidate();
-			toast.success("Прогресс по помещениям сохранён.");
+			toast.success("Прогресс по кабелям сохранён.");
 			setOpen(false);
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Не удалось сохранить изменения по помещениям.");
+			toast.error(error instanceof Error ? error.message : "Не удалось сохранить изменения по кабелям.");
 		} finally {
 			setPending(false);
 		}
@@ -448,7 +605,7 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 							<Badge variant="outline">Кабелей: {group.cableCount}</Badge>
 							<Badge variant="outline">Ниток: {group.threadCount}</Badge>
 							<Badge variant="outline">Длина: {Math.round(group.totalLength)} м</Badge>
-							<Badge variant="secondary">Средний прогресс: {group.averageProgress}%</Badge>
+							<Badge variant="secondary">Средний прогресс: {draftAverageProgress}%</Badge>
 						</div>
 
 						<GroupProgressControls
@@ -467,7 +624,9 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 							draftRooms={draftRooms}
 							canEdit={canEdit}
 							pending={pending}
-							onProgressChange={updateRoomProgress}
+							expandedRoomIds={expandedRoomIds}
+							onRoomToggle={handleRoomToggle}
+							onCableProgressChange={updateCableProgress}
 						/>
 					</div>
 				</SheetContent>
@@ -481,7 +640,7 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 						</AlertDialogMedia>
 						<AlertDialogTitle>Отменить несохранённые изменения?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Все изменения прогресса по помещениям будут сброшены.
+							Все изменения прогресса по кабелям будут сброшены.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

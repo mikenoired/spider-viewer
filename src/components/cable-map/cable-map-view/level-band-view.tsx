@@ -15,6 +15,7 @@ export const LevelBandView = memo(function LevelBandView({
 	bandIndex,
 	canEditProgress,
 	canManageManualRooms,
+	onOverlayOpenChange,
 	canExportDailyReport,
 	isExportDisabled,
 	isExportingReport,
@@ -25,6 +26,7 @@ export const LevelBandView = memo(function LevelBandView({
 	bandIndex: number;
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
+	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
 	canExportDailyReport: boolean;
 	isExportDisabled: boolean;
 	isExportingReport: boolean;
@@ -89,6 +91,7 @@ export const LevelBandView = memo(function LevelBandView({
 						rowHeight={row.height}
 						canEditProgress={canEditProgress}
 						canManageManualRooms={canManageManualRooms}
+						onOverlayOpenChange={onOverlayOpenChange}
 					/>
 				);
 			})}
@@ -103,6 +106,7 @@ const LevelBandRowView = memo(function LevelBandRowView({
 	rowHeight,
 	canEditProgress,
 	canManageManualRooms,
+	onOverlayOpenChange,
 }: {
 	dirtyGroup: LevelBand["rows"][number]["dirtyGroup"];
 	cleanGroup: LevelBand["rows"][number]["cleanGroup"];
@@ -110,6 +114,7 @@ const LevelBandRowView = memo(function LevelBandRowView({
 	rowHeight: number;
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
+	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
 }) {
 	return (
 		<>
@@ -118,6 +123,7 @@ const LevelBandRowView = memo(function LevelBandRowView({
 					group={dirtyGroup}
 					canEditProgress={canEditProgress}
 					canManageManualRooms={canManageManualRooms}
+					onOverlayOpenChange={onOverlayOpenChange}
 				/>
 			</div>
 
@@ -142,6 +148,7 @@ const LevelBandRowView = memo(function LevelBandRowView({
 					group={cleanGroup}
 					canEditProgress={canEditProgress}
 					canManageManualRooms={canManageManualRooms}
+					onOverlayOpenChange={onOverlayOpenChange}
 				/>
 			</div>
 		</>

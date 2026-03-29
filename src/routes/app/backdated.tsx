@@ -30,7 +30,7 @@ function BackdatedPage() {
 
 	return (
 		<HistoryPanel
-			description="Отдельный журнал записей, где дата действия не совпадает с фактическим моментом изменения."
+			description="Отдельный журнал кабельных изменений, где дата действия не совпадает с фактическим моментом изменения."
 			initialEntries={entries}
 			backdatedOnly
 		/>

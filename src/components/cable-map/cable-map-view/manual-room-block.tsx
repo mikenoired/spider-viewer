@@ -93,10 +93,12 @@ export const ManualRoomBlock = memo(function ManualRoomBlock({
 	group,
 	canManage,
 	className,
+	onOverlayOpenChange,
 }: {
 	group: GraphGroupView;
 	canManage: boolean;
 	className?: string;
+	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
 }) {
 	const router = useRouter();
 	const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -104,6 +106,13 @@ export const ManualRoomBlock = memo(function ManualRoomBlock({
 	const [draftRoomName, setDraftRoomName] = useState("");
 	const [deleteCandidate, setDeleteCandidate] = useState<GraphManualRoomView | null>(null);
 	const canSave = draftRoomName.trim().length > 0 && pendingAction !== "create";
+	const isOverlayOpen = addDialogOpen || deleteCandidate !== null;
+
+	useEffect(() => {
+		onOverlayOpenChange?.(`manual-room:${group.id}`, isOverlayOpen);
+
+		return () => onOverlayOpenChange?.(`manual-room:${group.id}`, false);
+	}, [group.id, isOverlayOpen, onOverlayOpenChange]);
 
 	useEffect(() => {
 		if (!addDialogOpen) {

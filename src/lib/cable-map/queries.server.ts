@@ -2,7 +2,8 @@ import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import {
-	changeAuditLogs,
+	cableChangeAuditLogs,
+	cableProgress,
 	graphGroupRooms,
 	graphGroups,
 	importedCableRows,
@@ -14,6 +15,7 @@ import {
 import type {
 	DashboardData,
 	DateRangeInput,
+	GraphCableView,
 	GraphGroupView,
 	GraphManualRoomView,
 	GraphRoomView,
@@ -127,8 +129,6 @@ async function getDashboardGroupRows(db: DbClient, snapshotId: string) {
 			roomCableCount: graphGroupRooms.cableCount,
 			roomThreadCount: graphGroupRooms.threadCount,
 			roomTotalLength: graphGroupRooms.totalLength,
-			roomProgress: graphGroupRooms.progress,
-			roomEffectiveDate: graphGroupRooms.effectiveDate,
 		})
 		.from(graphGroups)
 		.leftJoin(graphGroupRooms, eq(graphGroupRooms.groupId, graphGroups.id))
@@ -145,15 +145,30 @@ async function getDashboardGroupRows(db: DbClient, snapshotId: string) {
 async function getDashboardImportedRows(db: DbClient, snapshotId: string) {
 	return db
 		.select({
+			id: importedCableRows.id,
 			graphSide: importedCableRows.graphSide,
 			graphSubzone: importedCableRows.graphSubzone,
 			sourceZone: importedCableRows.fromZone,
 			level: importedCableRows.level,
 			cableLabel: importedCableRows.cableLabel,
+			cableJournal: importedCableRows.cableJournal,
+			cableNumber: importedCableRows.cableNumber,
+			fromRoom: importedCableRows.fromRoom,
+			toRoom: importedCableRows.toRoom,
 			threadLength: importedCableRows.threadLength,
 			threadCount: importedCableRows.threadCount,
+			totalLength: importedCableRows.totalLength,
+			farthestShaft: importedCableRows.farthestShaft,
+			progress: cableProgress.progress,
 		})
 		.from(importedCableRows)
+		.leftJoin(
+			cableProgress,
+			and(
+				eq(cableProgress.snapshotId, importedCableRows.snapshotId),
+				eq(cableProgress.cableRowId, importedCableRows.id)
+			)
+		)
 		.where(eq(importedCableRows.snapshotId, snapshotId));
 }
 
@@ -251,9 +266,9 @@ function buildGraphRoom(row: DashboardGroupRow): GraphRoomView | null {
 		cableCount: row.roomCableCount ?? 0,
 		threadCount: row.roomThreadCount ?? 0,
 		totalLength: row.roomTotalLength ?? 0,
-		progress: row.roomProgress ?? 0,
+		progress: 0,
 		roomRole: row.roomRole,
-		effectiveDate: row.roomEffectiveDate ?? null,
+		cables: [],
 	};
 }
 
@@ -280,6 +295,80 @@ function buildGroups(rows: DashboardGroupRow[], copperMassByGroup: Map<string, n
 	}
 
 	return groups;
+}
+
+function normalizeShaft(shaft: number | null | undefined): GraphCableView["shaft"] {
+	if (shaft === 1 || shaft === 2 || shaft === 3 || shaft === 4) {
+		return shaft;
+	}
+
+	return 0;
+}
+
+function buildRoomIndex(groups: Map<string, GraphGroupView>) {
+	const roomIndex = new Map<string, GraphRoomView>();
+
+	for (const group of groups.values()) {
+		for (const room of group.primaryRooms) {
+			roomIndex.set(`${group.groupKey}:${room.roomName}`, room);
+		}
+	}
+
+	return roomIndex;
+}
+
+function getAverageRoomProgress(cables: Pick<GraphCableView, "progress">[]) {
+	if (cables.length === 0) {
+		return 0;
+	}
+
+	return Math.round(cables.reduce((total, cable) => total + cable.progress, 0) / cables.length);
+}
+
+function appendImportedCablesToGroups(
+	groups: Map<string, GraphGroupView>,
+	importedRows: DashboardImportedRow[]
+) {
+	const roomIndex = buildRoomIndex(groups);
+
+	for (const row of importedRows) {
+		const groupKey = getImportedRowGroupKey(row);
+		const room = roomIndex.get(`${groupKey}:${row.fromRoom}`);
+
+		if (!room) {
+			continue;
+		}
+
+		room.cables.push({
+			id: row.id,
+			cableLabel: row.cableLabel,
+			cableJournal: row.cableJournal,
+			cableNumber: row.cableNumber,
+			fromRoom: row.fromRoom,
+			toRoom: row.toRoom,
+			threadLength: row.threadLength ?? 0,
+			threadCount: row.threadCount ?? 0,
+			totalLength: row.totalLength ?? 0,
+			progress: row.progress ?? 0,
+			shaft: normalizeShaft(row.farthestShaft),
+		});
+	}
+
+	for (const group of groups.values()) {
+		for (const room of group.primaryRooms) {
+			room.cables.sort((left, right) => {
+				if (left.shaft !== right.shaft) {
+					return left.shaft - right.shaft;
+				}
+
+				return left.cableLabel.localeCompare(right.cableLabel, "ru", {
+					numeric: true,
+					sensitivity: "base",
+				});
+			});
+			room.progress = getAverageRoomProgress(room.cables);
+		}
+	}
 }
 
 function buildManualRoomsByGroup(rows: DashboardManualRoomRow[]) {
@@ -388,6 +477,7 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 	const manualRoomRows = await getDashboardManualRoomRows(db, rows);
 	const copperMassByGroup = buildCopperMassByGroup(importedRows);
 	const groups = buildGroups(rows, copperMassByGroup);
+	appendImportedCablesToGroups(groups, importedRows);
 	const manualRoomsByGroup = buildManualRoomsByGroup(manualRoomRows);
 	const { levels, allPrimaryRooms } = buildDashboardLevels(groups, manualRoomsByGroup);
 
@@ -401,15 +491,15 @@ function buildHistoryConditions(range?: DateRangeInput, options: HistoryQueryOpt
 	const conditions = [];
 
 	if (options.backdatedOnly) {
-		conditions.push(eq(changeAuditLogs.isBackdated, true));
+		conditions.push(eq(cableChangeAuditLogs.isBackdated, true));
 	}
 
 	if (range?.from) {
-		conditions.push(gte(changeAuditLogs.effectiveDate, range.from));
+		conditions.push(gte(cableChangeAuditLogs.effectiveDate, range.from));
 	}
 
 	if (range?.to) {
-		conditions.push(lte(changeAuditLogs.effectiveDate, range.to));
+		conditions.push(lte(cableChangeAuditLogs.effectiveDate, range.to));
 	}
 
 	if (options.level?.trim()) {
@@ -424,28 +514,34 @@ export async function getHistoryEntries(range?: DateRangeInput, options: History
 	const conditions = buildHistoryConditions(range, options);
 	const result = await db
 		.select({
-			id: changeAuditLogs.id,
-			roomName: changeAuditLogs.roomName,
-			userLogin: changeAuditLogs.userLogin,
-			oldProgress: changeAuditLogs.oldProgress,
-			newProgress: changeAuditLogs.newProgress,
-			changedAt: changeAuditLogs.changedAt,
-			effectiveDate: changeAuditLogs.effectiveDate,
-			isBackdated: changeAuditLogs.isBackdated,
-			groupId: changeAuditLogs.groupId,
+			id: cableChangeAuditLogs.id,
+			cableId: cableChangeAuditLogs.cableRowId,
+			cableLabel: cableChangeAuditLogs.cableLabel,
+			roomName: cableChangeAuditLogs.roomName,
+			shaft: cableChangeAuditLogs.shaft,
+			userLogin: cableChangeAuditLogs.userLogin,
+			oldProgress: cableChangeAuditLogs.oldProgress,
+			newProgress: cableChangeAuditLogs.newProgress,
+			changedAt: cableChangeAuditLogs.changedAt,
+			effectiveDate: cableChangeAuditLogs.effectiveDate,
+			isBackdated: cableChangeAuditLogs.isBackdated,
+			groupId: cableChangeAuditLogs.groupId,
 			level: graphGroups.level,
 			levelOrder: graphGroups.levelOrder,
 		})
-		.from(changeAuditLogs)
-		.leftJoin(graphGroups, eq(graphGroups.id, changeAuditLogs.groupId))
+		.from(cableChangeAuditLogs)
+		.leftJoin(graphGroups, eq(graphGroups.id, cableChangeAuditLogs.groupId))
 		.where(conditions.length > 0 ? and(...conditions) : undefined)
-		.orderBy(desc(changeAuditLogs.changedAt));
+		.orderBy(desc(cableChangeAuditLogs.changedAt));
 
 	return result.map(
 		(entry) =>
 			({
 				id: entry.id,
+				cableId: entry.cableId,
+				cableLabel: entry.cableLabel,
 				roomName: entry.roomName,
+				shaft: entry.shaft,
 				userLogin: entry.userLogin,
 				oldProgress: entry.oldProgress,
 				newProgress: entry.newProgress,

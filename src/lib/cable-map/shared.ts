@@ -30,15 +30,16 @@ export const dateRangeSchema = z.object({
 	to: z.string().trim().optional().nullable(),
 });
 
-export const roomProgressPatchSchema = z.object({
+export const cableProgressPatchSchema = z.object({
 	roomId: z.uuid(),
+	cableId: z.uuid(),
 	progress: z.number().int().min(0).max(100),
 });
 
-export const saveRoomProgressSchema = z.object({
+export const saveCableProgressSchema = z.object({
 	groupId: z.uuid(),
 	effectiveDate: z.string().trim().optional().nullable(),
-	rooms: z.array(roomProgressPatchSchema).min(1),
+	cables: z.array(cableProgressPatchSchema).min(1),
 });
 
 export const createManualRoomSchema = z.object({
@@ -64,7 +65,7 @@ export const exportDailyHistorySchema = z.object({
 });
 
 export type DateRangeInput = z.infer<typeof dateRangeSchema>;
-export type SaveRoomProgressInput = z.infer<typeof saveRoomProgressSchema>;
+export type SaveCableProgressInput = z.infer<typeof saveCableProgressSchema>;
 export type CreateManualRoomInput = z.infer<typeof createManualRoomSchema>;
 export type DeleteManualRoomInput = z.infer<typeof deleteManualRoomSchema>;
 export type ExportHistoryInput = z.infer<typeof exportHistorySchema>;
@@ -73,7 +74,10 @@ export type ExportDailyHistoryInput = z.infer<typeof exportDailyHistorySchema>;
 
 export type HistoryEntryView = {
 	id: string;
+	cableId: string | null;
+	cableLabel: string;
 	roomName: string;
+	shaft: number;
 	userLogin: string;
 	oldProgress: number;
 	newProgress: number;
@@ -91,6 +95,20 @@ export type GraphBucketView = {
 	threadCount: number;
 };
 
+export type GraphCableView = {
+	id: string;
+	cableLabel: string;
+	cableJournal: string;
+	cableNumber: string;
+	fromRoom: string;
+	toRoom: string;
+	threadLength: number;
+	threadCount: number;
+	totalLength: number;
+	progress: number;
+	shaft: 0 | 1 | 2 | 3 | 4;
+};
+
 export type GraphRoomView = {
 	id: string;
 	roomName: string;
@@ -99,7 +117,7 @@ export type GraphRoomView = {
 	totalLength: number;
 	progress: number;
 	roomRole: "primary" | "secondary";
-	effectiveDate: string | null;
+	cables: GraphCableView[];
 };
 
 export type GraphManualRoomView = {

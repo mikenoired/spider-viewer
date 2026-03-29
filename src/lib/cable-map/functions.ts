@@ -10,7 +10,7 @@ import {
 	exportBackdatedSchema,
 	exportDailyHistorySchema,
 	exportHistorySchema,
-	saveRoomProgressSchema,
+	saveCableProgressSchema,
 } from "./shared";
 
 export const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
@@ -26,8 +26,8 @@ export const uploadWorkbook = createServerFn({ method: "POST" })
 		return importWorkbookFromFormData(data, session);
 	});
 
-export const saveRoomProgress = createServerFn({ method: "POST" })
-	.inputValidator(saveRoomProgressSchema)
+export const saveCableProgress = createServerFn({ method: "POST" })
+	.inputValidator(saveCableProgressSchema)
 	.handler(async ({ data }) => {
 		const session = await requireRole(["admin", "super-admin"]);
 
@@ -35,8 +35,8 @@ export const saveRoomProgress = createServerFn({ method: "POST" })
 			throw new Error("Недостаточно прав для изменения прогресса.");
 		}
 
-		const { saveRoomProgressChanges } = await import("./history.server");
-		return saveRoomProgressChanges(data, session);
+		const { saveCableProgressChanges } = await import("./history.server");
+		return saveCableProgressChanges(data, session);
 	});
 
 export const createManualRoom = createServerFn({ method: "POST" })

@@ -21,17 +21,28 @@ export const LeftRoomArea = memo(function LeftRoomArea({
 	group,
 	canEditProgress,
 	canManageManualRooms,
+	onOverlayOpenChange,
 }: {
 	group: GraphGroupView | null;
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
+	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
 }) {
 	if (!group) return;
 
 	return (
 		<div className="grid h-full grid-cols-[98px_minmax(0,1fr)] gap-3 py-4">
-			<ManualRoomBlock group={group} canManage={canManageManualRooms} />
-			<GroupProgressSheet group={group} canEdit={canEditProgress} variant="map" />
+			<ManualRoomBlock
+				group={group}
+				canManage={canManageManualRooms}
+				onOverlayOpenChange={onOverlayOpenChange}
+			/>
+			<GroupProgressSheet
+				group={group}
+				canEdit={canEditProgress}
+				variant="map"
+				onOverlayOpenChange={onOverlayOpenChange}
+			/>
 		</div>
 	);
 });
@@ -40,17 +51,30 @@ export const RightRoomArea = memo(function RightRoomArea({
 	group,
 	canEditProgress,
 	canManageManualRooms,
+	onOverlayOpenChange,
 }: {
 	group: GraphGroupView | null;
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
+	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
 }) {
 	if (!group) return;
 
 	return (
 		<div className="grid h-full grid-cols-[minmax(0,1fr)_98px] gap-3 py-4">
-			<GroupProgressSheet group={group} canEdit={canEditProgress} variant="map" align="right" />
-			<ManualRoomBlock group={group} canManage={canManageManualRooms} className="h-full" />
+			<GroupProgressSheet
+				group={group}
+				canEdit={canEditProgress}
+				variant="map"
+				align="right"
+				onOverlayOpenChange={onOverlayOpenChange}
+			/>
+			<ManualRoomBlock
+				group={group}
+				canManage={canManageManualRooms}
+				className="h-full"
+				onOverlayOpenChange={onOverlayOpenChange}
+			/>
 		</div>
 	);
 });
