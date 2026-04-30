@@ -56,6 +56,12 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 		};
 	}, []);
 
+	useEffect(() => {
+		if (!("serviceWorker" in navigator)) return;
+
+		void navigator.serviceWorker.register("/sw.js");
+	}, []);
+
 	return (
 		<ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="theme">
 			<TooltipProvider>
