@@ -6,10 +6,11 @@ import {
 	FileClockIcon,
 	FileSpreadsheetIcon,
 	HistoryIcon,
+	KanbanIcon,
 	MapIcon,
 	PanelLeftIcon,
 } from "lucide-react";
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ type AppShellChromeContextValue = {
 };
 
 const AppShellChromeContext = createContext<AppShellChromeContextValue | null>(null);
+const accountCacheKey = "spider-viewer:account";
 
 export function useAppShellChrome() {
 	const context = useContext(AppShellChromeContext);
@@ -75,6 +77,17 @@ export function AppShell({ children, user }: { children: React.ReactNode; user: 
 		}),
 		[chromeHidden]
 	);
+
+	useEffect(() => {
+		window.localStorage.setItem(
+			accountCacheKey,
+			JSON.stringify({
+				id: user.id,
+				login: user.login,
+				role: user.role,
+			})
+		);
+	}, [user]);
 
 	return (
 		<AppShellChromeContext.Provider value={chromeContextValue}>
@@ -304,7 +317,7 @@ function getInitials(value: string) {
 
 function getNavigationItems(role: AuthSession["role"]) {
 	const items: Array<{
-		to: "/app" | "/app/import" | "/app/history" | "/app/backdated";
+		to: "/app" | "/app/installation" | "/app/import" | "/app/history" | "/app/backdated";
 		label: string;
 		icon: typeof MapIcon;
 	}> = [
@@ -312,6 +325,11 @@ function getNavigationItems(role: AuthSession["role"]) {
 			to: "/app" as const,
 			label: "Карта демонтажа",
 			icon: MapIcon,
+		},
+		{
+			to: "/app/installation" as const,
+			label: "Монтаж",
+			icon: KanbanIcon,
 		},
 	];
 
@@ -345,6 +363,7 @@ function getPageTitle(pathname: string) {
 	return (
 		[
 			["/app/import", "Загрузка данных"],
+			["/app/installation", "Монтаж"],
 			["/app/history", "История изменений"],
 			["/app/backdated", "Изменения задним числом"],
 		].find(([path]) => pathname.startsWith(path))?.[1] ?? "Карта демонтажа"
