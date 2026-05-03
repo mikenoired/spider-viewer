@@ -12,6 +12,16 @@ import { PathArea } from "./path-layer";
 import { LeftRoomArea, RightRoomArea, TotalThreadsBadge } from "./room-blocks";
 import type { LevelBand } from "./types";
 
+function getDisplayedLevelLabel(level: string) {
+	const normalizedLevel = level.trim().toLowerCase();
+
+	if (normalizedLevel === "#н/д" || normalizedLevel === "н/д") {
+		return "";
+	}
+
+	return level;
+}
+
 export function LevelBandView({
 	band,
 	bandIndex,
@@ -34,6 +44,7 @@ export function LevelBandView({
 	isLast: boolean;
 }) {
 	const isFirst = bandIndex === 0;
+	const displayedLevelLabel = getDisplayedLevelLabel(band.level);
 
 	return (
 		<div
@@ -61,7 +72,7 @@ export function LevelBandView({
 			>
 				<div className="flex w-full flex-col items-center gap-3">
 					<div className="text-3xl font-semibold leading-none tracking-[-0.03em] text-zinc-900 dark:text-zinc-100">
-						{band.level}
+						{displayedLevelLabel}
 					</div>
 					{canExportDailyReport ? (
 						<Tooltip>
@@ -72,7 +83,11 @@ export function LevelBandView({
 									variant="outline"
 									onClick={onExportDailyReport}
 									disabled={isExportDisabled}
-									aria-label={`Выгрузить DOCX по уровню ${band.level}`}
+									aria-label={
+										displayedLevelLabel
+											? `Выгрузить DOCX по уровню ${displayedLevelLabel}`
+											: "Выгрузить DOCX по уровню"
+									}
 								>
 									{isExportingReport ? (
 										<LoaderCircleIcon className="animate-spin" />
