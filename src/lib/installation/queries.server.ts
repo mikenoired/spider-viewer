@@ -33,12 +33,12 @@ function toIsoString(value: Date | string | null | undefined) {
 	return value.toISOString();
 }
 
-function createEmptyColumns() {
+function createEmptyColumns(): Record<InstallationVisibleColumnId, InstallationGroupView[]> {
 	return {
 		not_started: [],
 		in_progress: [],
 		done: [],
-	} satisfies Record<InstallationVisibleColumnId, InstallationGroupView[]>;
+	};
 }
 
 async function getActiveInstallationSnapshot(db: DbClient) {

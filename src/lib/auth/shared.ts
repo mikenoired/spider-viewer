@@ -41,7 +41,7 @@ export function canEditProgress(role: UserRole) {
 }
 
 export function canEditInstallation(role: UserRole) {
-	return installationEditorRoles.includes(role);
+	return installationEditorRoles.some((editorRole) => editorRole === role);
 }
 
 export function canUploadSnapshot(role: UserRole) {

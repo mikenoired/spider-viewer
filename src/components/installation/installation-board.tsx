@@ -3,9 +3,16 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { InstallationPhotoOcrSetup } from "@/components/installation-photo/installation-photo-ocr-setup";
+import { InstallationPhotoPanel } from "@/components/installation-photo/installation-photo-panel";
 import { Card, CardContent } from "@/components/ui/card";
 import { useInstallationBoard } from "@/hooks/useInstallationBoard";
-import { type InstallationBoardData } from "@/lib/installation/shared";
+import { useInstallationPhotoOcrAssets } from "@/hooks/useInstallationPhotoOcrAssets";
+import {
+	getInstallationPhotoKnownItems,
+	type InstallationPhotoCandidate,
+} from "@/lib/installation-photo/shared";
+import { type InstallationBoardData, type InstallationKksChangeInput } from "@/lib/installation/shared";
 
 import { InstallationColumn } from "./installation-column";
 import { InstallationStatusBar } from "./installation-status-bar";
@@ -29,6 +36,32 @@ function findProcessingGroupById(data: InstallationBoardData, groupId: string | 
 	return data.processingGroups.find((group) => group.id === groupId) ?? null;
 }
 
+function createKksItemLookup(data: InstallationBoardData) {
+	const entries = getBoardGroups(data).flatMap((group) =>
+		group.kksItems.map((item) => [`${group.id}:${item.id}`, { groupId: group.id, item }] as const)
+	);
+
+	return new Map(entries);
+}
+
+function createPhotoChangeInputs(data: InstallationBoardData, candidates: InstallationPhotoCandidate[]) {
+	const itemByKey = createKksItemLookup(data);
+
+	return candidates.flatMap((candidate) => {
+		const row = itemByKey.get(`${candidate.groupId}:${candidate.kksItemId}`);
+
+		if (!row || row.item.isDone) return [];
+
+		return [
+			{
+				groupId: row.groupId,
+				item: row.item,
+				isDone: true,
+			} satisfies InstallationKksChangeInput,
+		];
+	});
+}
+
 export function InstallationBoard({
 	initialData,
 	canEdit,
@@ -41,6 +74,8 @@ export function InstallationBoard({
 	const [processingGroupId, setProcessingGroupId] = useState<string | null>(null);
 	const selectedGroup = findGroupById(board.data, selectedGroupId);
 	const processingGroup = findProcessingGroupById(board.data, processingGroupId);
+	const photoKnownItems = getInstallationPhotoKnownItems(board.data);
+	const photoOcrAssets = useInstallationPhotoOcrAssets(canEdit && board.hasSnapshot);
 
 	async function handleRefresh() {
 		try {
@@ -51,6 +86,17 @@ export function InstallationBoard({
 		}
 	}
 
+	async function handleApplyPhotoCandidates(candidates: InstallationPhotoCandidate[]) {
+		const changes = createPhotoChangeInputs(board.data, candidates);
+
+		if (changes.length === 0) {
+			toast.info("Новых KKS для отметки нет.");
+			return;
+		}
+
+		await board.queueKksChanges(changes);
+	}
+
 	return (
 		<div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4">
 			<InstallationStatusBar
@@ -58,8 +104,27 @@ export function InstallationBoard({
 				outboxCount={board.outboxCount}
 				onRefresh={() => void handleRefresh()}
 			/>
-			{board.hasSnapshot ? (
+			{board.hasSnapshot && photoOcrAssets.shouldShowSetup ? (
+				<InstallationPhotoOcrSetup
+					assetState={photoOcrAssets.assetState}
+					assetProgress={photoOcrAssets.assetProgress}
+					preparingAssets={photoOcrAssets.preparingAssets}
+					onPrepareAssets={photoOcrAssets.prepareAssets}
+					onDismiss={photoOcrAssets.dismissSetup}
+				/>
+			) : board.hasSnapshot ? (
 				<>
+					<InstallationPhotoPanel
+						snapshotId={board.data.snapshot?.id ?? null}
+						knownItems={photoKnownItems}
+						canEdit={canEdit}
+						assetState={photoOcrAssets.assetState}
+						assetProgress={photoOcrAssets.assetProgress}
+						preparingAssets={photoOcrAssets.preparingAssets}
+						ocrReady={photoOcrAssets.isReady}
+						onPrepareAssets={photoOcrAssets.prepareAssets}
+						onApplyCandidates={handleApplyPhotoCandidates}
+					/>
 					<ProcessingColumn
 						groups={board.data.processingGroups}
 						onOpen={(group) => setProcessingGroupId(group.id)}

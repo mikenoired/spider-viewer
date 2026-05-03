@@ -99,6 +99,34 @@ export async function queueInstallationOutboxChange(change: InstallationOfflineC
 	);
 }
 
+export async function queueInstallationOutboxChanges(changes: InstallationOfflineChange[]) {
+	if (changes.length === 0) return;
+
+	const db = await openInstallationDb();
+
+	await new Promise<void>((resolve, reject) => {
+		const transaction = db.transaction(outboxStoreName, "readwrite");
+		const store = transaction.objectStore(outboxStoreName);
+		const createdAt = new Date().toISOString();
+
+		for (const change of changes) {
+			store.put({
+				...change,
+				createdAt,
+			} satisfies InstallationOfflineOutboxChange);
+		}
+
+		transaction.oncomplete = () => {
+			db.close();
+			resolve();
+		};
+		transaction.onerror = () => {
+			db.close();
+			reject(transaction.error ?? createOfflineError("Не удалось сохранить offline-очередь."));
+		};
+	});
+}
+
 export async function removeInstallationOutboxChanges(clientMutationIds: string[]) {
 	const db = await openInstallationDb();
 
