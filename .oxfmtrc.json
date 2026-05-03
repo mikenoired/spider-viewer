@@ -13,7 +13,14 @@
 	"arrowParens": "always",
 	"bracketSameLine": true,
 	"bracketSpacing": true,
-	"ignorePatterns": ["**/src/routeTree.gen.ts", "**/src/styles.css", "**/dist", "**/build", "**/coverage"],
+	"ignorePatterns": [
+		"**/src/routeTree.gen.ts",
+		"**/src/styles.css",
+		"**/dist",
+		"**/build",
+		"**/coverage",
+		"**/public/vision"
+	],
 	"endOfLine": "lf",
 	"jsxBracketSameLine": true
 }

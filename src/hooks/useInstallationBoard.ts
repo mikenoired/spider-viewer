@@ -14,6 +14,7 @@ import {
 	getCachedInstallationBoard,
 	getInstallationOutboxChanges,
 	queueInstallationOutboxChange,
+	queueInstallationOutboxChanges,
 	removeInstallationOutboxChanges,
 	type InstallationOfflineOutboxChange,
 	saveCachedInstallationBoard,
@@ -23,6 +24,7 @@ import {
 	getInstallationProgressPercent,
 	type InstallationBoardData,
 	type InstallationGroupView,
+	type InstallationKksChangeInput,
 	type InstallationKksView,
 	type InstallationOfflineChange,
 	type InstallationVisibleColumnId,
@@ -37,12 +39,12 @@ type PendingResolution = {
 	resolvedDone: boolean;
 };
 
-function createEmptyColumns() {
+function createEmptyColumns(): Record<InstallationVisibleColumnId, InstallationGroupView[]> {
 	return {
 		not_started: [],
 		in_progress: [],
 		done: [],
-	} satisfies Record<InstallationVisibleColumnId, InstallationGroupView[]>;
+	};
 }
 
 function collectGroups(data: InstallationBoardData) {
@@ -81,6 +83,23 @@ function updateBoardItem(data: InstallationBoardData, groupId: string, kksItemId
 		...data,
 		columns: buildColumns(groups),
 	};
+}
+
+function updateBoardItems(data: InstallationBoardData, changes: InstallationKksChangeInput[]) {
+	return changes.reduce(
+		(currentData, change) => updateBoardItem(currentData, change.groupId, change.item.id, change.isDone),
+		data
+	);
+}
+
+function getLatestKksChangeInputs(changes: InstallationKksChangeInput[]) {
+	const latestByItemId = new Map<string, InstallationKksChangeInput>();
+
+	for (const change of changes) {
+		latestByItemId.set(change.item.id, change);
+	}
+
+	return [...latestByItemId.values()];
 }
 
 function getLatestOfflineChanges(changes: InstallationOfflineOutboxChange[]) {
@@ -179,6 +198,24 @@ export function useInstallationBoard(initialData: InstallationBoardData, canEdit
 		[canEdit, isOnline, snapshotId]
 	);
 
+	const queueKksChanges = useCallback(
+		async (changes: InstallationKksChangeInput[]) => {
+			if (!snapshotId || !canEdit) return;
+
+			const latestChanges = getLatestKksChangeInputs(changes);
+
+			if (latestChanges.length === 0) return;
+
+			setData((current) => updateBoardItems(current, latestChanges));
+			await queueOfflineChanges(snapshotId, latestChanges);
+
+			if (isOnline) {
+				await flushOfflineChanges();
+			}
+		},
+		[canEdit, isOnline, snapshotId]
+	);
+
 	async function queueOfflineChange(
 		currentSnapshotId: string,
 		groupId: string,
@@ -197,6 +234,24 @@ export function useInstallationBoard(initialData: InstallationBoardData, canEdit
 		await queueInstallationOutboxChange(change);
 		setOutboxCount((current) => current + 1);
 		toast.info("Изменение сохранено offline и будет синхронизировано позже.");
+	}
+
+	async function queueOfflineChanges(currentSnapshotId: string, changes: InstallationKksChangeInput[]) {
+		const offlineChanges = changes.map(
+			(change) =>
+				({
+					clientMutationId: createInstallationClientMutationId(change.item.id),
+					snapshotId: currentSnapshotId,
+					groupId: change.groupId,
+					kksItemId: change.item.id,
+					baseDone: change.item.isDone,
+					desiredDone: change.isDone,
+				}) satisfies InstallationOfflineChange
+		);
+
+		await queueInstallationOutboxChanges(offlineChanges);
+		setOutboxCount((current) => current + offlineChanges.length);
+		toast.info(`Offline-изменений добавлено: ${offlineChanges.length}.`);
 	}
 
 	async function saveOnlineChange(
@@ -273,8 +328,19 @@ export function useInstallationBoard(initialData: InstallationBoardData, canEdit
 			pending,
 			refresh,
 			toggleKks,
+			queueKksChanges,
 			applyProcessingGroup,
 		}),
-		[applyProcessingGroup, data, hasSnapshot, isOnline, outboxCount, pending, refresh, toggleKks]
+		[
+			applyProcessingGroup,
+			data,
+			hasSnapshot,
+			isOnline,
+			outboxCount,
+			pending,
+			queueKksChanges,
+			refresh,
+			toggleKks,
+		]
 	);
 }

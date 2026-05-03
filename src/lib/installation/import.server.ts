@@ -62,10 +62,15 @@ function parseDoneValue(value: string) {
 	return doneValueAliases.includes(value.trim().toLowerCase());
 }
 
-function validateInstallationHeaders(groupIndex: number | null, kksIndex: number | null) {
+function getRequiredInstallationHeaderIndexes(groupIndex: number | null, kksIndex: number | null) {
 	if (groupIndex === null || kksIndex === null) {
 		throw new Error("В файле монтажа нужны колонки группы KKS и названия KKS.");
 	}
+
+	return {
+		groupIndex,
+		kksIndex,
+	};
 }
 
 function validateInstallationRowLimit(dataRowCount: number) {
@@ -117,12 +122,14 @@ function parseInstallationRows(fileName: string, buffer: Buffer) {
 	const kksIndex = getHeaderIndex(headerRow, installationKksHeaderAliases);
 	const doneIndex = getHeaderIndex(headerRow, installationDoneHeaderAliases);
 
-	validateInstallationHeaders(groupIndex, kksIndex);
+	const requiredIndexes = getRequiredInstallationHeaderIndexes(groupIndex, kksIndex);
 	validateInstallationRowLimit(rawRows.length - 1);
 
 	const parsedRows = rawRows
 		.slice(1)
-		.map((row, index) => parseInstallationRow(row, index, groupIndex, kksIndex, doneIndex))
+		.map((row, index) =>
+			parseInstallationRow(row, index, requiredIndexes.groupIndex, requiredIndexes.kksIndex, doneIndex)
+		)
 		.filter((row): row is ParsedInstallationRow => row !== null);
 
 	if (parsedRows.length === 0) {

@@ -78,6 +78,12 @@ export type InstallationOfflineChange = {
 	desiredDone: boolean;
 };
 
+export type InstallationKksChangeInput = {
+	groupId: string;
+	item: InstallationKksView;
+	isDone: boolean;
+};
+
 export const saveInstallationKksSchema = z.object({
 	snapshotId: z.uuid(),
 	groupId: z.uuid(),
