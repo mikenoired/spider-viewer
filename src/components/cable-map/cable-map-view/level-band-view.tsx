@@ -84,8 +84,7 @@ export const LevelBandView = memo(function LevelBandView({
 										displayedLevelLabel
 											? `Выгрузить DOCX по уровню ${displayedLevelLabel}`
 											: "Выгрузить DOCX по уровню"
-									}
-								>
+									}>
 									{isExportingReport ? <LoaderCircleIcon className="animate-spin" /> : <DownloadIcon />}
 								</Button>
 							</TooltipTrigger>

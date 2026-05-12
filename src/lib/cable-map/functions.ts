@@ -29,7 +29,7 @@ export const uploadWorkbook = createServerFn({ method: "POST" })
 export const saveCableProgress = createServerFn({ method: "POST" })
 	.inputValidator(saveCableProgressSchema)
 	.handler(async ({ data }) => {
-		const session = await requireRole(["admin", "super-admin"]);
+		const session = await requireRole(["super-admin"]);
 
 		if (!canEditProgress(session.role)) {
 			throw new Error("Недостаточно прав для изменения прогресса.");

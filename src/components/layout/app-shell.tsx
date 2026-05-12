@@ -9,6 +9,7 @@ import {
 	KanbanIcon,
 	MapIcon,
 	PanelLeftIcon,
+	UsersIcon,
 } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
@@ -40,7 +41,7 @@ import {
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
 import type { AuthSession } from "@/lib/auth/shared";
-import { canUploadSnapshot, canViewAudit, PROJECT_NAME, roleLabels } from "@/lib/auth/shared";
+import { canManageUsers, canUploadSnapshot, canViewAudit, PROJECT_NAME, roleLabels } from "@/lib/auth/shared";
 import { cn } from "@/lib/utils";
 
 import { LogoutMenuItem } from "./logout-button";
@@ -317,7 +318,7 @@ function getInitials(value: string) {
 
 function getNavigationItems(role: AuthSession["role"]) {
 	const items: Array<{
-		to: "/app" | "/app/installation" | "/app/import" | "/app/history" | "/app/backdated";
+		to: "/app" | "/app/installation" | "/app/import" | "/app/history" | "/app/backdated" | "/app/users";
 		label: string;
 		icon: typeof MapIcon;
 	}> = [
@@ -356,6 +357,14 @@ function getNavigationItems(role: AuthSession["role"]) {
 		);
 	}
 
+	if (canManageUsers(role)) {
+		items.push({
+			to: "/app/users" as const,
+			label: "Пользователи",
+			icon: UsersIcon,
+		});
+	}
+
 	return items;
 }
 
@@ -366,6 +375,7 @@ function getPageTitle(pathname: string) {
 			["/app/installation", "Монтаж"],
 			["/app/history", "История изменений"],
 			["/app/backdated", "Изменения задним числом"],
+			["/app/users", "Пользователи"],
 		].find(([path]) => pathname.startsWith(path))?.[1] ?? "Карта демонтажа"
 	);
 }
