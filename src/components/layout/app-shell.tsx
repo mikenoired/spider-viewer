@@ -9,6 +9,7 @@ import {
 	KanbanIcon,
 	MapIcon,
 	PanelLeftIcon,
+	UserCheckIcon,
 	UsersIcon,
 } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
@@ -112,7 +113,8 @@ export function AppShell({ children, user }: { children: React.ReactNode; user: 
 							<PanelLeftIcon />
 						</Button>
 						<SidebarTrigger className="hidden md:inline-flex" />
-						<div className="text-sm font-medium">{getPageTitle(pathname)}</div>
+						<div className="min-w-0 flex-1 text-sm font-medium">{getPageTitle(pathname)}</div>
+						{canManageUsers(user.role) ? <ApprovalAccountsButton pathname={pathname} /> : null}
 					</header>
 					<div className="flex min-w-0 flex-1 flex-col pt-[calc(var(--app-shell-header-height)+var(--app-shell-content-padding))]">
 						{children}
@@ -309,6 +311,30 @@ function SidebarUserMenu({ user, mobile = false }: { user: AuthSession; mobile?:
 				</DropdownMenuGroup>
 			</DropdownMenuContent>
 		</DropdownMenu>
+	);
+}
+
+function ApprovalAccountsButton({ pathname }: { pathname: string }) {
+	const isUsersPage = pathname.startsWith("/app/users");
+
+	return (
+		<>
+			<Button
+				asChild
+				variant={isUsersPage ? "secondary" : "outline"}
+				size="sm"
+				className="hidden sm:inline-flex">
+				<Link to="/app/users">
+					<UserCheckIcon data-icon="inline-start" />
+					Подтверждение учёток
+				</Link>
+			</Button>
+			<Button asChild variant={isUsersPage ? "secondary" : "outline"} size="icon-sm" className="sm:hidden">
+				<Link to="/app/users" aria-label="Подтверждение учётных записей">
+					<UserCheckIcon />
+				</Link>
+			</Button>
+		</>
 	);
 }
 
