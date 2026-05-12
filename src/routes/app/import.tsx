@@ -1,17 +1,37 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+
 import { SnapshotImportForm } from "@/components/cable-map/snapshot-import-form";
+import { InstallationImportForm } from "@/components/installation/installation-import-form";
 import { getDashboardData } from "@/lib/cable-map/functions";
+import { getInstallationBoardData } from "@/lib/installation/functions";
 
 export const Route = createFileRoute("/app/import")({
 	beforeLoad: ({ context }) => {
 		if (context.auth?.role !== "super-admin") throw redirect({ to: "/app" });
 	},
-	loader: async () => getDashboardData(),
+	loader: async () => {
+		const [dashboardData, installationData] = await Promise.all([
+			getDashboardData(),
+			getInstallationBoardData(),
+		]);
+
+		return {
+			dashboardData,
+			installationData,
+		};
+	},
 	component: ImportSnapshotPage,
 });
 
 function ImportSnapshotPage() {
 	const data = Route.useLoaderData();
 
-	return <SnapshotImportForm snapshot={data.snapshot} />;
+	return (
+		<div className="flex flex-col gap-4">
+			<SnapshotImportForm snapshot={data.dashboardData.snapshot} />
+			<div className="px-4 pb-4">
+				<InstallationImportForm snapshot={data.installationData.snapshot} />
+			</div>
+		</div>
+	);
 }

@@ -2,8 +2,9 @@
 
 import { useRouter } from "@tanstack/react-router";
 import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { toast } from "sonner";
+
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -26,31 +27,92 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { createManualRoom, deleteManualRoom } from "@/lib/cable-map/functions";
-import type {
-	GraphGroupView,
-	GraphManualRoomView,
-} from "@/lib/cable-map/shared";
+import type { GraphGroupView, GraphManualRoomView } from "@/lib/cable-map/shared";
 import { cn } from "@/lib/utils";
 
-export function ManualRoomBlock({
+function ManualRoomAddButton({ onClick }: { onClick: () => void }) {
+	return (
+		<Button
+			type="button"
+			onClick={onClick}
+			variant="outline"
+			className="h-10 border-dashed border-amber-800 bg-white/20 text-amber-950 hover:bg-white/35 dark:border-amber-200 dark:bg-transparent dark:text-amber-100 dark:hover:bg-white/10">
+			<PlusIcon data-icon="inline-start" />
+		</Button>
+	);
+}
+
+function ManualRoomBlockContent({
+	hasRooms,
+	rooms,
+	canManage,
+	onAdd,
+	onDeleteCandidateSelect,
+}: {
+	hasRooms: boolean;
+	rooms: GraphManualRoomView[];
+	canManage: boolean;
+	onAdd: () => void;
+	onDeleteCandidateSelect: (room: GraphManualRoomView) => void;
+}) {
+	if (hasRooms) {
+		return (
+			<div className="flex w-full flex-col gap-2 rounded-[8px] border border-[#d2b55a] bg-amber-200 px-2 py-2 text-amber-950 shadow-sm dark:bg-amber-700 dark:text-amber-100">
+				<div className="flex flex-col gap-1">
+					{rooms.map((room) => (
+						<button
+							key={room.id}
+							type="button"
+							onClick={() => {
+								if (canManage) {
+									onDeleteCandidateSelect(room);
+								}
+							}}
+							className={cn(
+								"min-w-0 rounded-[6px] border border-[#b89124]/40 bg-white/40 px-2 py-1.5 text-left text-xs font-semibold leading-4 wrap-break-word transition",
+								canManage ? "cursor-pointer hover:bg-white/60" : "cursor-default"
+							)}>
+							{room.roomName}
+						</button>
+					))}
+				</div>
+
+				{canManage ? <ManualRoomAddButton onClick={onAdd} /> : null}
+			</div>
+		);
+	}
+
+	return (
+		<div className="flex h-full min-h-35 w-full flex-col items-center justify-center gap-3 rounded-[10px] border-2 border-dashed border-[#c6a643] bg-amber-200/50 px-3 py-4 text-center text-amber-950 shadow-sm dark:bg-amber-600/50 dark:text-amber-100">
+			{canManage ? <ManualRoomAddButton onClick={onAdd} /> : null}
+		</div>
+	);
+}
+
+export const ManualRoomBlock = memo(function ManualRoomBlock({
 	group,
 	canManage,
 	className,
+	onOverlayOpenChange,
 }: {
 	group: GraphGroupView;
 	canManage: boolean;
 	className?: string;
+	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
 }) {
 	const router = useRouter();
 	const [addDialogOpen, setAddDialogOpen] = useState(false);
-	const [pendingAction, setPendingAction] = useState<
-		"create" | "delete" | null
-	>(null);
+	const [pendingAction, setPendingAction] = useState<"create" | "delete" | null>(null);
 	const [draftRoomName, setDraftRoomName] = useState("");
-	const [deleteCandidate, setDeleteCandidate] =
-		useState<GraphManualRoomView | null>(null);
-	const hasRooms = group.manualRooms.length > 0;
+	const [deleteCandidate, setDeleteCandidate] = useState<GraphManualRoomView | null>(null);
 	const canSave = draftRoomName.trim().length > 0 && pendingAction !== "create";
+	const isOverlayOpen = addDialogOpen || deleteCandidate !== null;
+
+	useEffect(() => {
+		onOverlayOpenChange?.(`manual-room:${group.id}`, isOverlayOpen);
+
+		return () => onOverlayOpenChange?.(`manual-room:${group.id}`, false);
+	}, [group.id, isOverlayOpen, onOverlayOpenChange]);
 
 	useEffect(() => {
 		if (!addDialogOpen) {
@@ -76,11 +138,7 @@ export function ManualRoomBlock({
 			setAddDialogOpen(false);
 			await router.invalidate();
 		} catch (error) {
-			toast.error(
-				error instanceof Error
-					? error.message
-					: "Не удалось добавить ручное помещение.",
-			);
+			toast.error(error instanceof Error ? error.message : "Не удалось добавить ручное помещение.");
 		} finally {
 			setPendingAction(null);
 		}
@@ -103,11 +161,7 @@ export function ManualRoomBlock({
 			setDeleteCandidate(null);
 			await router.invalidate();
 		} catch (error) {
-			toast.error(
-				error instanceof Error
-					? error.message
-					: "Не удалось удалить ручное помещение.",
-			);
+			toast.error(error instanceof Error ? error.message : "Не удалось удалить ручное помещение.");
 		} finally {
 			setPendingAction(null);
 		}
@@ -116,57 +170,13 @@ export function ManualRoomBlock({
 	return (
 		<>
 			<div className={cn("flex h-full items-center justify-center", className)}>
-				{hasRooms ? (
-					<div className="flex w-full flex-col gap-2 rounded-[8px] border border-[#d2b55a] bg-amber-200 dark:bg-amber-700 px-2 py-2 text-amber-950 dark:text-amber-100 shadow-sm">
-						<div className="flex flex-col gap-1">
-							{group.manualRooms.map((room) => (
-								<button
-									key={room.id}
-									type="button"
-									onClick={() => {
-										if (!canManage) {
-											return;
-										}
-
-										setDeleteCandidate(room);
-									}}
-									className={cn(
-										"min-w-0 rounded-[6px] border border-[#b89124]/40 bg-white/40 px-2 py-1.5 text-left text-xs font-semibold leading-4 wrap-break-word transition",
-										canManage
-											? "cursor-pointer hover:bg-white/60"
-											: "cursor-default",
-									)}
-								>
-									{room.roomName}
-								</button>
-							))}
-						</div>
-
-						{canManage ? (
-							<Button
-								type="button"
-								onClick={() => setAddDialogOpen(true)}
-								variant="outline"
-								className="h-10 border-dashed border-amber-800 bg-white/20 text-amber-950 hover:bg-white/35 dark:border-amber-200 dark:bg-transparent dark:text-amber-100 dark:hover:bg-white/10"
-							>
-								<PlusIcon data-icon="inline-start" />
-							</Button>
-						) : null}
-					</div>
-				) : (
-					<div className="flex h-full min-h-35 w-full flex-col items-center justify-center gap-3 rounded-[10px] border-2 border-dashed border-[#c6a643] bg-amber-200/50 px-3 py-4 text-center text-amber-950 shadow-sm dark:bg-amber-600/50 dark:text-amber-100">
-						{canManage ? (
-							<Button
-								type="button"
-								onClick={() => setAddDialogOpen(true)}
-								variant="outline"
-								className="h-10 border-dashed border-amber-800 bg-white/20 text-amber-950 hover:bg-white/35 dark:border-amber-200 dark:bg-transparent dark:text-amber-100 dark:hover:bg-white/10"
-							>
-								<PlusIcon data-icon="inline-start" />
-							</Button>
-						) : null}
-					</div>
-				)}
+				<ManualRoomBlockContent
+					hasRooms={group.manualRooms.length > 0}
+					rooms={group.manualRooms}
+					canManage={canManage}
+					onAdd={() => setAddDialogOpen(true)}
+					onDeleteCandidateSelect={setDeleteCandidate}
+				/>
 			</div>
 
 			<Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
@@ -174,8 +184,7 @@ export function ManualRoomBlock({
 					<DialogHeader>
 						<DialogTitle>Новое ручное помещение</DialogTitle>
 						<DialogDescription>
-							Помещение будет привязано к зоне {group.sourceZone || "Без зоны"}{" "}
-							и отметке {group.level}.
+							Помещение будет привязано к зоне {group.sourceZone || "Без зоны"} и отметке {group.level}.
 						</DialogDescription>
 					</DialogHeader>
 
@@ -194,20 +203,12 @@ export function ManualRoomBlock({
 							type="button"
 							variant="outline"
 							onClick={() => setAddDialogOpen(false)}
-							disabled={pendingAction === "create"}
-						>
+							disabled={pendingAction === "create"}>
 							Отмена
 						</Button>
-						<Button
-							type="button"
-							onClick={handleCreateRoom}
-							disabled={!canSave}
-						>
+						<Button type="button" onClick={handleCreateRoom} disabled={!canSave}>
 							{pendingAction === "create" ? (
-								<LoaderCircleIcon
-									data-icon="inline-start"
-									className="animate-spin"
-								/>
+								<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
 							) : (
 								<PlusIcon data-icon="inline-start" />
 							)}
@@ -223,8 +224,7 @@ export function ManualRoomBlock({
 					if (!open && pendingAction !== "delete") {
 						setDeleteCandidate(null);
 					}
-				}}
-			>
+				}}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogMedia>
@@ -232,24 +232,15 @@ export function ManualRoomBlock({
 						</AlertDialogMedia>
 						<AlertDialogTitle>Удалить ручное помещение?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Помещение {deleteCandidate?.roomName ?? ""} будет удалено из
-							жёлтого блока для зоны {group.sourceZone || "Без зоны"} и отметки{" "}
-							{group.level}.
+							Помещение {deleteCandidate?.roomName ?? ""} будет удалено из жёлтого блока для зоны{" "}
+							{group.sourceZone || "Без зоны"} и отметки {group.level}.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel disabled={pendingAction === "delete"}>
-							Отмена
-						</AlertDialogCancel>
-						<AlertDialogAction
-							onClick={handleDeleteRoom}
-							disabled={pendingAction === "delete"}
-						>
+						<AlertDialogCancel disabled={pendingAction === "delete"}>Отмена</AlertDialogCancel>
+						<AlertDialogAction onClick={handleDeleteRoom} disabled={pendingAction === "delete"}>
 							{pendingAction === "delete" ? (
-								<LoaderCircleIcon
-									data-icon="inline-start"
-									className="animate-spin"
-								/>
+								<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
 							) : (
 								<Trash2Icon data-icon="inline-start" />
 							)}
@@ -260,4 +251,6 @@ export function ManualRoomBlock({
 			</AlertDialog>
 		</>
 	);
-}
+});
+
+ManualRoomBlock.displayName = "ManualRoomBlock";

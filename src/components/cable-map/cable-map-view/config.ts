@@ -30,19 +30,10 @@ export const shaftPalette = {
 >;
 
 export const boardColumnWidths = [252, 96, 320, 112, 320, 96, 252] as const;
-export const boardColumns = boardColumnWidths
-	.map((width) => `${width}px`)
-	.join(" ");
-export const boardWidth = boardColumnWidths.reduce(
-	(total, width) => total + width,
-	0,
-);
-export const dirtyPathColumnStart = boardColumnWidths
-	.slice(0, 2)
-	.reduce((total, width) => total + width, 0);
-export const cleanPathColumnStart = boardColumnWidths
-	.slice(0, 4)
-	.reduce((total, width) => total + width, 0);
+export const boardColumns = boardColumnWidths.map((width) => `${width}px`).join(" ");
+export const boardWidth = boardColumnWidths.reduce((total, width) => total + width, 0);
+export const dirtyPathColumnStart = boardColumnWidths.slice(0, 2).reduce((total, width) => total + width, 0);
+export const cleanPathColumnStart = boardColumnWidths.slice(0, 4).reduce((total, width) => total + width, 0);
 export const pathColumnWidth = boardColumnWidths[2];
 export const bandBorderThickness = 2;
 export const shaftCapInset = 4;
@@ -60,20 +51,20 @@ export const manualRoomActionHeight = 50;
 export const manualRoomPlaceholderHeight = 140;
 
 const levelValuePattern = /^-?\d+(?:,\d+)?$/;
-const zonePriority: Record<string, number> = {
-	ГЗ: 0,
-	ЧЗ: 1,
-	ГО: 2,
-	МЗ: 3,
-	РДЭС: 4,
-};
+const zonePriority = new Map<string, number>([
+	["ГЗ", 0],
+	["ЧЗ", 1],
+	["ГО", 2],
+	["МЗ", 3],
+	["РДЭС", 4],
+]);
 
 export function isLevelValue(level: string) {
 	return levelValuePattern.test(level);
 }
 
 export function getZonePriority(zone: string) {
-	return zonePriority[zone] ?? 99;
+	return zonePriority.get(zone) ?? 99;
 }
 
 export function getPdfRoomGridRowCount(roomCount: number) {
@@ -83,11 +74,7 @@ export function getPdfRoomGridRowCount(roomCount: number) {
 export function getPdfImportedRoomBlockHeight(importedRoomCount: number) {
 	const roomRows = getPdfRoomGridRowCount(importedRoomCount);
 
-	return (
-		roomRows * pdfRoomLineHeight +
-		(roomRows - 1) * pdfRoomRowGap +
-		pdfRoomBlockVerticalPadding
-	);
+	return roomRows * pdfRoomLineHeight + (roomRows - 1) * pdfRoomRowGap + pdfRoomBlockVerticalPadding;
 }
 
 export function getPdfManualRoomBlockHeight(manualRoomCount: number) {

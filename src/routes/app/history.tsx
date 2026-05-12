@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { format } from "date-fns";
+
 import { HistoryPanel } from "@/components/cable-map/history-panel";
 import { getHistory } from "@/lib/cable-map/functions";
 
@@ -29,7 +30,7 @@ function HistoryPage() {
 
 	return (
 		<HistoryPanel
-			description="Все зафиксированные изменения прогресса по помещениям."
+			description="Все зафиксированные изменения прогресса по кабелям."
 			initialEntries={entries}
 		/>
 	);

@@ -1,12 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
+
 import { loginSchema } from "./shared";
 
-export const getCurrentSession = createServerFn({ method: "GET" }).handler(
-	async () => {
-		const { getCurrentSession } = await import("./server");
-		return getCurrentSession();
-	},
-);
+export const getCurrentSession = createServerFn({ method: "GET" }).handler(async () => {
+	const { getCurrentSession } = await import("./server");
+	return getCurrentSession();
+});
 
 export const login = createServerFn({ method: "POST" })
 	.inputValidator(loginSchema)

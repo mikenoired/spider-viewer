@@ -5,8 +5,6 @@ export default defineConfig({
 	schema: "./src/lib/db/schema.ts",
 	out: "./drizzle",
 	dbCredentials: {
-		url:
-			process.env.DATABASE_URL ??
-			"postgresql://postgres:postgres@localhost:5432/spider_viewer",
+		url: process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/spider_viewer",
 	},
 });

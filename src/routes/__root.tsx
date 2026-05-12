@@ -1,10 +1,7 @@
 import { TanStackDevtools } from "@tanstack/react-devtools";
-import {
-	createRootRouteWithContext,
-	HeadContent,
-	Scripts,
-} from "@tanstack/react-router";
+import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+
 import { getCurrentSession } from "@/lib/auth/auth.functions";
 import type { AuthSession } from "@/lib/auth/shared";
 import { PROJECT_NAME } from "@/lib/auth/shared";
@@ -39,6 +36,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 			{
 				rel: "stylesheet",
 				href: appCss,
+			},
+			{
+				rel: "manifest",
+				href: "/manifest.webmanifest",
 			},
 		],
 	}),

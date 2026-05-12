@@ -1,16 +1,11 @@
 import { eq } from "drizzle-orm";
+
 import type { AuthSession } from "@/lib/auth/shared";
-import type {
-	CreateManualRoomInput,
-	DeleteManualRoomInput,
-} from "@/lib/cable-map/shared";
+import type { CreateManualRoomInput, DeleteManualRoomInput } from "@/lib/cable-map/shared";
 import { getDb } from "@/lib/db";
 import { graphGroups, manualGraphRooms } from "@/lib/db/schema";
 
-export async function createManualGroupRoom(
-	input: CreateManualRoomInput,
-	session: AuthSession,
-) {
+export async function createManualGroupRoom(input: CreateManualRoomInput, session: AuthSession) {
 	const db = getDb();
 	const roomName = input.roomName.trim();
 	const [group] = await db
@@ -51,10 +46,7 @@ export async function createManualGroupRoom(
 	return createdRoom;
 }
 
-export async function deleteManualGroupRoom(
-	input: DeleteManualRoomInput,
-	_session: AuthSession,
-) {
+export async function deleteManualGroupRoom(input: DeleteManualRoomInput, _session: AuthSession) {
 	const db = getDb();
 	const [deletedRoom] = await db
 		.delete(manualGraphRooms)

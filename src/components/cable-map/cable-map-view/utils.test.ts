@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+
 import type { GraphGroupView } from "@/lib/cable-map/shared";
+
 import { buildLevelBands } from "./utils";
 
 function createGroup(overrides: Partial<GraphGroupView> = {}): GraphGroupView {

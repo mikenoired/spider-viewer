@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
+
 import { requireRole } from "@/lib/auth/guards";
 import { canEditProgress, canViewAudit } from "@/lib/auth/shared";
+
 import {
 	createManualRoomSchema,
 	dateRangeSchema,
@@ -8,15 +10,13 @@ import {
 	exportBackdatedSchema,
 	exportDailyHistorySchema,
 	exportHistorySchema,
-	saveRoomProgressSchema,
+	saveCableProgressSchema,
 } from "./shared";
 
-export const getDashboardData = createServerFn({ method: "GET" }).handler(
-	async () => {
-		const { getActiveDashboardData } = await import("./queries.server");
-		return getActiveDashboardData();
-	},
-);
+export const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
+	const { getActiveDashboardData } = await import("./queries.server");
+	return getActiveDashboardData();
+});
 
 export const uploadWorkbook = createServerFn({ method: "POST" })
 	.inputValidator((input: FormData) => input)
@@ -26,8 +26,8 @@ export const uploadWorkbook = createServerFn({ method: "POST" })
 		return importWorkbookFromFormData(data, session);
 	});
 
-export const saveRoomProgress = createServerFn({ method: "POST" })
-	.inputValidator(saveRoomProgressSchema)
+export const saveCableProgress = createServerFn({ method: "POST" })
+	.inputValidator(saveCableProgressSchema)
 	.handler(async ({ data }) => {
 		const session = await requireRole(["admin", "super-admin"]);
 
@@ -35,8 +35,8 @@ export const saveRoomProgress = createServerFn({ method: "POST" })
 			throw new Error("Недостаточно прав для изменения прогресса.");
 		}
 
-		const { saveRoomProgressChanges } = await import("./history.server");
-		return saveRoomProgressChanges(data, session);
+		const { saveCableProgressChanges } = await import("./history.server");
+		return saveCableProgressChanges(data, session);
 	});
 
 export const createManualRoom = createServerFn({ method: "POST" })
@@ -98,8 +98,7 @@ export const downloadHistoryDocx = createServerFn({ method: "POST" })
 
 		return new Response(new Uint8Array(buffer), {
 			headers: {
-				"Content-Type":
-					"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+				"Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 				"Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
 			},
 		});
@@ -120,8 +119,7 @@ export const downloadBackdatedDocx = createServerFn({ method: "POST" })
 
 		return new Response(new Uint8Array(buffer), {
 			headers: {
-				"Content-Type":
-					"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+				"Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 				"Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
 			},
 		});
@@ -139,13 +137,11 @@ export const downloadDailyHistoryDocx = createServerFn({ method: "POST" })
 		const { createDailyHistoryDocx } = await import("./history.server");
 		const { buildDailyHistoryReportFileName } = await import("./report-utils");
 		const buffer = await createDailyHistoryDocx(data.level);
-		const fileName =
-			data.fileName?.trim() || buildDailyHistoryReportFileName(data.level);
+		const fileName = data.fileName?.trim() || buildDailyHistoryReportFileName(data.level);
 
 		return new Response(new Uint8Array(buffer), {
 			headers: {
-				"Content-Type":
-					"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+				"Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 				"Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
 			},
 		});

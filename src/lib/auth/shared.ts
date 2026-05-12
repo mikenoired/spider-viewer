@@ -14,6 +14,8 @@ export type AuthSession = {
 	role: UserRole;
 };
 
+export const installationEditorRoles = ["admin", "super-admin"] as const satisfies readonly UserRole[];
+
 export const loginSchema = z.object({
 	login: z
 		.string()
@@ -29,13 +31,17 @@ export const loginSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export const roleLabels: Record<UserRole, string> = {
-	user: "Пользователь",
-	admin: "Админ",
+	"user": "Пользователь",
+	"admin": "Админ",
 	"super-admin": "Супер-админ",
 };
 
 export function canEditProgress(role: UserRole) {
 	return role === "admin" || role === "super-admin";
+}
+
+export function canEditInstallation(role: UserRole) {
+	return installationEditorRoles.some((editorRole) => editorRole === role);
 }
 
 export function canUploadSnapshot(role: UserRole) {
