@@ -1,28 +1,29 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { LoginForm } from "@/components/auth/login-form";
+import { RegisterForm } from "@/components/auth/register-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PROJECT_NAME } from "@/lib/auth/shared";
 
-export const Route = createFileRoute("/login")({
+export const Route = createFileRoute("/register")({
 	beforeLoad: ({ context }) => {
 		if (context.auth) throw redirect({ to: "/app" });
 	},
-	component: LoginPage,
+	component: RegisterPage,
 });
 
-function LoginPage() {
+function RegisterPage() {
 	return (
 		<main className="flex min-h-svh items-center justify-center px-4 py-10">
 			<Card className="w-full max-w-md">
 				<CardHeader>
-					<CardTitle>Вход в {PROJECT_NAME}</CardTitle>
+					<CardTitle>Регистрация в {PROJECT_NAME}</CardTitle>
 					<CardDescription>
-						Авторизуйтесь через логин и пароль. Если аккаунта ещё нет, отправьте заявку на регистрацию.
+						После отправки заявки суперпользователь должен подтвердить доступ. До подтверждения вход в систему
+						будет недоступен.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<LoginForm />
+					<RegisterForm />
 				</CardContent>
 			</Card>
 		</main>

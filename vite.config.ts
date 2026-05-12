@@ -8,6 +8,10 @@ const config = defineConfig({
 	plugins: [devtools(), tailwindcss(), tanstackStart(), viteReact()],
 	resolve: { tsconfigPaths: true },
 	server: { host: true },
+	test: {
+		include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+		exclude: ["node_modules/**", "spider-viewer/**"],
+	},
 });
 
 export default config;

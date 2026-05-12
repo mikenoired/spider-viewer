@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { canUploadSnapshot, canViewAudit } from "@/lib/auth/shared";
+import type { UserRole } from "@/lib/auth/shared";
 import { downloadDailyHistoryDocx } from "@/lib/cable-map/functions";
 import { buildDailyHistoryReportFileName } from "@/lib/cable-map/report-utils";
 import type { DashboardData } from "@/lib/cable-map/shared";
@@ -200,7 +201,7 @@ export function CableMapView({
 	data: DashboardData;
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
-	role: "user" | "admin" | "super-admin";
+	role: UserRole;
 }) {
 	const { setChromeHidden } = useAppShellChrome();
 	const workspaceRef = useRef<HTMLDivElement | null>(null);

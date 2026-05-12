@@ -1,5 +1,5 @@
-import { createServer } from "node:http";
 import fs from "node:fs";
+import { createServer } from "node:http";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pathToFileURL } from "node:url";
@@ -196,7 +196,7 @@ const server = createServer(async (req, res) => {
 
 function tryServeStatic(req, res) {
 	const url = new URL(req.url ?? "/", "http://localhost");
-	let filePath = path.join(clientDir, url.pathname === "/" ? "index.html" : url.pathname);
+	const filePath = path.join(clientDir, url.pathname === "/" ? "index.html" : url.pathname);
 
 	if (!filePath.startsWith(clientDir)) {
 		return false;
