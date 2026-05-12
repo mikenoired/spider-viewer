@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import fs from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pathToFileURL } from "node:url";
@@ -15,8 +16,28 @@ const healthcheckRedisRequired = process.env.HEALTHCHECK_REDIS_REQUIRED === "tru
 const releaseId = process.env.RELEASE_ID ?? "dev";
 const serverLogger = logger.child({ module: "http-server", releaseId });
 
-const entryUrl = pathToFileURL(path.join(process.cwd(), "dist", "server", "server.js")).href;
+const clientDir = path.join(process.cwd(), "dist", "client");
+const serverDir = path.join(process.cwd(), "dist", "server");
+const entryUrl = pathToFileURL(path.join(serverDir, "server.js")).href;
 const { default: serverEntry } = await import(entryUrl);
+
+const MIME_TYPES = {
+	".js": "application/javascript",
+	".css": "text/css",
+	".wasm": "application/wasm",
+	".json": "application/json",
+	".webmanifest": "application/manifest+json",
+	".png": "image/png",
+	".jpg": "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif": "image/gif",
+	".svg": "image/svg+xml",
+	".ico": "image/x-icon",
+	".woff": "font/woff",
+	".woff2": "font/woff2",
+	".txt": "text/plain",
+	".gz": "application/gzip",
+};
 
 let isShuttingDown = false;
 const sockets = new Set();
@@ -158,6 +179,11 @@ const server = createServer(async (req, res) => {
 		return;
 	}
 
+	if (req.method === "GET" || req.method === "HEAD") {
+		const served = tryServeStatic(req, res);
+		if (served) return;
+	}
+
 	try {
 		const request = createFetchRequest(req);
 		const response = await serverEntry.fetch(request);
@@ -167,6 +193,41 @@ const server = createServer(async (req, res) => {
 		sendJson(res, 500, { ok: false, error: "Internal server error." });
 	}
 });
+
+function tryServeStatic(req, res) {
+	const url = new URL(req.url ?? "/", "http://localhost");
+	let filePath = path.join(clientDir, url.pathname === "/" ? "index.html" : url.pathname);
+
+	if (!filePath.startsWith(clientDir)) {
+		return false;
+	}
+
+	try {
+		const stat = fs.statSync(filePath);
+		if (!stat.isFile()) return false;
+	} catch {
+		return false;
+	}
+
+	const ext = path.extname(filePath).toLowerCase();
+	const mimeType = MIME_TYPES[ext] ?? "application/octet-stream";
+	const isJS = ext === ".js";
+
+	res.statusCode = 200;
+	res.setHeader("content-type", mimeType);
+
+	if (isJS) {
+		res.setHeader("cache-control", "public, max-age=31536000, immutable");
+	} else if (ext === ".css" || ext === ".woff" || ext === ".woff2") {
+		res.setHeader("cache-control", "public, max-age=31536000, immutable");
+	} else if (ext === ".webmanifest" || ext === ".html") {
+		res.setHeader("cache-control", "no-cache");
+	}
+
+	const readStream = fs.createReadStream(filePath);
+	readStream.pipe(res);
+	return true;
+}
 
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;
