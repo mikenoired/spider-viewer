@@ -26,6 +26,11 @@ export const snapshotSourceTypeEnum = pgEnum("snapshot_source_type", [
 export const graphSideEnum = pgEnum("graph_side", ["dirty", "clean"]);
 export const graphSubzoneEnum = pgEnum("graph_subzone", ["dirty", "clean"]);
 export const roomRoleEnum = pgEnum("graph_room_role", ["primary", "secondary"]);
+export const installationPendingStatusEnum = pgEnum("installation_pending_status", [
+	"pending",
+	"applied",
+	"discarded",
+]);
 
 export const users = pgTable(
 	"users",
@@ -243,6 +248,121 @@ export const manualGraphRooms = pgTable(
 	(table) => [uniqueIndex("manual_graph_rooms_unique").on(table.sourceZone, table.level, table.roomName)]
 );
 
+export const installationSnapshots = pgTable(
+	"installation_snapshots",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		fileName: text("file_name").notNull(),
+		fileType: snapshotSourceTypeEnum("file_type").notNull(),
+		checksum: text("checksum").notNull(),
+		importedByUserId: uuid("imported_by_user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		rowCount: integer("row_count").notNull().default(0),
+		isActive: boolean("is_active").notNull().default(false),
+		summary: jsonb("summary")
+			.$type<{
+				groupCount: number;
+				kksCount: number;
+			}>()
+			.notNull()
+			.default({
+				groupCount: 0,
+				kksCount: 0,
+			}),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("installation_snapshots_active_idx").on(table.isActive),
+		uniqueIndex("installation_snapshots_single_active_unique")
+			.on(table.isActive)
+			.where(sql`${table.isActive} = true`),
+	]
+);
+
+export const installationKksGroups = pgTable(
+	"installation_kks_groups",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		snapshotId: uuid("snapshot_id")
+			.notNull()
+			.references(() => installationSnapshots.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		sortOrder: integer("sort_order").notNull().default(0),
+		kksCount: integer("kks_count").notNull().default(0),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("installation_kks_groups_snapshot_sort_idx").on(table.snapshotId, table.sortOrder),
+		uniqueIndex("installation_kks_groups_snapshot_name_unique").on(table.snapshotId, table.name),
+	]
+);
+
+export const installationKksItems = pgTable(
+	"installation_kks_items",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		snapshotId: uuid("snapshot_id")
+			.notNull()
+			.references(() => installationSnapshots.id, { onDelete: "cascade" }),
+		groupId: uuid("group_id")
+			.notNull()
+			.references(() => installationKksGroups.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		sortOrder: integer("sort_order").notNull().default(0),
+		isDone: boolean("is_done").notNull().default(false),
+		revision: integer("revision").notNull().default(1),
+		updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("installation_kks_items_snapshot_group_sort_idx").on(
+			table.snapshotId,
+			table.groupId,
+			table.sortOrder
+		),
+		uniqueIndex("installation_kks_items_group_name_unique").on(table.groupId, table.name),
+	]
+);
+
+export const installationPendingChanges = pgTable(
+	"installation_pending_changes",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		clientMutationId: text("client_mutation_id").notNull(),
+		snapshotId: uuid("snapshot_id")
+			.notNull()
+			.references(() => installationSnapshots.id, { onDelete: "cascade" }),
+		groupId: uuid("group_id")
+			.notNull()
+			.references(() => installationKksGroups.id, { onDelete: "cascade" }),
+		kksItemId: uuid("kks_item_id")
+			.notNull()
+			.references(() => installationKksItems.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		userLogin: text("user_login").notNull(),
+		baseDone: boolean("base_done").notNull(),
+		desiredDone: boolean("desired_done").notNull(),
+		serverDone: boolean("server_done").notNull(),
+		hasConflict: boolean("has_conflict").notNull().default(false),
+		resolvedDone: boolean("resolved_done"),
+		status: installationPendingStatusEnum("status").notNull().default("pending"),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("installation_pending_changes_status_group_idx").on(table.status, table.groupId),
+		index("installation_pending_changes_snapshot_status_idx").on(table.snapshotId, table.status),
+		uniqueIndex("installation_pending_changes_client_mutation_unique").on(table.clientMutationId),
+	]
+);
+
 export const changeAuditLogs = pgTable(
 	"change_audit_logs",
 	{
@@ -327,5 +447,9 @@ export type GraphGroup = typeof graphGroups.$inferSelect;
 export type GraphGroupRoom = typeof graphGroupRooms.$inferSelect;
 export type CableProgress = typeof cableProgress.$inferSelect;
 export type ManualGraphRoom = typeof manualGraphRooms.$inferSelect;
+export type InstallationSnapshot = typeof installationSnapshots.$inferSelect;
+export type InstallationKksGroup = typeof installationKksGroups.$inferSelect;
+export type InstallationKksItem = typeof installationKksItems.$inferSelect;
+export type InstallationPendingChange = typeof installationPendingChanges.$inferSelect;
 export type ChangeAuditLog = typeof changeAuditLogs.$inferSelect;
 export type CableChangeAuditLog = typeof cableChangeAuditLogs.$inferSelect;
