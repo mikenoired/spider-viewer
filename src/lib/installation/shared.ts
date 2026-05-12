@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod";
 
 export const installationColumnIds = ["not_started", "in_progress", "done", "processing"] as const;
 export const installationVisibleColumnIds = ["not_started", "in_progress", "done"] as const;
@@ -85,21 +85,21 @@ export type InstallationKksChangeInput = {
 };
 
 export const saveInstallationKksSchema = z.object({
-	snapshotId: z.uuid(),
-	groupId: z.uuid(),
-	kksItemId: z.uuid(),
+	snapshotId: z.string().uuid(),
+	groupId: z.string().uuid(),
+	kksItemId: z.string().uuid(),
 	isDone: z.boolean(),
 	baseRevision: z.number().int().positive(),
 });
 
 export const submitInstallationOfflineChangesSchema = z.object({
-	snapshotId: z.uuid(),
+	snapshotId: z.string().uuid(),
 	changes: z
 		.array(
 			z.object({
 				clientMutationId: z.string().trim().min(1).max(120),
-				groupId: z.uuid(),
-				kksItemId: z.uuid(),
+				groupId: z.string().uuid(),
+				kksItemId: z.string().uuid(),
 				baseDone: z.boolean(),
 				desiredDone: z.boolean(),
 			})
@@ -108,11 +108,11 @@ export const submitInstallationOfflineChangesSchema = z.object({
 });
 
 export const applyInstallationPendingGroupSchema = z.object({
-	groupId: z.uuid(),
+	groupId: z.string().uuid(),
 	changes: z
 		.array(
 			z.object({
-				pendingChangeId: z.uuid(),
+				pendingChangeId: z.string().uuid(),
 				resolvedDone: z.boolean(),
 			})
 		)

@@ -9,15 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteRouteImport } from './routes/app/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppUsersRouteImport } from './routes/app/users'
 import { Route as AppInstallationRouteImport } from './routes/app/installation'
 import { Route as AppImportRouteImport } from './routes/app/import'
 import { Route as AppHistoryRouteImport } from './routes/app/history'
 import { Route as AppBackdatedRouteImport } from './routes/app/backdated'
 
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -36,6 +43,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppUsersRoute = AppUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppInstallationRoute = AppInstallationRouteImport.update({
@@ -63,19 +75,23 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/app/backdated': typeof AppBackdatedRoute
   '/app/history': typeof AppHistoryRoute
   '/app/import': typeof AppImportRoute
   '/app/installation': typeof AppInstallationRoute
+  '/app/users': typeof AppUsersRoute
   '/app/': typeof AppIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/app/backdated': typeof AppBackdatedRoute
   '/app/history': typeof AppHistoryRoute
   '/app/import': typeof AppImportRoute
   '/app/installation': typeof AppInstallationRoute
+  '/app/users': typeof AppUsersRoute
   '/app': typeof AppIndexRoute
 }
 export interface FileRoutesById {
@@ -83,10 +99,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/app/backdated': typeof AppBackdatedRoute
   '/app/history': typeof AppHistoryRoute
   '/app/import': typeof AppImportRoute
   '/app/installation': typeof AppInstallationRoute
+  '/app/users': typeof AppUsersRoute
   '/app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
@@ -95,29 +113,35 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/register'
     | '/app/backdated'
     | '/app/history'
     | '/app/import'
     | '/app/installation'
+    | '/app/users'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/register'
     | '/app/backdated'
     | '/app/history'
     | '/app/import'
     | '/app/installation'
+    | '/app/users'
     | '/app'
   id:
     | '__root__'
     | '/'
     | '/app'
     | '/login'
+    | '/register'
     | '/app/backdated'
     | '/app/history'
     | '/app/import'
     | '/app/installation'
+    | '/app/users'
     | '/app/'
   fileRoutesById: FileRoutesById
 }
@@ -125,10 +149,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRouteRoute: typeof AppRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  RegisterRoute: typeof RegisterRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -155,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/app/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/users': {
+      id: '/app/users'
+      path: '/users'
+      fullPath: '/app/users'
+      preLoaderRoute: typeof AppUsersRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/installation': {
@@ -193,6 +232,7 @@ interface AppRouteRouteChildren {
   AppHistoryRoute: typeof AppHistoryRoute
   AppImportRoute: typeof AppImportRoute
   AppInstallationRoute: typeof AppInstallationRoute
+  AppUsersRoute: typeof AppUsersRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
@@ -201,6 +241,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppHistoryRoute: AppHistoryRoute,
   AppImportRoute: AppImportRoute,
   AppInstallationRoute: AppInstallationRoute,
+  AppUsersRoute: AppUsersRoute,
   AppIndexRoute: AppIndexRoute,
 }
 
@@ -212,6 +253,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRouteRoute: AppRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  RegisterRoute: RegisterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
