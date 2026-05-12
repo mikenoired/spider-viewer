@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod";
 
 export const supportedWorkbookExtensions = ["ods", "xlsx", "xls"] as const;
 export const supportedWorkbookMimeTypes = [
@@ -31,19 +31,19 @@ export const dateRangeSchema = z.object({
 });
 
 export const cableProgressPatchSchema = z.object({
-	roomId: z.uuid(),
-	cableId: z.uuid(),
+	roomId: z.string().uuid(),
+	cableId: z.string().uuid(),
 	progress: z.number().int().min(0).max(100),
 });
 
 export const saveCableProgressSchema = z.object({
-	groupId: z.uuid(),
+	groupId: z.string().uuid(),
 	effectiveDate: z.string().trim().optional().nullable(),
 	cables: z.array(cableProgressPatchSchema).min(1),
 });
 
 export const createManualRoomSchema = z.object({
-	groupId: z.uuid(),
+	groupId: z.string().uuid(),
 	roomName: z
 		.string()
 		.trim()
@@ -52,7 +52,7 @@ export const createManualRoomSchema = z.object({
 });
 
 export const deleteManualRoomSchema = z.object({
-	roomId: z.uuid(),
+	roomId: z.string().uuid(),
 });
 
 export const exportHistorySchema = dateRangeSchema.extend({

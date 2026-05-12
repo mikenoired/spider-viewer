@@ -10,6 +10,16 @@ import { PathArea } from "./path-layer";
 import { LeftRoomArea, RightRoomArea, TotalThreadsBadge } from "./room-blocks";
 import type { LevelBand } from "./types";
 
+function getDisplayedLevelLabel(level: string) {
+	const normalizedLevel = level.trim().toLowerCase();
+
+	if (normalizedLevel === "#н/д" || normalizedLevel === "н/д") {
+		return "";
+	}
+
+	return level;
+}
+
 export const LevelBandView = memo(function LevelBandView({
 	band,
 	bandIndex,
@@ -34,6 +44,7 @@ export const LevelBandView = memo(function LevelBandView({
 	isLast: boolean;
 }) {
 	const isFirst = bandIndex === 0;
+	const displayedLevelLabel = getDisplayedLevelLabel(band.level);
 
 	return (
 		<div
@@ -57,8 +68,8 @@ export const LevelBandView = memo(function LevelBandView({
 					} satisfies CSSProperties
 				}>
 				<div className="flex w-full flex-col items-center gap-3">
-					<div className="text-3xl font-semibold leading-none tracking-[-0.03em] text-zinc-900 dark:text-zinc-100 select-none">
-						{band.level}
+					<div className="select-none text-3xl font-semibold leading-none tracking-[-0.03em] text-zinc-900 dark:text-zinc-100">
+						{displayedLevelLabel}
 					</div>
 					{canExportDailyReport ? (
 						<Tooltip>
@@ -69,7 +80,11 @@ export const LevelBandView = memo(function LevelBandView({
 									variant="outline"
 									onClick={() => void onExportDailyReport(band.level)}
 									disabled={isExportDisabled}
-									aria-label={`Выгрузить DOCX по уровню ${band.level}`}>
+									aria-label={
+										displayedLevelLabel
+											? `Выгрузить DOCX по уровню ${displayedLevelLabel}`
+											: "Выгрузить DOCX по уровню"
+									}>
 									{isExportingReport ? <LoaderCircleIcon className="animate-spin" /> : <DownloadIcon />}
 								</Button>
 							</TooltipTrigger>

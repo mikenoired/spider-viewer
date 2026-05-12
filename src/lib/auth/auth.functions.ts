@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { loginSchema } from "./shared";
+import { requireRole } from "./guards";
+import { loginSchema, registerSchema, userModerationSchema } from "./shared";
 
 export const getCurrentSession = createServerFn({ method: "GET" }).handler(async () => {
 	const { getCurrentSession } = await import("./server");
@@ -12,6 +13,35 @@ export const login = createServerFn({ method: "POST" })
 	.handler(async ({ data }) => {
 		const { loginWithCredentials } = await import("./server");
 		return loginWithCredentials(data);
+	});
+
+export const registerUser = createServerFn({ method: "POST" })
+	.inputValidator(registerSchema)
+	.handler(async ({ data }) => {
+		const { registerWithCredentials } = await import("./server");
+		return registerWithCredentials(data);
+	});
+
+export const getManagedUsers = createServerFn({ method: "GET" }).handler(async () => {
+	await requireRole(["super-admin"]);
+	const { getManagedUsers } = await import("./server");
+	return getManagedUsers();
+});
+
+export const approveUserRegistration = createServerFn({ method: "POST" })
+	.inputValidator(userModerationSchema)
+	.handler(async ({ data }) => {
+		const reviewer = await requireRole(["super-admin"]);
+		const { approvePendingUser } = await import("./server");
+		return approvePendingUser(data.userId, reviewer);
+	});
+
+export const rejectUserRegistration = createServerFn({ method: "POST" })
+	.inputValidator(userModerationSchema)
+	.handler(async ({ data }) => {
+		const reviewer = await requireRole(["super-admin"]);
+		const { rejectPendingUser } = await import("./server");
+		return rejectPendingUser(data.userId, reviewer);
 	});
 
 export const logout = createServerFn({ method: "POST" }).handler(async () => {

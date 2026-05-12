@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+	type AnyPgColumn,
 	boolean,
 	date,
 	doublePrecision,
@@ -14,9 +15,10 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 
-import { userRoles } from "@/lib/auth/shared";
+import { userRoles, userStatuses } from "@/lib/auth/shared";
 
 export const userRoleEnum = pgEnum("user_role", userRoles);
+export const userStatusEnum = pgEnum("user_status", userStatuses);
 export const snapshotSourceTypeEnum = pgEnum("snapshot_source_type", [
 	// Keep ODS for already stored snapshots; new uploads are limited in app code.
 	"ods",
@@ -39,10 +41,15 @@ export const users = pgTable(
 		login: text("login").notNull(),
 		passwordHash: text("password_hash").notNull(),
 		role: userRoleEnum("role").notNull().default("user"),
+		status: userStatusEnum("status").notNull().default("active"),
+		reviewedByUserId: uuid("reviewed_by_user_id").references((): AnyPgColumn => users.id, {
+			onDelete: "set null",
+		}),
+		reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 	},
-	(table) => [uniqueIndex("users_login_unique").on(table.login)]
+	(table) => [uniqueIndex("users_login_unique").on(table.login), index("users_status_idx").on(table.status)]
 );
 
 export type User = typeof users.$inferSelect;
