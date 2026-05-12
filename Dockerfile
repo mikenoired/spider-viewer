@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM oven/bun:1.3.11-debian AS dependencies
+FROM oven/bun:1.3.11 AS dependencies
 
 WORKDIR /app
 
