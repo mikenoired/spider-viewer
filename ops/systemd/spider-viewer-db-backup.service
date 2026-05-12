@@ -1,0 +1,19 @@
+[Unit]
+Description=Spider Viewer PostgreSQL backup
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/spider-viewer/spider-viewer.env
+ConditionPathExists=/opt/spider-viewer/current/ops/backup/postgres-backup.sh
+
+[Service]
+Type=oneshot
+User=spider
+Group=spider
+WorkingDirectory=/opt/spider-viewer/current
+EnvironmentFile=/etc/spider-viewer/spider-viewer.env
+ExecStart=/usr/bin/env bash /opt/spider-viewer/current/ops/backup/postgres-backup.sh
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

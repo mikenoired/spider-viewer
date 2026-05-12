@@ -1,11 +1,9 @@
 import { Buffer } from "node:buffer";
+
 import { describe, expect, it } from "vitest";
-import * as XLSX from "xlsx";
-import {
-	ensureUploadFile,
-	hasExpectedWorkbookSignature,
-	parseWorkbookRows,
-} from "./import.server";
+import * as Xlsx from "xlsx";
+
+import { ensureUploadFile, hasExpectedWorkbookSignature, parseWorkbookRows } from "./import.server";
 
 const workbookColumnIndexes = {
 	cableLabel: 0,
@@ -25,21 +23,17 @@ function createWorkbookBuffer(rows: string[][], sheetName = "Общ") {
 	return createWorkbookBufferForType(rows, "xlsx", sheetName);
 }
 
-function createWorkbookBufferForType(
-	rows: string[][],
-	bookType: "ods" | "xlsx",
-	sheetName = "Общ",
-) {
-	const workbook = XLSX.utils.book_new();
-	const sheet = XLSX.utils.aoa_to_sheet(rows);
+function createWorkbookBufferForType(rows: string[][], bookType: "ods" | "xlsx", sheetName = "Общ") {
+	const workbook = Xlsx.utils.book_new();
+	const sheet = Xlsx.utils.aoa_to_sheet(rows);
 
-	XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+	Xlsx.utils.book_append_sheet(workbook, sheet, sheetName);
 
 	return Buffer.from(
-		XLSX.write(workbook, {
+		Xlsx.write(workbook, {
 			type: "buffer",
 			bookType,
-		}),
+		})
 	);
 }
 
@@ -72,15 +66,13 @@ describe("workbook import validation", () => {
 			"file",
 			new File([buffer], "report.xlsx", {
 				type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-			}),
+			})
 		);
 
 		const result = await ensureUploadFile(formData);
 
 		expect(result.fileType).toBe("xlsx");
-		expect(hasExpectedWorkbookSignature(result.fileType, result.buffer)).toBe(
-			true,
-		);
+		expect(hasExpectedWorkbookSignature(result.fileType, result.buffer)).toBe(true);
 	});
 
 	it("accepts a valid ods upload", async () => {
@@ -91,15 +83,13 @@ describe("workbook import validation", () => {
 			"file",
 			new File([buffer], "report.ods", {
 				type: "application/vnd.oasis.opendocument.spreadsheet",
-			}),
+			})
 		);
 
 		const result = await ensureUploadFile(formData);
 
 		expect(result.fileType).toBe("ods");
-		expect(hasExpectedWorkbookSignature(result.fileType, result.buffer)).toBe(
-			true,
-		);
+		expect(hasExpectedWorkbookSignature(result.fileType, result.buffer)).toBe(true);
 	});
 
 	it("rejects an upload with an unexpected mime type", async () => {
@@ -109,7 +99,7 @@ describe("workbook import validation", () => {
 			"file",
 			new File(["PK"], "report.xlsx", {
 				type: "text/plain",
-			}),
+			})
 		);
 
 		await expect(ensureUploadFile(formData)).rejects.toThrow(/MIME-тип/);
@@ -122,17 +112,14 @@ describe("workbook import validation", () => {
 			"file",
 			new File(["not-a-workbook"], "report.xlsx", {
 				type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-			}),
+			})
 		);
 
 		await expect(ensureUploadFile(formData)).rejects.toThrow(/не похож/);
 	});
 
 	it("parses a valid workbook row", () => {
-		const rows = parseWorkbookRows(
-			"report.xlsx",
-			createWorkbookBuffer(createWorkbookRows()),
-		);
+		const rows = parseWorkbookRows("report.xlsx", createWorkbookBuffer(createWorkbookRows()));
 
 		expect(rows).toHaveLength(1);
 		expect(rows[0]?.fromRoom).toBe("А101");
@@ -141,10 +128,7 @@ describe("workbook import validation", () => {
 	});
 
 	it("parses a valid ods row", () => {
-		const rows = parseWorkbookRows(
-			"report.ods",
-			createWorkbookBufferForType(createWorkbookRows(), "ods"),
-		);
+		const rows = parseWorkbookRows("report.ods", createWorkbookBufferForType(createWorkbookRows(), "ods"));
 
 		expect(rows).toHaveLength(1);
 		expect(rows[0]?.fromRoom).toBe("А101");
@@ -155,8 +139,6 @@ describe("workbook import validation", () => {
 	it("rejects a workbook without the expected sheet", () => {
 		const buffer = createWorkbookBuffer(createWorkbookRows(), "Data");
 
-		expect(() => parseWorkbookRows("report.xlsx", buffer)).toThrow(
-			/лист "Общ"/,
-		);
+		expect(() => parseWorkbookRows("report.xlsx", buffer)).toThrow(/лист "Общ"/);
 	});
 });

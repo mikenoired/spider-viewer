@@ -1,8 +1,5 @@
-import type {
-	DashboardData,
-	GraphBucketView,
-	GraphGroupView,
-} from "@/lib/cable-map/shared";
+import type { DashboardData, GraphBucketView, GraphGroupView } from "@/lib/cable-map/shared";
+
 import {
 	bandBorderThickness,
 	getPdfImportedRoomBlockHeight,
@@ -12,7 +9,7 @@ import {
 	pdfRowVerticalInset,
 	shaftCapInset,
 } from "./config";
-import type { GraphSide, LevelBand } from "./types";
+import type { BoardMetrics, GraphSide, LevelBand, ShaftExtent } from "./types";
 
 export function buildLevelBands(levels: DashboardData["levels"]): LevelBand[] {
 	let globalRowIndex = 0;
@@ -26,10 +23,7 @@ export function buildLevelBands(levels: DashboardData["levels"]): LevelBand[] {
 			cleanGroup: cleanGroups[rowIndex] ?? null,
 			globalRowIndex: globalRowIndex + rowIndex,
 			height:
-				getPdfRowHeight(
-					dirtyGroups[rowIndex] ?? null,
-					cleanGroups[rowIndex] ?? null,
-				) +
+				getPdfRowHeight(dirtyGroups[rowIndex] ?? null, cleanGroups[rowIndex] ?? null) +
 				pdfRowVerticalInset * 2,
 			startY: 0,
 		}));
@@ -78,51 +72,97 @@ export function getBoardHeight(bands: LevelBand[]) {
 
 	return bands.reduce((total, band, index) => {
 		const bandHeight = band.rows.reduce((sum, row) => sum + row.height, 0);
-		return (
-			total +
-			bandBorderThickness +
-			bandHeight +
-			(index === bands.length - 1 ? bandBorderThickness : 0)
-		);
+		return total + bandBorderThickness + bandHeight + (index === bands.length - 1 ? bandBorderThickness : 0);
 	}, 0);
 }
 
-export function getShaftExtents(
-	bands: LevelBand[],
-	side: GraphSide,
-	shaft: 1 | 2 | 3 | 4,
-) {
-	let top: number | null = null;
-	let bottom: number | null = null;
+function mergeShaftExtent(current: ShaftExtent | undefined, next: ShaftExtent) {
+	if (!current) {
+		return next;
+	}
 
-	for (const band of bands) {
-		for (const row of band.rows) {
-			const group = side === "dirty" ? row.dirtyGroup : row.cleanGroup;
-			if (!group || getBucketThreadCount(group, shaft) <= 0) {
+	return {
+		top: Math.min(current.top, next.top),
+		bottom: Math.max(current.bottom, next.bottom),
+	};
+}
+
+function updateShaftExtentsForRow(
+	shaftExtents: BoardMetrics["shaftExtents"],
+	row: LevelBand["rows"][number]
+) {
+	for (const side of ["dirty", "clean"] as const) {
+		for (const shaft of [1, 2, 3, 4] as const) {
+			const nextExtent = getRowShaftExtent(row, side, shaft);
+
+			if (!nextExtent) {
 				continue;
 			}
 
-			const nextTop = row.startY + shaftCapInset;
-			const nextBottom = row.startY + row.height - shaftCapInset;
+			shaftExtents[side][shaft] = mergeShaftExtent(shaftExtents[side][shaft], nextExtent);
+		}
+	}
+}
 
-			top = top === null ? nextTop : Math.min(top, nextTop);
-			bottom = bottom === null ? nextBottom : Math.max(bottom, nextBottom);
+function getGroupForSide(row: LevelBand["rows"][number], side: GraphSide) {
+	return side === "dirty" ? row.dirtyGroup : row.cleanGroup;
+}
+
+function getRowShaftExtent(row: LevelBand["rows"][number], side: GraphSide, shaft: 1 | 2 | 3 | 4) {
+	const group = getGroupForSide(row, side);
+
+	if (!group || getBucketThreadCount(group, shaft) <= 0) {
+		return null;
+	}
+
+	return {
+		top: row.startY + shaftCapInset,
+		bottom: row.startY + row.height - shaftCapInset,
+	};
+}
+
+export function getShaftExtents(bands: LevelBand[], side: GraphSide, shaft: 1 | 2 | 3 | 4) {
+	const extents = bands.flatMap((band) =>
+		band.rows.flatMap((row) => {
+			const extent = getRowShaftExtent(row, side, shaft);
+			return extent ? [extent] : [];
+		})
+	);
+
+	if (extents.length === 0) {
+		return null;
+	}
+
+	const top = Math.min(...extents.map((extent) => extent.top));
+	const bottom = Math.max(...extents.map((extent) => extent.bottom));
+
+	return bottom > top ? { top, bottom } : null;
+}
+
+export function buildBoardMetrics(bands: LevelBand[]): BoardMetrics {
+	const shaftExtents: BoardMetrics["shaftExtents"] = {
+		dirty: {},
+		clean: {},
+	};
+	const height = getBoardHeight(bands);
+
+	for (const band of bands) {
+		for (const row of band.rows) {
+			updateShaftExtentsForRow(shaftExtents, row);
 		}
 	}
 
-	if (top === null || bottom === null || bottom <= top) return null;
-
-	return { top, bottom };
+	return {
+		height,
+		shaftExtents,
+	};
 }
 
-function getPdfRowHeight(
-	dirtyGroup: GraphGroupView | null,
-	cleanGroup: GraphGroupView | null,
-) {
+function getPdfRowHeight(dirtyGroup: GraphGroupView | null, cleanGroup: GraphGroupView | null) {
 	return Math.max(
 		getPdfRenderedGroupHeight(dirtyGroup),
 		getPdfRenderedGroupHeight(cleanGroup),
-		minPdfRowHeight,
+		minPdfRowHeight
 	);
 }
 
@@ -131,7 +171,7 @@ function getPdfRenderedGroupHeight(group: GraphGroupView | null) {
 
 	return Math.max(
 		getPdfImportedRoomBlockHeight(group.primaryRooms.length),
-		getPdfManualRoomBlockHeight(group.manualRooms.length),
+		getPdfManualRoomBlockHeight(group.manualRooms.length)
 	);
 }
 
@@ -154,13 +194,8 @@ function sortGroupsForPdf(groups: GraphGroupView[]) {
 	});
 }
 
-export function getBucketThreadCount(
-	group: GraphGroupView,
-	shaft: GraphBucketView["shaft"],
-) {
-	return (
-		group.buckets.find((bucket) => bucket.shaft === shaft)?.threadCount ?? 0
-	);
+export function getBucketThreadCount(group: GraphGroupView, shaft: GraphBucketView["shaft"]) {
+	return group.buckets.find((bucket) => bucket.shaft === shaft)?.threadCount ?? 0;
 }
 
 export function getShaftX(side: GraphSide) {

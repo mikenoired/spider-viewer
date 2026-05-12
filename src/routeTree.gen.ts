@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteRouteImport } from './routes/app/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppInstallationRouteImport } from './routes/app/installation'
 import { Route as AppImportRouteImport } from './routes/app/import'
 import { Route as AppHistoryRouteImport } from './routes/app/history'
 import { Route as AppBackdatedRouteImport } from './routes/app/backdated'
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppInstallationRoute = AppInstallationRouteImport.update({
+  id: '/installation',
+  path: '/installation',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppImportRoute = AppImportRouteImport.update({
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/app/backdated': typeof AppBackdatedRoute
   '/app/history': typeof AppHistoryRoute
   '/app/import': typeof AppImportRoute
+  '/app/installation': typeof AppInstallationRoute
   '/app/': typeof AppIndexRoute
 }
 export interface FileRoutesByTo {
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/app/backdated': typeof AppBackdatedRoute
   '/app/history': typeof AppHistoryRoute
   '/app/import': typeof AppImportRoute
+  '/app/installation': typeof AppInstallationRoute
   '/app': typeof AppIndexRoute
 }
 export interface FileRoutesById {
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/app/backdated': typeof AppBackdatedRoute
   '/app/history': typeof AppHistoryRoute
   '/app/import': typeof AppImportRoute
+  '/app/installation': typeof AppInstallationRoute
   '/app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/app/backdated'
     | '/app/history'
     | '/app/import'
+    | '/app/installation'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/app/backdated'
     | '/app/history'
     | '/app/import'
+    | '/app/installation'
     | '/app'
   id:
     | '__root__'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/app/backdated'
     | '/app/history'
     | '/app/import'
+    | '/app/installation'
     | '/app/'
   fileRoutesById: FileRoutesById
 }
@@ -145,6 +157,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/installation': {
+      id: '/app/installation'
+      path: '/installation'
+      fullPath: '/app/installation'
+      preLoaderRoute: typeof AppInstallationRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/import': {
       id: '/app/import'
       path: '/import'
@@ -173,6 +192,7 @@ interface AppRouteRouteChildren {
   AppBackdatedRoute: typeof AppBackdatedRoute
   AppHistoryRoute: typeof AppHistoryRoute
   AppImportRoute: typeof AppImportRoute
+  AppInstallationRoute: typeof AppInstallationRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
@@ -180,6 +200,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppBackdatedRoute: AppBackdatedRoute,
   AppHistoryRoute: AppHistoryRoute,
   AppImportRoute: AppImportRoute,
+  AppInstallationRoute: AppInstallationRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

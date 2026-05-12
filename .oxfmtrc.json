@@ -1,0 +1,26 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"useTabs": true,
+	"tabWidth": 2,
+	"printWidth": 110,
+	"singleQuote": false,
+	"jsxSingleQuote": false,
+	"quoteProps": "consistent",
+	"sortImports": {},
+	"sortPackageJson": false,
+	"trailingComma": "es5",
+	"semi": true,
+	"arrowParens": "always",
+	"bracketSameLine": true,
+	"bracketSpacing": true,
+	"ignorePatterns": [
+		"**/src/routeTree.gen.ts",
+		"**/src/styles.css",
+		"**/dist",
+		"**/build",
+		"**/coverage",
+		"**/public/vision"
+	],
+	"endOfLine": "lf",
+	"jsxBracketSameLine": true
+}

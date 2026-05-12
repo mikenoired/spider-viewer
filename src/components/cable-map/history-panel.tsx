@@ -19,15 +19,11 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { toast } from "sonner";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
 	Popover,
 	PopoverContent,
@@ -35,14 +31,7 @@ import {
 	PopoverTitle,
 	PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
 	downloadBackdatedDocx,
 	downloadHistoryDocx,
@@ -61,11 +50,9 @@ function formatRangeLabel(range?: DateRange) {
 		return format(range.from, "d MMM yyyy", { locale: ru });
 	}
 
-	return `${format(range.from, "d MMM yyyy", { locale: ru })} — ${format(
-		range.to,
-		"d MMM yyyy",
-		{ locale: ru },
-	)}`;
+	return `${format(range.from, "d MMM yyyy", { locale: ru })} — ${format(range.to, "d MMM yyyy", {
+		locale: ru,
+	})}`;
 }
 
 function dateToIso(value: Date | undefined) {
@@ -104,7 +91,9 @@ type SortKey =
 	| "changedAt"
 	| "effectiveDate"
 	| "userLogin"
+	| "cableLabel"
 	| "roomName"
+	| "shaft"
 	| "oldProgress"
 	| "newProgress"
 	| "isBackdated";
@@ -119,7 +108,9 @@ const sortableColumns: Array<{
 	{ key: "changedAt", label: "Изменено", icon: Clock3Icon },
 	{ key: "effectiveDate", label: "Дата действия", icon: CalendarDaysIcon },
 	{ key: "userLogin", label: "Пользователь", icon: UserIcon },
+	{ key: "cableLabel", label: "Кабель", icon: TagIcon },
 	{ key: "roomName", label: "Помещение", icon: FolderIcon },
+	{ key: "shaft", label: "КШ", icon: TagIcon },
 	{ key: "oldProgress", label: "Было", icon: PercentIcon },
 	{ key: "newProgress", label: "Стало", icon: PercentIcon },
 	{ key: "isBackdated", label: "Тип", icon: TagIcon },
@@ -129,17 +120,13 @@ function compareEntries(
 	left: HistoryEntryView,
 	right: HistoryEntryView,
 	key: SortKey,
-	direction: SortDirection,
+	direction: SortDirection
 ) {
 	const factor = direction === "asc" ? 1 : -1;
 
 	switch (key) {
 		case "changedAt":
-			return (
-				(new Date(left.changedAt).getTime() -
-					new Date(right.changedAt).getTime()) *
-				factor
-			);
+			return (new Date(left.changedAt).getTime() - new Date(right.changedAt).getTime()) * factor;
 		case "effectiveDate":
 			return (
 				left.effectiveDate.localeCompare(right.effectiveDate, "ru", {
@@ -153,6 +140,13 @@ function compareEntries(
 					sensitivity: "base",
 				}) * factor
 			);
+		case "cableLabel":
+			return (
+				left.cableLabel.localeCompare(right.cableLabel, "ru", {
+					numeric: true,
+					sensitivity: "base",
+				}) * factor
+			);
 		case "roomName":
 			return (
 				left.roomName.localeCompare(right.roomName, "ru", {
@@ -160,6 +154,8 @@ function compareEntries(
 					sensitivity: "base",
 				}) * factor
 			);
+		case "shaft":
+			return (left.shaft - right.shaft) * factor;
 		case "oldProgress":
 			return (left.oldProgress - right.oldProgress) * factor;
 		case "newProgress":
@@ -169,13 +165,7 @@ function compareEntries(
 	}
 }
 
-function SortIcon({
-	active,
-	direction,
-}: {
-	active: boolean;
-	direction: SortDirection;
-}) {
+function SortIcon({ active, direction }: { active: boolean; direction: SortDirection }) {
 	if (!active) {
 		return <ArrowUpDownIcon className="text-muted-foreground/70" />;
 	}
@@ -220,14 +210,11 @@ export function HistoryPanel({
 				from: dateToIso(range?.from),
 				to: dateToIso(range?.to),
 			}) satisfies DateRangeInput,
-		[range],
+		[range]
 	);
 	const sortedEntries = useMemo(
-		() =>
-			[...entries].sort((left, right) =>
-				compareEntries(left, right, sortKey, sortDirection),
-			),
-		[entries, sortDirection, sortKey],
+		() => [...entries].sort((left, right) => compareEntries(left, right, sortKey, sortDirection)),
+		[entries, sortDirection, sortKey]
 	);
 
 	function handleSort(nextKey: SortKey) {
@@ -254,11 +241,7 @@ export function HistoryPanel({
 
 			setEntries(nextEntries);
 		} catch (error) {
-			toast.error(
-				error instanceof Error
-					? error.message
-					: "Не удалось загрузить историю изменений.",
-			);
+			toast.error(error instanceof Error ? error.message : "Не удалось загрузить историю изменений.");
 		} finally {
 			setPending(false);
 		}
@@ -289,11 +272,7 @@ export function HistoryPanel({
 
 			await downloadResponseFile(response, fileName);
 		} catch (error) {
-			toast.error(
-				error instanceof Error
-					? error.message
-					: "Не удалось выгрузить docx-отчёт.",
-			);
+			toast.error(error instanceof Error ? error.message : "Не удалось выгрузить docx-отчёт.");
 		} finally {
 			setExporting(false);
 		}
@@ -312,16 +291,12 @@ export function HistoryPanel({
 							<Button
 								type="button"
 								variant="outline"
-								className="h-10 w-full justify-between sm:h-8 sm:w-auto sm:justify-center"
-							>
+								className="h-10 w-full justify-between sm:h-8 sm:w-auto sm:justify-center">
 								<CalendarDaysIcon data-icon="inline-start" />
 								{formatRangeLabel(range)}
 							</Button>
 						</PopoverTrigger>
-						<PopoverContent
-							align="end"
-							className="w-[min(22rem,calc(100vw-2rem))]"
-						>
+						<PopoverContent align="end" className="w-[min(22rem,calc(100vw-2rem))]">
 							<PopoverHeader>
 								<PopoverTitle>Диапазон дат</PopoverTitle>
 							</PopoverHeader>
@@ -340,13 +315,9 @@ export function HistoryPanel({
 						variant="outline"
 						onClick={() => reloadEntries(rangePayload)}
 						disabled={pending}
-						className="h-10 w-full sm:h-8 sm:w-auto"
-					>
+						className="h-10 w-full sm:h-8 sm:w-auto">
 						{pending ? (
-							<LoaderCircleIcon
-								data-icon="inline-start"
-								className="animate-spin"
-							/>
+							<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
 						) : (
 							<RefreshCcwIcon data-icon="inline-start" />
 						)}
@@ -367,8 +338,7 @@ export function HistoryPanel({
 							});
 						}}
 						disabled={pending}
-						className="h-10 w-full sm:h-8 sm:w-auto"
-					>
+						className="h-10 w-full sm:h-8 sm:w-auto">
 						Сбросить
 					</Button>
 
@@ -376,13 +346,9 @@ export function HistoryPanel({
 						type="button"
 						onClick={handleExport}
 						disabled={exporting}
-						className="h-10 w-full sm:h-8 sm:w-auto"
-					>
+						className="h-10 w-full sm:h-8 sm:w-auto">
 						{exporting ? (
-							<LoaderCircleIcon
-								data-icon="inline-start"
-								className="animate-spin"
-							/>
+							<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
 						) : (
 							<DownloadIcon data-icon="inline-start" />
 						)}
@@ -407,9 +373,8 @@ export function HistoryPanel({
 											onClick={() => handleSort(column.key)}
 											className={cn(
 												"-ml-2 h-8 px-2 text-muted-foreground hover:text-foreground",
-												active && "text-foreground",
-											)}
-										>
+												active && "text-foreground"
+											)}>
 											<Icon />
 											{column.label}
 											<SortIcon active={active} direction={sortDirection} />
@@ -424,58 +389,52 @@ export function HistoryPanel({
 							sortedEntries.map((entry) => (
 								<TableRow
 									key={entry.id}
-									className="block rounded-xl border sm:table-row sm:rounded-none sm:border-x-0"
-								>
+									className="block rounded-xl border sm:table-row sm:rounded-none sm:border-x-0">
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Изменено"
-									>
-										<span className="text-right sm:text-left">
-											{formatTimestamp(entry.changedAt)}
-										</span>
+										data-label="Изменено">
+										<span className="text-right sm:text-left">{formatTimestamp(entry.changedAt)}</span>
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Дата действия"
-									>
-										<span className="text-right sm:text-left">
-											{entry.effectiveDate}
-										</span>
+										data-label="Дата действия">
+										<span className="text-right sm:text-left">{entry.effectiveDate}</span>
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Пользователь"
-									>
-										<span className="text-right sm:text-left">
-											{entry.userLogin}
-										</span>
+										data-label="Пользователь">
+										<span className="text-right sm:text-left">{entry.userLogin}</span>
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 font-medium before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Помещение"
-									>
+										data-label="Кабель">
+										{entry.cableLabel}
+									</TableCell>
+									<TableCell
+										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 font-medium before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+										data-label="Помещение">
 										{entry.roomName}
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Было"
-									>
+										data-label="КШ">
 										<span className="text-right sm:text-left">
-											{entry.oldProgress}%
+											{entry.shaft > 0 ? `КШ ${entry.shaft}` : "Без КШ"}
 										</span>
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Стало"
-									>
-										<span className="text-right sm:text-left">
-											{entry.newProgress}%
-										</span>
+										data-label="Было">
+										<span className="text-right sm:text-left">{entry.oldProgress}%</span>
 									</TableCell>
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
-										data-label="Тип"
-									>
+										data-label="Стало">
+										<span className="text-right sm:text-left">{entry.newProgress}%</span>
+									</TableCell>
+									<TableCell
+										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
+										data-label="Тип">
 										{entry.isBackdated ? (
 											<Badge variant="destructive">Задним числом</Badge>
 										) : (
@@ -488,8 +447,7 @@ export function HistoryPanel({
 							<TableRow>
 								<TableCell
 									colSpan={7}
-									className="block h-auto px-4 py-8 text-center text-muted-foreground sm:table-cell sm:h-32"
-								>
+									className="block h-auto px-4 py-8 text-center text-muted-foreground sm:table-cell sm:h-32">
 									За выбранный период записей не найдено.
 								</TableCell>
 							</TableRow>

@@ -1,13 +1,11 @@
-import {
-	deleteCookie,
-	getCookie,
-	setCookie,
-} from "@tanstack/react-start/server";
+import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
 import type { CookieSerializeOptions } from "cookie-es";
 import { eq } from "drizzle-orm";
 import { jwtVerify, SignJWT } from "jose";
+
 import { getDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+
 import { verifyPassword } from "./password";
 import type { AuthSession, LoginInput } from "./shared";
 import { AUTH_COOKIE_NAME, loginSchema } from "./shared";
@@ -22,12 +20,21 @@ function getJwtSecret() {
 	return new TextEncoder().encode(secret);
 }
 
+function shouldUseSecureAuthCookie() {
+	const configuredValue = process.env.AUTH_COOKIE_SECURE?.trim().toLowerCase();
+
+	if (configuredValue === "true") return true;
+	if (configuredValue === "false") return false;
+
+	return process.env.NODE_ENV === "production";
+}
+
 function getAuthCookieOptions(): CookieSerializeOptions {
 	return {
 		httpOnly: true,
 		path: "/",
 		sameSite: "lax",
-		secure: process.env.NODE_ENV === "production",
+		secure: shouldUseSecureAuthCookie(),
 		maxAge: AUTH_COOKIE_MAX_AGE,
 	};
 }

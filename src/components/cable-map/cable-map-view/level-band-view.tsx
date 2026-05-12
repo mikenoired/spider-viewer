@@ -1,12 +1,10 @@
 import { DownloadIcon, LoaderCircleIcon } from "lucide-react";
-import type { CSSProperties } from "react";
+import { type CSSProperties, memo } from "react";
+
 import { Button } from "@/components/ui/button";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+
 import { boardColumns } from "./config";
 import { PathArea } from "./path-layer";
 import { LeftRoomArea, RightRoomArea, TotalThreadsBadge } from "./room-blocks";
@@ -22,11 +20,12 @@ function getDisplayedLevelLabel(level: string) {
 	return level;
 }
 
-export function LevelBandView({
+export const LevelBandView = memo(function LevelBandView({
 	band,
 	bandIndex,
 	canEditProgress,
 	canManageManualRooms,
+	onOverlayOpenChange,
 	canExportDailyReport,
 	isExportDisabled,
 	isExportingReport,
@@ -37,10 +36,11 @@ export function LevelBandView({
 	bandIndex: number;
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
+	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
 	canExportDailyReport: boolean;
 	isExportDisabled: boolean;
 	isExportingReport: boolean;
-	onExportDailyReport: () => void;
+	onExportDailyReport: (level: string) => void;
 	isLast: boolean;
 }) {
 	const isFirst = bandIndex === 0;
@@ -51,16 +51,14 @@ export function LevelBandView({
 			className={cn(
 				"relative grid",
 				isLast && "border-b-2",
-				!isFirst &&
-					"border-t-2 border-dashed border-zinc-400/90 dark:border-zinc-700",
+				!isFirst && "border-t-2 border-dashed border-zinc-400/90 dark:border-zinc-700"
 			)}
 			style={
 				{
 					gridTemplateColumns: boardColumns,
 					gridTemplateRows: band.rows.map((row) => `${row.height}px`).join(" "),
 				} satisfies CSSProperties
-			}
-		>
+			}>
 			<div
 				className="relative flex items-center justify-center border-x-2 border-dashed border-zinc-400/90 px-2 text-center dark:border-zinc-700"
 				style={
@@ -68,10 +66,9 @@ export function LevelBandView({
 						gridColumn: "4",
 						gridRow: `1 / span ${band.rowCount}`,
 					} satisfies CSSProperties
-				}
-			>
+				}>
 				<div className="flex w-full flex-col items-center gap-3">
-					<div className="text-3xl font-semibold leading-none tracking-[-0.03em] text-zinc-900 dark:text-zinc-100">
+					<div className="select-none text-3xl font-semibold leading-none tracking-[-0.03em] text-zinc-900 dark:text-zinc-100">
 						{displayedLevelLabel}
 					</div>
 					{canExportDailyReport ? (
@@ -81,7 +78,7 @@ export function LevelBandView({
 									type="button"
 									size="icon-sm"
 									variant="outline"
-									onClick={onExportDailyReport}
+									onClick={() => void onExportDailyReport(band.level)}
 									disabled={isExportDisabled}
 									aria-label={
 										displayedLevelLabel
@@ -89,11 +86,7 @@ export function LevelBandView({
 											: "Выгрузить DOCX по уровню"
 									}
 								>
-									{isExportingReport ? (
-										<LoaderCircleIcon className="animate-spin" />
-									) : (
-										<DownloadIcon />
-									)}
+									{isExportingReport ? <LoaderCircleIcon className="animate-spin" /> : <DownloadIcon />}
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent>Выгрузить DOCX</TooltipContent>
@@ -114,20 +107,22 @@ export function LevelBandView({
 						rowHeight={row.height}
 						canEditProgress={canEditProgress}
 						canManageManualRooms={canManageManualRooms}
+						onOverlayOpenChange={onOverlayOpenChange}
 					/>
 				);
 			})}
 		</div>
 	);
-}
+});
 
-function LevelBandRowView({
+const LevelBandRowView = memo(function LevelBandRowView({
 	dirtyGroup,
 	cleanGroup,
 	gridRow,
 	rowHeight,
 	canEditProgress,
 	canManageManualRooms,
+	onOverlayOpenChange,
 }: {
 	dirtyGroup: LevelBand["rows"][number]["dirtyGroup"];
 	cleanGroup: LevelBand["rows"][number]["cleanGroup"];
@@ -135,6 +130,7 @@ function LevelBandRowView({
 	rowHeight: number;
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
+	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
 }) {
 	return (
 		<>
@@ -143,6 +139,7 @@ function LevelBandRowView({
 					group={dirtyGroup}
 					canEditProgress={canEditProgress}
 					canManageManualRooms={canManageManualRooms}
+					onOverlayOpenChange={onOverlayOpenChange}
 				/>
 			</div>
 
@@ -167,8 +164,12 @@ function LevelBandRowView({
 					group={cleanGroup}
 					canEditProgress={canEditProgress}
 					canManageManualRooms={canManageManualRooms}
+					onOverlayOpenChange={onOverlayOpenChange}
 				/>
 			</div>
 		</>
 	);
-}
+});
+
+LevelBandView.displayName = "LevelBandView";
+LevelBandRowView.displayName = "LevelBandRowView";

@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
-import * as XLSX from "xlsx";
+
+import * as Xlsx from "xlsx";
+
 import type { AuthSession } from "@/lib/auth/shared";
 import { getDb } from "@/lib/db";
 import {
@@ -11,10 +13,8 @@ import {
 	importSnapshots,
 } from "@/lib/db/schema";
 import { enToRuVisual } from "@/lib/utils";
-import {
-	supportedWorkbookExtensions,
-	supportedWorkbookMimeTypes,
-} from "./shared";
+
+import { supportedWorkbookExtensions, supportedWorkbookMimeTypes } from "./shared";
 
 type GraphSide = (typeof graphSideEnum.enumValues)[number];
 type GraphSubzone = (typeof graphSubzoneEnum.enumValues)[number] | null;
@@ -75,6 +75,11 @@ type AggregatedGroup = {
 	bucketThreads: Record<0 | 1 | 2 | 3 | 4, number>;
 };
 
+type SideSummaryState = {
+	groupCount: number;
+	roomNames: Set<string>;
+};
+
 const workbookColumnIndexes = {
 	cableLabel: 0,
 	cableJournal: 1,
@@ -126,6 +131,10 @@ function parseInteger(value: string) {
 	return Math.round(parseLocaleNumber(value));
 }
 
+function getWorkbookCell(row: string[], columnIndex: number) {
+	return row[columnIndex] ?? "";
+}
+
 function getWorkbookExtension(fileName: string) {
 	return fileName.split(".").pop()?.toLowerCase() ?? "";
 }
@@ -154,10 +163,7 @@ function hasLegacyExcelSignature(buffer: Buffer) {
 	);
 }
 
-export function hasExpectedWorkbookSignature(
-	fileType: "ods" | "xlsx" | "xls",
-	buffer: Buffer,
-) {
+export function hasExpectedWorkbookSignature(fileType: "ods" | "xlsx" | "xls", buffer: Buffer) {
 	if (fileType === "xls") {
 		return hasLegacyExcelSignature(buffer);
 	}
@@ -169,10 +175,7 @@ function resolveGraphSide(fromZone: string): GraphSide {
 	return fromZone === "ЧЗ" ? "clean" : "dirty";
 }
 
-function resolveGraphSubzone(
-	fromZone: string,
-	graphSide: GraphSide,
-): GraphSubzone {
+function resolveGraphSubzone(fromZone: string, graphSide: GraphSide): GraphSubzone {
 	if (graphSide === "clean") {
 		return "clean";
 	}
@@ -189,7 +192,7 @@ function sortRoomNames(values: Iterable<string>) {
 		left.localeCompare(right, "ru", {
 			numeric: true,
 			sensitivity: "base",
-		}),
+		})
 	);
 }
 
@@ -216,13 +219,88 @@ function extractShaftValues(row: string[], headerRow: string[]) {
 	return shaftValues;
 }
 
+function getFarthestShaft(shaftValues: ParsedCableRow["shaftValues"]) {
+	return shaftValues.length > 0 ? Math.max(...shaftValues.map((entry) => entry.shaft)) : null;
+}
+
+function hasRequiredRowData({
+	cableLabel,
+	level,
+	fromZone,
+	fromRoom,
+	toRoom,
+}: {
+	cableLabel: string;
+	level: string;
+	fromZone: string;
+	fromRoom: string;
+	toRoom: string;
+}) {
+	return cableLabel !== "" && level !== "" && fromZone !== "" && (fromRoom !== "" || toRoom !== "");
+}
+
+function parseWorkbookDataRow(rawRow: string[], index: number, headerRow: string[]) {
+	const row = rawRow.map(normalizeCellValue);
+	const cableLabel = getWorkbookCell(row, workbookColumnIndexes.cableLabel);
+	const level = getWorkbookCell(row, workbookColumnIndexes.level);
+	const fromZone = getWorkbookCell(row, workbookColumnIndexes.fromZone);
+	const fromRoom = getWorkbookCell(row, workbookColumnIndexes.fromRoom);
+	const toRoom = getWorkbookCell(row, workbookColumnIndexes.toRoom);
+
+	if (!hasRequiredRowData({ cableLabel, level, fromZone, fromRoom, toRoom })) {
+		return null;
+	}
+
+	const graphSide = resolveGraphSide(fromZone);
+	const graphSubzone = resolveGraphSubzone(fromZone, graphSide);
+	const shaftValues = extractShaftValues(row, headerRow);
+
+	return {
+		sourceRowIndex: index + 2,
+		cableLabel,
+		cableJournal: getWorkbookCell(row, workbookColumnIndexes.cableJournal),
+		cableNumber: getWorkbookCell(row, workbookColumnIndexes.cableNumber),
+		repeatFrom: getWorkbookCell(row, workbookColumnIndexes.repeatFrom),
+		repeatTo: getWorkbookCell(row, workbookColumnIndexes.repeatTo),
+		repeatKks: getWorkbookCell(row, workbookColumnIndexes.repeatKks),
+		fromRoom: enToRuVisual(fromRoom),
+		fromLocation: getWorkbookCell(row, workbookColumnIndexes.fromLocation),
+		fromEquipment: getWorkbookCell(row, workbookColumnIndexes.fromEquipment),
+		toRoom,
+		threadLength: parseLocaleNumber(getWorkbookCell(row, workbookColumnIndexes.threadLength)),
+		threadCount: parseInteger(getWorkbookCell(row, workbookColumnIndexes.threadCount)),
+		totalLength: parseLocaleNumber(getWorkbookCell(row, workbookColumnIndexes.totalLength)),
+		level,
+		levelOrder: parseLocaleNumber(level),
+		fromZone,
+		toZone: getWorkbookCell(row, workbookColumnIndexes.toZone),
+		graphSide,
+		graphSubzone,
+		farthestShaft: getFarthestShaft(shaftValues),
+		shaftValues,
+		route: getWorkbookCell(row, workbookColumnIndexes.route),
+		rawRow: row,
+	} satisfies ParsedCableRow;
+}
+
+function validateWorkbookStructure(headerRow: string[]) {
+	const lastRequiredColumnIndex = Math.max(...requiredWorkbookColumnIndexes);
+
+	if (headerRow.length <= lastRequiredColumnIndex) {
+		throw new Error('Структура листа "Общ" не соответствует ожидаемому шаблону.');
+	}
+}
+
+function validateWorkbookRowCount(dataRowCount: number) {
+	if (dataRowCount > maxWorkbookRowCount) {
+		throw new Error(
+			`Файл содержит слишком много строк для безопасного импорта (${dataRowCount}). Лимит: ${maxWorkbookRowCount}.`
+		);
+	}
+}
+
 function groupKeyForRow(row: ParsedCableRow) {
-	return [
-		row.graphSide,
-		row.graphSubzone ?? "none",
-		row.fromZone || "unknown",
-		row.level,
-	].join(":");
+	return [row.graphSide, row.graphSubzone ?? "none", row.fromZone || "unknown", row.level].join(":");
 }
 
 function createAggregatedGroup(row: ParsedCableRow): AggregatedGroup {
@@ -251,7 +329,7 @@ function createAggregatedGroup(row: ParsedCableRow): AggregatedGroup {
 function upsertGroupRoom(
 	rooms: Map<string, AggregatedRoom>,
 	roomName: string,
-	roomRole: "primary" | "secondary",
+	roomRole: "primary" | "secondary"
 ) {
 	const current = rooms.get(roomName);
 
@@ -283,7 +361,7 @@ function chunkValues<T>(values: T[], size: number) {
 }
 
 export function parseWorkbookRows(fileName: string, buffer: Buffer) {
-	const workbook = XLSX.read(buffer, {
+	const workbook = Xlsx.read(buffer, {
 		type: "buffer",
 		cellDates: false,
 		raw: false,
@@ -294,7 +372,7 @@ export function parseWorkbookRows(fileName: string, buffer: Buffer) {
 		throw new Error('В файле отсутствует лист "Общ".');
 	}
 
-	const rawRows = XLSX.utils.sheet_to_json<string[]>(sheet, {
+	const rawRows = Xlsx.utils.sheet_to_json<string[]>(sheet, {
 		header: 1,
 		raw: false,
 		defval: "",
@@ -306,81 +384,18 @@ export function parseWorkbookRows(fileName: string, buffer: Buffer) {
 	}
 
 	const headerRow = rawRows[0].map(normalizeCellValue);
-	const lastRequiredColumnIndex = Math.max(...requiredWorkbookColumnIndexes);
-
-	if (headerRow.length <= lastRequiredColumnIndex) {
-		throw new Error(
-			'Структура листа "Общ" не соответствует ожидаемому шаблону.',
-		);
-	}
+	validateWorkbookStructure(headerRow);
 
 	const dataRowCount = rawRows.length - 1;
-
-	if (dataRowCount > maxWorkbookRowCount) {
-		throw new Error(
-			`Файл содержит слишком много строк для безопасного импорта (${dataRowCount}). Лимит: ${maxWorkbookRowCount}.`,
-		);
-	}
+	validateWorkbookRowCount(dataRowCount);
 
 	const parsedRows = rawRows
 		.slice(1)
-		.map((rawRow, index) => {
-			const row = rawRow.map(normalizeCellValue);
-			const cableLabel = row[workbookColumnIndexes.cableLabel] ?? "";
-			const level = row[workbookColumnIndexes.level] ?? "";
-			const fromZone = row[workbookColumnIndexes.fromZone] ?? "";
-			const fromRoom = row[workbookColumnIndexes.fromRoom] ?? "";
-			const toRoom = row[workbookColumnIndexes.toRoom] ?? "";
-
-			if (!cableLabel || !level || !fromZone || (!fromRoom && !toRoom)) {
-				return null;
-			}
-
-			const graphSide = resolveGraphSide(fromZone);
-			const graphSubzone = resolveGraphSubzone(fromZone, graphSide);
-			const shaftValues = extractShaftValues(row, headerRow);
-			const farthestShaft =
-				shaftValues.length > 0
-					? Math.max(...shaftValues.map((entry) => entry.shaft))
-					: null;
-
-			return {
-				sourceRowIndex: index + 2,
-				cableLabel,
-				cableJournal: row[workbookColumnIndexes.cableJournal] ?? "",
-				cableNumber: row[workbookColumnIndexes.cableNumber] ?? "",
-				repeatFrom: row[workbookColumnIndexes.repeatFrom] ?? "",
-				repeatTo: row[workbookColumnIndexes.repeatTo] ?? "",
-				repeatKks: row[workbookColumnIndexes.repeatKks] ?? "",
-				fromRoom: enToRuVisual(fromRoom),
-				fromLocation: row[workbookColumnIndexes.fromLocation] ?? "",
-				fromEquipment: row[workbookColumnIndexes.fromEquipment] ?? "",
-				toRoom,
-				threadLength: parseLocaleNumber(
-					row[workbookColumnIndexes.threadLength] ?? "",
-				),
-				threadCount: parseInteger(row[workbookColumnIndexes.threadCount] ?? ""),
-				totalLength: parseLocaleNumber(
-					row[workbookColumnIndexes.totalLength] ?? "",
-				),
-				level,
-				levelOrder: parseLocaleNumber(level),
-				fromZone,
-				toZone: row[workbookColumnIndexes.toZone] ?? "",
-				graphSide,
-				graphSubzone,
-				farthestShaft,
-				shaftValues,
-				route: row[workbookColumnIndexes.route] ?? "",
-				rawRow: row,
-			} satisfies ParsedCableRow;
-		})
+		.map((rawRow, index) => parseWorkbookDataRow(rawRow, index, headerRow))
 		.filter((row): row is ParsedCableRow => row !== null);
 
 	if (parsedRows.length === 0) {
-		throw new Error(
-			`В "${fileName}" не удалось найти валидные строки на листе "Общ".`,
-		);
+		throw new Error(`В "${fileName}" не удалось найти валидные строки на листе "Общ".`);
 	}
 
 	return parsedRows;
@@ -389,50 +404,40 @@ export function parseWorkbookRows(fileName: string, buffer: Buffer) {
 function aggregateGroups(rows: ParsedCableRow[]) {
 	const groups = new Map<string, AggregatedGroup>();
 	const uniqueLevels = new Set<string>();
-	const sideSummary = new Map<
-		GraphSide,
-		{
-			groupCount: number;
-			roomNames: Set<string>;
-		}
-	>();
+	const sideSummary = new Map<GraphSide, SideSummaryState>();
 
-	for (const row of rows) {
-		uniqueLevels.add(row.level);
-
-		const groupKey = groupKeyForRow(row);
-		const group = groups.get(groupKey) ?? createAggregatedGroup(row);
-		groups.set(groupKey, group);
-
+	function updateGroupTotals(group: AggregatedGroup, row: ParsedCableRow) {
 		group.cableCount += 1;
 		group.threadCount += row.threadCount;
 		group.totalLength += row.totalLength;
 
 		const bucket = (row.farthestShaft ?? 0) as 0 | 1 | 2 | 3 | 4;
 		group.bucketThreads[bucket] += row.threadCount;
+	}
 
-		if (isMeaningfulValue(row.fromRoom)) {
-			const room = upsertGroupRoom(group.primaryRooms, row.fromRoom, "primary");
-			room.cableCount += 1;
-			room.threadCount += row.threadCount;
-			room.totalLength += row.totalLength;
+	function updatePrimaryRoom(group: AggregatedGroup, row: ParsedCableRow) {
+		if (!isMeaningfulValue(row.fromRoom)) {
+			return;
 		}
 
-		if (
-			isMeaningfulValue(row.toRoom) &&
-			row.toRoom !== row.fromRoom &&
-			!group.primaryRooms.has(row.toRoom)
-		) {
-			const room = upsertGroupRoom(
-				group.secondaryRooms,
-				row.toRoom,
-				"secondary",
-			);
-			room.cableCount += 1;
-			room.threadCount += row.threadCount;
-			room.totalLength += row.totalLength;
+		const room = upsertGroupRoom(group.primaryRooms, row.fromRoom, "primary");
+		room.cableCount += 1;
+		room.threadCount += row.threadCount;
+		room.totalLength += row.totalLength;
+	}
+
+	function updateSecondaryRoom(group: AggregatedGroup, row: ParsedCableRow) {
+		if (!isMeaningfulValue(row.toRoom) || row.toRoom === row.fromRoom || group.primaryRooms.has(row.toRoom)) {
+			return;
 		}
 
+		const room = upsertGroupRoom(group.secondaryRooms, row.toRoom, "secondary");
+		room.cableCount += 1;
+		room.threadCount += row.threadCount;
+		room.totalLength += row.totalLength;
+	}
+
+	function updateSideSummary(row: ParsedCableRow) {
 		const sideState = sideSummary.get(row.graphSide) ?? {
 			groupCount: 0,
 			roomNames: new Set<string>(),
@@ -442,6 +447,19 @@ function aggregateGroups(rows: ParsedCableRow[]) {
 		sideSummary.set(row.graphSide, sideState);
 	}
 
+	for (const row of rows) {
+		uniqueLevels.add(row.level);
+
+		const groupKey = groupKeyForRow(row);
+		const group = groups.get(groupKey) ?? createAggregatedGroup(row);
+		groups.set(groupKey, group);
+
+		updateGroupTotals(group, row);
+		updatePrimaryRoom(group, row);
+		updateSecondaryRoom(group, row);
+		updateSideSummary(row);
+	}
+
 	for (const group of groups.values()) {
 		const sideState = sideSummary.get(group.graphSide);
 
@@ -449,7 +467,7 @@ function aggregateGroups(rows: ParsedCableRow[]) {
 	}
 
 	const orderedLevels = [...uniqueLevels].sort(
-		(left, right) => parseLocaleNumber(right) - parseLocaleNumber(left),
+		(left, right) => parseLocaleNumber(right) - parseLocaleNumber(left)
 	);
 
 	return {
@@ -477,9 +495,7 @@ function getFileType(fileName: string) {
 	const extension = getWorkbookExtension(fileName);
 
 	if (!supportedWorkbookExtensions.includes(extension as never)) {
-		throw new Error(
-			`Неподдерживаемый формат файла. Разрешены: ${supportedWorkbookExtensions.join(", ")}.`,
-		);
+		throw new Error(`Неподдерживаемый формат файла. Разрешены: ${supportedWorkbookExtensions.join(", ")}.`);
 	}
 
 	return extension as (typeof supportedWorkbookExtensions)[number];
@@ -495,7 +511,7 @@ export async function ensureUploadFile(formData: FormData) {
 
 	if (file.size > maxWorkbookFileSizeBytes) {
 		throw new Error(
-			`Файл слишком большой. Максимальный размер: ${Math.floor(maxWorkbookFileSizeBytes / (1024 * 1024))} МБ.`,
+			`Файл слишком большой. Максимальный размер: ${Math.floor(maxWorkbookFileSizeBytes / (1024 * 1024))} МБ.`
 		);
 	}
 
@@ -505,13 +521,9 @@ export async function ensureUploadFile(formData: FormData) {
 	if (
 		fileMimeType &&
 		fileMimeType !== "application/octet-stream" &&
-		!supportedWorkbookMimeTypes.includes(
-			fileMimeType as (typeof supportedWorkbookMimeTypes)[number],
-		)
+		!supportedWorkbookMimeTypes.includes(fileMimeType as (typeof supportedWorkbookMimeTypes)[number])
 	) {
-		throw new Error(
-			`Неверный MIME-тип файла: ${file.type}. Разрешены только таблицы Excel или LibreOffice.`,
-		);
+		throw new Error(`Неверный MIME-тип файла: ${file.type}. Разрешены только таблицы Excel или LibreOffice.`);
 	}
 
 	const buffer = Buffer.from(await file.arrayBuffer());
@@ -527,10 +539,7 @@ export async function ensureUploadFile(formData: FormData) {
 	};
 }
 
-export async function importWorkbookFromFormData(
-	formData: FormData,
-	session: AuthSession,
-) {
+export async function importWorkbookFromFormData(formData: FormData, session: AuthSession) {
 	const { file, fileType, buffer } = await ensureUploadFile(formData);
 	const parsedRows = parseWorkbookRows(file.name, buffer);
 	const { groups, orderedLevels, sideSummary } = aggregateGroups(parsedRows);
@@ -568,7 +577,7 @@ export async function importWorkbookFromFormData(
 				...row,
 				createdAt: now,
 			})),
-			500,
+			500
 		)) {
 			await tx.insert(importedCableRows).values(chunk);
 		}
@@ -595,61 +604,55 @@ export async function importWorkbookFromFormData(
 					shaft3Threads: group.bucketThreads[3],
 					shaft4Threads: group.bucketThreads[4],
 					createdAt: now,
-				})),
+				}))
 			)
 			.returning({
 				id: graphGroups.id,
 				groupKey: graphGroups.groupKey,
 			});
 
-		const groupIdByKey = new Map(
-			insertedGroups.map((group) => [group.groupKey, group.id]),
-		);
+		const groupIdByKey = new Map(insertedGroups.map((group) => [group.groupKey, group.id]));
 		const roomRows = groups.flatMap((group) => {
 			const groupId = groupIdByKey.get(group.groupKey);
 
 			if (!groupId) return [];
 
-			const primaryRooms = sortRoomNames(group.primaryRooms.keys()).map(
-				(roomName, index) => {
-					const room = group.primaryRooms.get(roomName);
+			const primaryRooms = sortRoomNames(group.primaryRooms.keys()).map((roomName, index) => {
+				const room = group.primaryRooms.get(roomName);
 
-					return {
-						snapshotId: createdSnapshot.id,
-						groupId,
-						roomName,
-						roomRole: "primary" as const,
-						sortOrder: index,
-						cableCount: room?.cableCount ?? 0,
-						threadCount: room?.threadCount ?? 0,
-						totalLength: room?.totalLength ?? 0,
-						progress: 0,
-						effectiveDate: getTodayInMoscow(),
-						updatedAt: now,
-						createdAt: now,
-					};
-				},
-			);
-			const secondaryRooms = sortRoomNames(group.secondaryRooms.keys()).map(
-				(roomName, index) => {
-					const room = group.secondaryRooms.get(roomName);
+				return {
+					snapshotId: createdSnapshot.id,
+					groupId,
+					roomName,
+					roomRole: "primary" as const,
+					sortOrder: index,
+					cableCount: room?.cableCount ?? 0,
+					threadCount: room?.threadCount ?? 0,
+					totalLength: room?.totalLength ?? 0,
+					progress: 0,
+					effectiveDate: getTodayInMoscow(),
+					updatedAt: now,
+					createdAt: now,
+				};
+			});
+			const secondaryRooms = sortRoomNames(group.secondaryRooms.keys()).map((roomName, index) => {
+				const room = group.secondaryRooms.get(roomName);
 
-					return {
-						snapshotId: createdSnapshot.id,
-						groupId,
-						roomName,
-						roomRole: "secondary" as const,
-						sortOrder: index,
-						cableCount: room?.cableCount ?? 0,
-						threadCount: room?.threadCount ?? 0,
-						totalLength: room?.totalLength ?? 0,
-						progress: 0,
-						effectiveDate: getTodayInMoscow(),
-						updatedAt: now,
-						createdAt: now,
-					};
-				},
-			);
+				return {
+					snapshotId: createdSnapshot.id,
+					groupId,
+					roomName,
+					roomRole: "secondary" as const,
+					sortOrder: index,
+					cableCount: room?.cableCount ?? 0,
+					threadCount: room?.threadCount ?? 0,
+					totalLength: room?.totalLength ?? 0,
+					progress: 0,
+					effectiveDate: getTodayInMoscow(),
+					updatedAt: now,
+					createdAt: now,
+				};
+			});
 
 			return [...primaryRooms, ...secondaryRooms];
 		});

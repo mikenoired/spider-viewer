@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Spider Viewer PostgreSQL backup every 30 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00,30:00
+Persistent=true
+Unit=spider-viewer-db-backup.service
+
+[Install]
+WantedBy=timers.target

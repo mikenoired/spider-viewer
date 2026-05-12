@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+
 import { CableMapView } from "@/components/cable-map/cable-map-view";
 import { canEditProgress, canManageManualRooms } from "@/lib/auth/shared";
 import { getDashboardData } from "@/lib/cable-map/functions";

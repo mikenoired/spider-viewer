@@ -1,23 +1,43 @@
 import { createServer } from "node:http";
+import fs from "node:fs";
+import path from "node:path";
 import { Readable } from "node:stream";
 import { pathToFileURL } from "node:url";
-import path from "node:path";
+
 import postgres from "postgres";
 import { createClient } from "redis";
 
+import { logger } from "./logger.mjs";
+
 const port = Number.parseInt(process.env.PORT ?? "3000", 10);
 const host = process.env.HOST ?? "127.0.0.1";
-const shutdownTimeoutMs = Number.parseInt(
-	process.env.SHUTDOWN_TIMEOUT_MS ?? "30000",
-	10,
-);
+const shutdownTimeoutMs = Number.parseInt(process.env.SHUTDOWN_TIMEOUT_MS ?? "30000", 10);
 const healthcheckRedisRequired = process.env.HEALTHCHECK_REDIS_REQUIRED === "true";
 const releaseId = process.env.RELEASE_ID ?? "dev";
+const serverLogger = logger.child({ module: "http-server", releaseId });
 
-const entryUrl = pathToFileURL(
-	path.join(process.cwd(), "dist", "server", "server.js"),
-).href;
+const clientDir = path.join(process.cwd(), "dist", "client");
+const serverDir = path.join(process.cwd(), "dist", "server");
+const entryUrl = pathToFileURL(path.join(serverDir, "server.js")).href;
 const { default: serverEntry } = await import(entryUrl);
+
+const MIME_TYPES = {
+	".js": "application/javascript",
+	".css": "text/css",
+	".wasm": "application/wasm",
+	".json": "application/json",
+	".webmanifest": "application/manifest+json",
+	".png": "image/png",
+	".jpg": "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif": "image/gif",
+	".svg": "image/svg+xml",
+	".ico": "image/x-icon",
+	".woff": "font/woff",
+	".woff2": "font/woff2",
+	".txt": "text/plain",
+	".gz": "application/gzip",
+};
 
 let isShuttingDown = false;
 const sockets = new Set();
@@ -142,6 +162,7 @@ const server = createServer(async (req, res) => {
 			await runReadinessChecks();
 			sendJson(res, 200, { ok: true, releaseId, status: "ready" });
 		} catch (error) {
+			serverLogger.warn({ err: error }, "Readiness check failed");
 			sendJson(res, 503, {
 				ok: false,
 				releaseId,
@@ -158,15 +179,55 @@ const server = createServer(async (req, res) => {
 		return;
 	}
 
+	if (req.method === "GET" || req.method === "HEAD") {
+		const served = tryServeStatic(req, res);
+		if (served) return;
+	}
+
 	try {
 		const request = createFetchRequest(req);
 		const response = await serverEntry.fetch(request);
 		await sendFetchResponse(res, response);
 	} catch (error) {
-		console.error("Unhandled server error", error);
+		serverLogger.error({ err: error, method: req.method, url: req.url }, "Unhandled server error");
 		sendJson(res, 500, { ok: false, error: "Internal server error." });
 	}
 });
+
+function tryServeStatic(req, res) {
+	const url = new URL(req.url ?? "/", "http://localhost");
+	let filePath = path.join(clientDir, url.pathname === "/" ? "index.html" : url.pathname);
+
+	if (!filePath.startsWith(clientDir)) {
+		return false;
+	}
+
+	try {
+		const stat = fs.statSync(filePath);
+		if (!stat.isFile()) return false;
+	} catch {
+		return false;
+	}
+
+	const ext = path.extname(filePath).toLowerCase();
+	const mimeType = MIME_TYPES[ext] ?? "application/octet-stream";
+	const isJS = ext === ".js";
+
+	res.statusCode = 200;
+	res.setHeader("content-type", mimeType);
+
+	if (isJS) {
+		res.setHeader("cache-control", "public, max-age=31536000, immutable");
+	} else if (ext === ".css" || ext === ".woff" || ext === ".woff2") {
+		res.setHeader("cache-control", "public, max-age=31536000, immutable");
+	} else if (ext === ".webmanifest" || ext === ".html") {
+		res.setHeader("cache-control", "no-cache");
+	}
+
+	const readStream = fs.createReadStream(filePath);
+	readStream.pipe(res);
+	return true;
+}
 
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;
@@ -186,14 +247,15 @@ function shutdown(signal) {
 	}
 
 	isShuttingDown = true;
-	console.log(`${signal} received, starting graceful shutdown`);
+	serverLogger.info({ signal, shutdownTimeoutMs }, "Starting graceful shutdown");
 
 	server.close((error) => {
 		if (error) {
-			console.error("Error while closing HTTP server", error);
+			serverLogger.error({ err: error }, "Error while closing HTTP server");
 			process.exit(1);
 		}
 
+		serverLogger.info("HTTP server closed");
 		process.exit(0);
 	});
 
@@ -206,6 +268,7 @@ function shutdown(signal) {
 			socket.destroy();
 		}
 
+		serverLogger.warn("Graceful shutdown timed out; destroying open sockets");
 		process.exit(1);
 	}, shutdownTimeoutMs).unref();
 }
@@ -214,5 +277,5 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 server.listen(port, host, () => {
-	console.log(`Spider Viewer listening on http://${host}:${port} (${releaseId})`);
+	serverLogger.info({ host, port, url: `http://${host}:${port}` }, "Spider Viewer listening");
 });
