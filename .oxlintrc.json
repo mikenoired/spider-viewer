@@ -5,7 +5,7 @@
 		"browser": true,
 		"node": true
 	},
-	"ignorePatterns": ["src/routeTree.gen.ts"],
+	"ignorePatterns": ["src/routeTree.gen.ts", "public/vision/**"],
 	"rules": {
 		"no-console": "warn",
 		"no-unused-vars": "error",

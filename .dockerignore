@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.git
+.github
+.nitro
+.output
+.railway
+.tanstack
+.vinxi
+.wrangler
+dist
+dist-ssr
+node_modules
+ops
+todos.json
+__unconfig*
+*.local

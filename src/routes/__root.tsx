@@ -37,6 +37,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 				rel: "stylesheet",
 				href: appCss,
 			},
+			{
+				rel: "manifest",
+				href: "/manifest.webmanifest",
+			},
 		],
 	}),
 	shellComponent: RootDocument,
