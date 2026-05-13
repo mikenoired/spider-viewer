@@ -1,7 +1,6 @@
 "use client";
 
 import { useForm } from "@tanstack/react-form";
-import { Link } from "@tanstack/react-router";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -114,15 +113,10 @@ export function LoginForm() {
 					isSubmitting: state.isSubmitting,
 				})}>
 				{({ canSubmit, isSubmitting }) => (
-					<div className="flex flex-col gap-3">
-						<Button type="submit" disabled={!canSubmit || isSubmitting}>
-							{isSubmitting ? <Spinner data-icon="inline-start" /> : null}
-							Войти
-						</Button>
-						<Button asChild variant="outline">
-							<Link to="/register">Подать заявку на регистрацию</Link>
-						</Button>
-					</div>
+					<Button type="submit" disabled={!canSubmit || isSubmitting}>
+						{isSubmitting ? <Spinner data-icon="inline-start" /> : null}
+						Войти
+					</Button>
 				)}
 			</form.Subscribe>
 		</form>

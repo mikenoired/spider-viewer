@@ -15,7 +15,7 @@
 		"db:push": "bunx --bun drizzle-kit push",
 		"db:deploy": "drizzle-kit push",
 		"db:studio": "bunx --bun drizzle-kit studio",
-		"auth:seed:superusers": "bun run ./scripts/seed-superusers.ts",
+		"auth:seed:superusers": "sh -c 'if command -v node >/dev/null 2>&1; then node ./scripts/seed-superusers.mjs; else bun ./scripts/seed-superusers.mjs; fi'",
 		"lint": "oxlint .",
 		"lint:fix": "oxlint . --fix",
 		"format": "oxfmt .",
