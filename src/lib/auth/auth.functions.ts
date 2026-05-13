@@ -1,11 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireRole } from "./guards";
-import { loginSchema, registerSchema, userModerationSchema } from "./shared";
+import {
+	createManagedUserSchema,
+	loginSchema,
+	registerSchema,
+	updateManagedUserRoleSchema,
+	userModerationSchema,
+} from "./shared";
 
 export const getCurrentSession = createServerFn({ method: "GET" }).handler(async () => {
 	const { getCurrentSession } = await import("./server");
 	return getCurrentSession();
+});
+
+export const getAuthBootstrapState = createServerFn({ method: "GET" }).handler(async () => {
+	const { getAuthBootstrapState } = await import("./server");
+	return getAuthBootstrapState();
 });
 
 export const login = createServerFn({ method: "POST" })
@@ -20,6 +31,22 @@ export const registerUser = createServerFn({ method: "POST" })
 	.handler(async ({ data }) => {
 		const { registerWithCredentials } = await import("./server");
 		return registerWithCredentials(data);
+	});
+
+export const createManagedUser = createServerFn({ method: "POST" })
+	.inputValidator(createManagedUserSchema)
+	.handler(async ({ data }) => {
+		const creator = await requireRole(["super-admin"]);
+		const { createManagedUser } = await import("./server");
+		return createManagedUser(data, creator);
+	});
+
+export const updateManagedUserRole = createServerFn({ method: "POST" })
+	.inputValidator(updateManagedUserRoleSchema)
+	.handler(async ({ data }) => {
+		const reviewer = await requireRole(["super-admin"]);
+		const { updateManagedUserRole } = await import("./server");
+		return updateManagedUserRole(data, reviewer);
 	});
 
 export const getManagedUsers = createServerFn({ method: "GET" }).handler(async () => {
