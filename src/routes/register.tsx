@@ -2,11 +2,16 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { RegisterForm } from "@/components/auth/register-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getAuthBootstrapState } from "@/lib/auth/auth.functions";
 import { PROJECT_NAME } from "@/lib/auth/shared";
 
 export const Route = createFileRoute("/register")({
-	beforeLoad: ({ context }) => {
+	beforeLoad: async ({ context }) => {
 		if (context.auth) throw redirect({ to: "/app" });
+
+		const bootstrapState = await getAuthBootstrapState();
+
+		if (bootstrapState.hasSuperAdmin) throw redirect({ to: "/login" });
 	},
 	component: RegisterPage,
 });
@@ -16,10 +21,10 @@ function RegisterPage() {
 		<main className="flex min-h-svh items-center justify-center px-4 py-10">
 			<Card className="w-full max-w-md">
 				<CardHeader>
-					<CardTitle>Регистрация в {PROJECT_NAME}</CardTitle>
+					<CardTitle>Создание первого суперпользователя</CardTitle>
 					<CardDescription>
-						После отправки заявки суперпользователь должен подтвердить доступ. До подтверждения вход в систему
-						будет недоступен.
+						В {PROJECT_NAME} ещё нет аккаунта суперпользователя. Создайте первый профиль, чтобы получить
+						доступ к управлению системой.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>

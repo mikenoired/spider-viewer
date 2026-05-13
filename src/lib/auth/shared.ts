@@ -4,12 +4,15 @@ export const PROJECT_NAME = "Spider Viewer";
 
 export const userRoles = ["user", "admin", "super-admin"] as const;
 export const userStatuses = ["pending", "active", "rejected"] as const;
+export const assignableUserRoles = ["user", "super-admin"] as const;
 
 export const userRoleSchema = z.enum(userRoles);
 export const userStatusSchema = z.enum(userStatuses);
+export const assignableUserRoleSchema = z.enum(assignableUserRoles);
 
 export type UserRole = z.infer<typeof userRoleSchema>;
 export type UserStatus = z.infer<typeof userStatusSchema>;
+export type AssignableUserRole = z.infer<typeof assignableUserRoleSchema>;
 
 export type AuthSession = {
 	id: string;
@@ -65,6 +68,30 @@ export const userModerationSchema = z.object({
 });
 
 export type UserModerationInput = z.infer<typeof userModerationSchema>;
+
+export const createManagedUserFieldsSchema = z.object({
+	login: loginValueSchema,
+	password: registrationPasswordSchema,
+	confirmPassword: z.string().max(128, "Подтверждение пароля не должно быть длиннее 128 символов."),
+	role: assignableUserRoleSchema,
+});
+
+export const createManagedUserSchema = createManagedUserFieldsSchema.refine(
+	(value) => value.password === value.confirmPassword,
+	{
+		path: ["confirmPassword"],
+		message: "Пароли не совпадают.",
+	}
+);
+
+export type CreateManagedUserInput = z.infer<typeof createManagedUserSchema>;
+
+export const updateManagedUserRoleSchema = z.object({
+	userId: z.string().uuid("Некорректный идентификатор пользователя."),
+	role: assignableUserRoleSchema,
+});
+
+export type UpdateManagedUserRoleInput = z.infer<typeof updateManagedUserRoleSchema>;
 
 export const bootstrapSuperuserSchema = z.object({
 	login: loginValueSchema,

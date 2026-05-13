@@ -10,6 +10,7 @@ import {
 	MapIcon,
 	PanelLeftIcon,
 	UserCheckIcon,
+	UserPlusIcon,
 	UsersIcon,
 } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
@@ -20,6 +21,7 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuGroup,
+	DropdownMenuItem,
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
@@ -305,6 +307,25 @@ function SidebarUserMenu({ user, mobile = false }: { user: AuthSession; mobile?:
 				<DropdownMenuGroup>
 					<ThemeMenuItem />
 				</DropdownMenuGroup>
+				{canManageUsers(user.role) ? (
+					<>
+						<DropdownMenuSeparator />
+						<DropdownMenuGroup>
+							<DropdownMenuItem asChild onSelect={() => setOpen(false)}>
+								<Link to="/app/users" search={{ create: true }}>
+									<UserPlusIcon />
+									Создать пользователя
+								</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild onSelect={() => setOpen(false)}>
+								<Link to="/app/users">
+									<UsersIcon />
+									Управление профилями
+								</Link>
+							</DropdownMenuItem>
+						</DropdownMenuGroup>
+					</>
+				) : null}
 				<DropdownMenuSeparator />
 				<DropdownMenuGroup>
 					<LogoutMenuItem onBeforeOpen={() => setOpen(false)} />

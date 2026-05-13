@@ -38,4 +38,4 @@ HEALTHCHECK_REDIS_REQUIRED=false
 SHUTDOWN_TIMEOUT_MS=30000
 ```
 
-Перед запуском контейнера Railway выполняет `npm run db:deploy`, который синхронизирует схему через Drizzle. Healthcheck смотрит на `/healthz`, чтобы деплой не зависел от прогрева базы или Redis.
+Перед запуском контейнера Railway выполняет `npm run db:deploy && npm run auth:seed:superusers`: схема синхронизируется через Drizzle, затем создаются или обновляются 3 суперпользователя из `AUTH_SUPERUSERS_JSON`. Healthcheck смотрит на `/healthz`, чтобы деплой не зависел от прогрева базы или Redis.

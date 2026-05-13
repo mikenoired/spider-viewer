@@ -1,7 +1,7 @@
 "use client";
 
 import { useForm } from "@tanstack/react-form";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -27,6 +27,7 @@ function toFieldErrors(errors: Array<unknown>) {
 export function RegisterForm() {
 	const [submitError, setSubmitError] = useState<string | null>(null);
 	const navigate = useNavigate();
+	const router = useRouter();
 	const form = useForm({
 		defaultValues: {
 			login: "",
@@ -41,11 +42,12 @@ export function RegisterForm() {
 
 			try {
 				await registerUser({ data: value });
-				toast.success("Заявка отправлена. После подтверждения суперпользователем вы сможете войти.");
-				await navigate({ to: "/login" });
+				toast.success("Первый суперпользователь создан.");
+				await router.invalidate();
+				await navigate({ to: "/app" });
 			} catch (error) {
 				const message =
-					error instanceof Error ? error.message : "Не удалось отправить заявку на регистрацию.";
+					error instanceof Error ? error.message : "Не удалось создать первого суперпользователя.";
 
 				setSubmitError(message);
 				toast.error(message);
@@ -140,10 +142,7 @@ export function RegisterForm() {
 					<div className="flex flex-col gap-3">
 						<Button type="submit" disabled={!canSubmit || isSubmitting}>
 							{isSubmitting ? <Spinner data-icon="inline-start" /> : null}
-							Отправить заявку
-						</Button>
-						<Button asChild variant="outline">
-							<Link to="/login">Назад ко входу</Link>
+							Создать суперпользователя
 						</Button>
 					</div>
 				)}
