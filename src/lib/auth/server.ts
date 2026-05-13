@@ -1,14 +1,23 @@
 import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
 import type { CookieSerializeOptions } from "cookie-es";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { jwtVerify, SignJWT } from "jose";
 
 import { getDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 
 import { hashPassword, verifyPassword } from "./password";
-import type { AuthSession, LoginInput, ManagedUsersView, ManagedUserView, RegisterInput } from "./shared";
+import type {
+	AuthSession,
+	CreateManagedUserInput,
+	LoginInput,
+	ManagedUsersView,
+	ManagedUserView,
+	RegisterInput,
+	UpdateManagedUserRoleInput,
+} from "./shared";
 import { AUTH_COOKIE_NAME, loginSchema, normalizeLogin, registerSchema } from "./shared";
+import { createManagedUserSchema, updateManagedUserRoleSchema } from "./shared";
 
 const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
@@ -94,6 +103,75 @@ async function ensureLegacyAuthUsersReconciled() {
 	}
 
 	await globalThis.__spiderViewerLegacyAuthUsersPromise__;
+}
+
+async function hasSuperAdminAccount() {
+	const db = getDb();
+	const [superAdmin] = await db
+		.select({
+			id: users.id,
+		})
+		.from(users)
+		.where(and(eq(users.role, "super-admin"), eq(users.status, "active")))
+		.limit(1);
+
+	return Boolean(superAdmin);
+}
+
+async function getSuperAdminCount() {
+	const db = getDb();
+	const rows = await db
+		.select({
+			id: users.id,
+		})
+		.from(users)
+		.where(and(eq(users.role, "super-admin"), eq(users.status, "active")));
+
+	return rows.length;
+}
+
+async function createAndSignInBootstrapSuperAdmin(login: string, password: string) {
+	const db = getDb();
+	const now = new Date();
+	const passwordHash = await hashPassword(password);
+	const [createdUser] = await db
+		.insert(users)
+		.values({
+			login,
+			passwordHash,
+			role: "super-admin",
+			status: "active",
+			reviewedByUserId: null,
+			reviewedAt: now,
+			createdAt: now,
+			updatedAt: now,
+		})
+		.returning({
+			id: users.id,
+			login: users.login,
+			role: users.role,
+		});
+
+	if (!createdUser) throw new Error("Не удалось создать первого суперпользователя.");
+
+	const session = {
+		id: createdUser.id,
+		login: createdUser.login,
+		role: createdUser.role,
+	} satisfies AuthSession;
+	const token = await createAuthToken(session);
+
+	setCookie(AUTH_COOKIE_NAME, token, getAuthCookieOptions());
+
+	return session;
+}
+
+export async function getAuthBootstrapState() {
+	await ensureLegacyAuthUsersReconciled();
+
+	return {
+		hasSuperAdmin: await hasSuperAdminAccount(),
+	};
 }
 
 export async function getCurrentSession() {
@@ -184,6 +262,33 @@ export async function registerWithCredentials(input: RegisterInput) {
 	const { login, password } = registerSchema.parse(input);
 	const normalizedLogin = normalizeLogin(login);
 	const db = getDb();
+	const hasSuperAdmin = await hasSuperAdminAccount();
+
+	if (!hasSuperAdmin) {
+		const [existingBootstrapUser] = await db
+			.select({
+				id: users.id,
+			})
+			.from(users)
+			.where(eq(users.login, normalizedLogin))
+			.limit(1);
+
+		if (existingBootstrapUser) {
+			throw new Error("Пользователь с таким логином уже существует.");
+		}
+
+		return createAndSignInBootstrapSuperAdmin(normalizedLogin, password);
+	}
+
+	throw new Error("Публичная регистрация закрыта. Пользователей создаёт суперпользователь.");
+}
+
+export async function createManagedUser(input: CreateManagedUserInput, creator: AuthSession) {
+	await ensureLegacyAuthUsersReconciled();
+
+	const { login, password, role } = createManagedUserSchema.parse(input);
+	const normalizedLogin = normalizeLogin(login);
+	const db = getDb();
 	const now = new Date();
 	const [existingUser] = await db
 		.select({
@@ -199,7 +304,7 @@ export async function registerWithCredentials(input: RegisterInput) {
 	}
 
 	if (existingUser?.status === "pending") {
-		throw new Error("Заявка с таким логином уже отправлена и ожидает подтверждения.");
+		throw new Error("Заявка с таким логином уже ожидает подтверждения.");
 	}
 
 	const passwordHash = await hashPassword(password);
@@ -209,10 +314,10 @@ export async function registerWithCredentials(input: RegisterInput) {
 			.update(users)
 			.set({
 				passwordHash,
-				role: "user",
-				status: "pending",
-				reviewedByUserId: null,
-				reviewedAt: null,
+				role,
+				status: "active",
+				reviewedByUserId: creator.id,
+				reviewedAt: now,
 				updatedAt: now,
 			})
 			.where(eq(users.id, existingUser.id));
@@ -220,16 +325,59 @@ export async function registerWithCredentials(input: RegisterInput) {
 		await db.insert(users).values({
 			login: normalizedLogin,
 			passwordHash,
-			role: "user",
-			status: "pending",
+			role,
+			status: "active",
+			reviewedByUserId: creator.id,
+			reviewedAt: now,
 			createdAt: now,
 			updatedAt: now,
 		});
 	}
 
 	return {
-		status: "pending" as const,
+		success: true,
 	};
+}
+
+export async function updateManagedUserRole(input: UpdateManagedUserRoleInput, reviewer: AuthSession) {
+	await ensureLegacyAuthUsersReconciled();
+
+	const { userId, role } = updateManagedUserRoleSchema.parse(input);
+	const db = getDb();
+	const now = new Date();
+	const [user] = await db
+		.select({
+			id: users.id,
+			role: users.role,
+			status: users.status,
+		})
+		.from(users)
+		.where(eq(users.id, userId))
+		.limit(1);
+
+	if (!user) throw new Error("Пользователь не найден.");
+	if (user.status !== "active") throw new Error("Роль можно менять только активному пользователю.");
+	if (user.role === role) return { success: true };
+
+	if (user.role === "super-admin" && role !== "super-admin") {
+		const superAdminCount = await getSuperAdminCount();
+
+		if (superAdminCount <= 1) {
+			throw new Error("Нельзя снять роль с последнего суперпользователя.");
+		}
+	}
+
+	await db
+		.update(users)
+		.set({
+			role,
+			reviewedByUserId: reviewer.id,
+			reviewedAt: now,
+			updatedAt: now,
+		})
+		.where(eq(users.id, user.id));
+
+	return { success: true };
 }
 
 export async function getManagedUsers() {

@@ -4,6 +4,7 @@ import {
 	bootstrapSuperusersSchema,
 	canEditInstallation,
 	canEditProgress,
+	createManagedUserSchema,
 	normalizeLogin,
 	registerSchema,
 } from "./shared";
@@ -30,6 +31,26 @@ describe("auth shared rules", () => {
 				{ login: "super-2", password: "Password456!" },
 			])
 		).toThrow(/ровно 3/i);
+	});
+
+	it("allows super-admins to create users only with assignable roles", () => {
+		expect(
+			createManagedUserSchema.parse({
+				login: "worker-1",
+				password: "Password123!",
+				confirmPassword: "Password123!",
+				role: "super-admin",
+			}).role
+		).toBe("super-admin");
+
+		expect(() =>
+			createManagedUserSchema.parse({
+				login: "worker-2",
+				password: "Password123!",
+				confirmPassword: "Password123!",
+				role: "admin",
+			})
+		).toThrow();
 	});
 
 	it("allows editing only for super-admin", () => {
