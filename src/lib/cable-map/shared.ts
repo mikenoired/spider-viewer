@@ -7,15 +7,44 @@ export const supportedWorkbookMimeTypes = [
 	"application/vnd.ms-excel",
 ] as const;
 
+export const snapshotKinds = ["demolition", "installation"] as const;
+export type SnapshotKind = (typeof snapshotKinds)[number];
+
+export const snapshotKindLabels = {
+	demolition: "Демонтаж",
+	installation: "Монтаж",
+} as const satisfies Record<SnapshotKind, string>;
+
+export const mapTitleBySnapshotKind = {
+	demolition: "Демонтаж кабеля САЭ в части 1 канала СБ и НЭ энергоблока № 1",
+	installation: "Монтаж кабеля УСБТ в помещении 1АЭ408/1",
+} as const satisfies Record<SnapshotKind, string>;
+
 export const graphSideLabels = {
 	dirty: "Демонтаж кабеля САЭ со стороны грязной зоны",
 	clean: "Демонтаж кабеля САЭ со стороны чистой зоны",
 } as const;
 
+export const graphSideLabelsBySnapshotKind = {
+	demolition: graphSideLabels,
+	installation: {
+		dirty: "Монтаж кабеля: сторона «Откуда»",
+		clean: "Монтаж кабеля: сторона «Куда»",
+	},
+} as const satisfies Record<SnapshotKind, typeof graphSideLabels>;
+
 export const graphSubzoneLabels = {
 	dirty: "Грязная зона",
 	clean: "Чистая зона",
 } as const;
+
+export const graphSubzoneLabelsBySnapshotKind = {
+	demolition: graphSubzoneLabels,
+	installation: {
+		dirty: "Откуда",
+		clean: "Куда",
+	},
+} as const satisfies Record<SnapshotKind, typeof graphSubzoneLabels>;
 
 export const shaftBucketLabels = {
 	0: "Не заходит в КШ",
@@ -62,6 +91,7 @@ export const exportBackdatedSchema = exportHistorySchema;
 export const exportDailyHistorySchema = z.object({
 	fileName: z.string().trim().optional().nullable(),
 	level: z.string().trim().min(1).optional().nullable(),
+	snapshotKind: z.enum(snapshotKinds).optional().default("demolition"),
 });
 
 export type DateRangeInput = z.infer<typeof dateRangeSchema>;
@@ -146,6 +176,7 @@ export type GraphGroupView = {
 
 export type SnapshotSummaryView = {
 	id: string;
+	snapshotKind: SnapshotKind;
 	fileName: string;
 	fileType: string;
 	rowCount: number;
@@ -159,6 +190,7 @@ export type SnapshotSummaryView = {
 
 export type DashboardData = {
 	snapshot: SnapshotSummaryView | null;
+	snapshotKind: SnapshotKind;
 	levels: Array<{
 		level: string;
 		levelOrder: number;

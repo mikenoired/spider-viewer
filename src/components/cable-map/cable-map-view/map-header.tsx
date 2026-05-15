@@ -1,44 +1,55 @@
 import type { ReactNode } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { graphSideLabels, graphSubzoneLabels } from "@/lib/cable-map/shared";
+import {
+	graphSideLabelsBySnapshotKind,
+	graphSubzoneLabelsBySnapshotKind,
+	mapTitleBySnapshotKind,
+	type SnapshotKind,
+} from "@/lib/cable-map/shared";
 
 import type { GraphSide } from "./types";
 import { getShaftX } from "./utils";
 
-export function MapTitle() {
+export function MapTitle({ snapshotKind }: { snapshotKind: SnapshotKind }) {
+	const sideLabels = graphSideLabelsBySnapshotKind[snapshotKind];
+
 	return (
 		<div className="space-y-1 text-center">
 			<div className="text-[30px] font-semibold leading-tight text-zinc-950 dark:text-zinc-50 select-none">
-				Демонтаж кабеля САЭ в части 1 канала СБ и НЭ энергоблока № 1
+				{mapTitleBySnapshotKind[snapshotKind]}
 			</div>
 			<div className="grid grid-cols-[1fr_auto_1fr] items-end gap-6 text-balance">
 				<div className="text-[18px] font-semibold leading-tight text-zinc-900 dark:text-zinc-100 select-none">
-					{graphSideLabels.dirty}
+					{sideLabels.dirty}
 				</div>
 				<div className="w-24" />
 				<div className="text-[18px] font-semibold leading-tight text-zinc-900 dark:text-zinc-100 select-none">
-					{graphSideLabels.clean}
+					{sideLabels.clean}
 				</div>
 			</div>
 		</div>
 	);
 }
 
-export function LeftZoneHeader() {
+export function LeftZoneHeader({ snapshotKind }: { snapshotKind: SnapshotKind }) {
+	const subzoneLabels = graphSubzoneLabelsBySnapshotKind[snapshotKind];
+
 	return (
 		<div className="grid h-11 grid-cols-[98px_minmax(0,1fr)] items-center gap-3 pb-1 text-center text-base font-semibold text-zinc-700 dark:text-zinc-300">
-			<span className="select-none">{graphSubzoneLabels.dirty}</span>
+			<span className="select-none">{subzoneLabels.dirty}</span>
 			<div />
 		</div>
 	);
 }
 
-export function RightZoneHeader() {
+export function RightZoneHeader({ snapshotKind }: { snapshotKind: SnapshotKind }) {
+	const subzoneLabels = graphSubzoneLabelsBySnapshotKind[snapshotKind];
+
 	return (
 		<div className="grid h-11 grid-cols-[minmax(0,1fr)_98px] items-center gap-3 pb-1 text-center text-base font-semibold text-zinc-700 dark:text-zinc-300">
 			<div />
-			<span className="select-none">{graphSubzoneLabels.clean}</span>
+			<span className="select-none">{subzoneLabels.clean}</span>
 		</div>
 	);
 }
