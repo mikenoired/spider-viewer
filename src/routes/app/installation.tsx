@@ -1,30 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { InstallationBoard } from "@/components/installation/installation-board";
-import { canEditInstallation } from "@/lib/auth/shared";
-import { getInstallationBoardData } from "@/lib/installation/functions";
-import type { InstallationBoardData } from "@/lib/installation/shared";
-
-function createInstallationFallbackData(): InstallationBoardData {
-	return {
-		snapshot: null,
-		columns: {
-			not_started: [],
-			in_progress: [],
-			done: [],
-		},
-		processingGroups: [],
-	};
-}
+import { CableMapView } from "@/components/cable-map/cable-map-view";
+import { canEditProgress, canManageManualRooms } from "@/lib/auth/shared";
+import { getInstallationDashboardData } from "@/lib/cable-map/functions";
 
 export const Route = createFileRoute("/app/installation")({
-	loader: async () => {
-		try {
-			return await getInstallationBoardData();
-		} catch {
-			return createInstallationFallbackData();
-		}
-	},
+	loader: async () => getInstallationDashboardData(),
 	component: InstallationPage,
 });
 
@@ -34,5 +15,12 @@ function InstallationPage() {
 
 	if (!auth) return null;
 
-	return <InstallationBoard initialData={data} canEdit={canEditInstallation(auth.role)} />;
+	return (
+		<CableMapView
+			data={data}
+			canEditProgress={canEditProgress(auth.role)}
+			canManageManualRooms={canManageManualRooms(auth.role)}
+			role={auth.role}
+		/>
+	);
 }

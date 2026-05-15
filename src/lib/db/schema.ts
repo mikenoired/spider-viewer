@@ -25,6 +25,7 @@ export const snapshotSourceTypeEnum = pgEnum("snapshot_source_type", [
 	"xlsx",
 	"xls",
 ]);
+export const snapshotKindEnum = pgEnum("snapshot_kind", ["demolition", "installation"]);
 export const graphSideEnum = pgEnum("graph_side", ["dirty", "clean"]);
 export const graphSubzoneEnum = pgEnum("graph_subzone", ["dirty", "clean"]);
 export const roomRoleEnum = pgEnum("graph_room_role", ["primary", "secondary"]);
@@ -59,6 +60,7 @@ export const importSnapshots = pgTable(
 	"import_snapshots",
 	{
 		id: uuid("id").defaultRandom().primaryKey(),
+		snapshotKind: snapshotKindEnum("snapshot_kind").notNull().default("demolition"),
 		fileName: text("file_name").notNull(),
 		fileType: snapshotSourceTypeEnum("file_type").notNull(),
 		checksum: text("checksum").notNull(),
@@ -85,9 +87,9 @@ export const importSnapshots = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => [
-		index("import_snapshots_active_idx").on(table.isActive),
-		uniqueIndex("import_snapshots_single_active_unique")
-			.on(table.isActive)
+		index("import_snapshots_kind_active_idx").on(table.snapshotKind, table.isActive),
+		uniqueIndex("import_snapshots_kind_single_active_unique")
+			.on(table.snapshotKind, table.isActive)
 			.where(sql`${table.isActive} = true`),
 	]
 );
