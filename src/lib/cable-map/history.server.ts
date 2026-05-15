@@ -25,7 +25,7 @@ import { getRedis } from "@/lib/redis";
 
 import { getHistoryEntries } from "./queries.server";
 import { getTodayIsoInMoscow } from "./report-utils";
-import type { DateRangeInput, HistoryEntryView, SaveCableProgressInput } from "./shared";
+import type { DateRangeInput, HistoryEntryView, SaveCableProgressInput, SnapshotKind } from "./shared";
 
 const historyTableColumnWidths = [1500, 1300, 1400, 2600, 1500, 900, 900, 900] as const;
 const historyReportTableColumnWidths = [1500, 1300, 1400, 2400, 1400, 900, 900, 900, 1200] as const;
@@ -94,18 +94,6 @@ export async function saveCableProgressChanges(input: SaveCableProgressInput, se
 	const effectiveDate = getEffectiveDate(input.effectiveDate);
 	const isBackdated = effectiveDate !== getTodayInMoscow();
 
-	const [activeSnapshot] = await db
-		.select({
-			id: importSnapshots.id,
-		})
-		.from(importSnapshots)
-		.where(eq(importSnapshots.isActive, true))
-		.limit(1);
-
-	if (!activeSnapshot) {
-		throw new Error("Сначала загрузите данные для графа.");
-	}
-
 	const [group] = await db
 		.select({
 			id: graphGroups.id,
@@ -113,7 +101,8 @@ export async function saveCableProgressChanges(input: SaveCableProgressInput, se
 			groupKey: graphGroups.groupKey,
 		})
 		.from(graphGroups)
-		.where(and(eq(graphGroups.id, input.groupId), eq(graphGroups.snapshotId, activeSnapshot.id)))
+		.innerJoin(importSnapshots, eq(importSnapshots.id, graphGroups.snapshotId))
+		.where(and(eq(graphGroups.id, input.groupId), eq(importSnapshots.isActive, true)))
 		.limit(1);
 
 	if (!group) {
@@ -146,7 +135,7 @@ export async function saveCableProgressChanges(input: SaveCableProgressInput, se
 			farthestShaft: importedCableRows.farthestShaft,
 		})
 		.from(importedCableRows)
-		.where(and(eq(importedCableRows.snapshotId, activeSnapshot.id), inArray(importedCableRows.id, cableIds)));
+		.where(and(eq(importedCableRows.snapshotId, group.snapshotId), inArray(importedCableRows.id, cableIds)));
 
 	if (persistedCables.length !== cableIds.length) {
 		throw new Error("Не все кабели найдены для сохранения прогресса.");
@@ -160,7 +149,7 @@ export async function saveCableProgressChanges(input: SaveCableProgressInput, se
 				})
 				.from(cableProgress)
 				.where(
-					and(eq(cableProgress.snapshotId, activeSnapshot.id), inArray(cableProgress.cableRowId, cableIds))
+					and(eq(cableProgress.snapshotId, group.snapshotId), inArray(cableProgress.cableRowId, cableIds))
 				)
 		: [];
 
@@ -218,7 +207,7 @@ export async function saveCableProgressChanges(input: SaveCableProgressInput, se
 			await tx
 				.insert(cableProgress)
 				.values({
-					snapshotId: activeSnapshot.id,
+					snapshotId: group.snapshotId,
 					groupId: group.id,
 					roomId: auditRow.roomId,
 					cableRowId: auditRow.cableRowId,
@@ -245,7 +234,7 @@ export async function saveCableProgressChanges(input: SaveCableProgressInput, se
 			.insert(cableChangeAuditLogs)
 			.values(
 				auditRows.map((auditRow) => ({
-					snapshotId: activeSnapshot.id,
+					snapshotId: group.snapshotId,
 					groupId: group.id,
 					roomId: auditRow.roomId,
 					cableRowId: auditRow.cableRowId,
@@ -420,6 +409,7 @@ function groupHistoryEntriesByLevel(entries: HistoryEntryView[]) {
 
 type CreateHistoryDocxOptions = {
 	level?: string | null;
+	snapshotKind?: SnapshotKind;
 	title?: string;
 	emptyMessage?: string;
 };
@@ -538,7 +528,10 @@ export async function createBackdatedDocx(range?: DateRangeInput) {
 
 export async function createHistoryDocx(range?: DateRangeInput, options: CreateHistoryDocxOptions = {}) {
 	const level = options.level?.trim() || null;
-	const entries = await getHistoryEntries(range, level ? { level } : {});
+	const entries = await getHistoryEntries(range, {
+		...(level ? { level } : {}),
+		...(options.snapshotKind ? { snapshotKind: options.snapshotKind } : {}),
+	});
 	const rangeLabel = createRangeLabel(range);
 	const groups = groupHistoryEntriesByLevel(entries);
 	const title = createHistoryTitle(rangeLabel, level, options.title);
@@ -561,7 +554,10 @@ export async function createHistoryDocx(range?: DateRangeInput, options: CreateH
 	return Packer.toBuffer(document);
 }
 
-export async function createDailyHistoryDocx(level?: string | null) {
+export async function createDailyHistoryDocx(
+	level?: string | null,
+	snapshotKind: SnapshotKind = "demolition"
+) {
 	const today = getTodayIsoInMoscow();
 	const range = {
 		from: today,
@@ -572,6 +568,7 @@ export async function createDailyHistoryDocx(level?: string | null) {
 
 	return createHistoryDocx(range, {
 		level: levelLabel,
+		snapshotKind,
 		title: levelLabel
 			? `Ежедневный отчёт по уровню ${levelLabel}: ${rangeLabel}`
 			: `Ежедневный отчёт по всем уровням: ${rangeLabel}`,

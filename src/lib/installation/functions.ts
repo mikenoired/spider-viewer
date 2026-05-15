@@ -28,9 +28,20 @@ export const uploadInstallationWorkbook = createServerFn({ method: "POST" })
 	.inputValidator((input: FormData) => input)
 	.handler(async ({ data }) => {
 		const session = await requireInstallationEditor();
-		const { importInstallationWorkbookFromFormData } = await import("./import.server");
+		const { importWorkbookFromFormData } = await import("../cable-map/import.server");
 
-		return importInstallationWorkbookFromFormData(data, session);
+		return importWorkbookFromFormData(data, session, {
+			snapshotKind: "installation",
+		});
+	});
+
+export const uploadInstallationProgressWorkbooks = createServerFn({ method: "POST" })
+	.inputValidator((input: FormData) => input)
+	.handler(async ({ data }) => {
+		const session = await requireInstallationEditor();
+		const { importInstallationProgressFromFormData } = await import("./progress-import.server");
+
+		return importInstallationProgressFromFormData(data, session);
 	});
 
 export const saveInstallationKks = createServerFn({ method: "POST" })

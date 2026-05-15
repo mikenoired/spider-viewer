@@ -2,8 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { SnapshotImportForm } from "@/components/cable-map/snapshot-import-form";
 import { InstallationImportForm } from "@/components/installation/installation-import-form";
-import { getDashboardData } from "@/lib/cable-map/functions";
-import { getInstallationBoardData } from "@/lib/installation/functions";
+import { getDashboardData, getInstallationDashboardData } from "@/lib/cable-map/functions";
 
 export const Route = createFileRoute("/app/import")({
 	beforeLoad: ({ context }) => {
@@ -12,7 +11,7 @@ export const Route = createFileRoute("/app/import")({
 	loader: async () => {
 		const [dashboardData, installationData] = await Promise.all([
 			getDashboardData(),
-			getInstallationBoardData(),
+			getInstallationDashboardData(),
 		]);
 
 		return {

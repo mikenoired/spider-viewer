@@ -176,12 +176,13 @@ function getDailyReportExportErrorMessage(error: unknown, level?: string) {
 	return level ? `Не удалось выгрузить отчёт по уровню ${level}.` : "Не удалось выгрузить ежедневный отчёт.";
 }
 
-async function exportDailyReport(level?: string) {
+async function exportDailyReport(snapshotKind: DashboardData["snapshotKind"], level?: string) {
 	const fileName = buildDailyHistoryReportFileName(level);
 	const response = await downloadDailyHistoryDocx({
 		data: {
 			fileName,
 			level: level ?? null,
+			snapshotKind,
 		},
 	});
 
@@ -961,14 +962,14 @@ export function CableMapView({
 			startDailyReportExport(level, setExportingLevel, setExportingDailyReport);
 
 			try {
-				await exportDailyReport(level);
+				await exportDailyReport(data.snapshotKind, level);
 			} catch (error) {
 				toast.error(getDailyReportExportErrorMessage(error, level));
 			} finally {
 				finishDailyReportExport(level, setExportingLevel, setExportingDailyReport);
 			}
 		},
-		[canExportDailyReport]
+		[canExportDailyReport, data.snapshotKind]
 	);
 
 	if (!data.snapshot) {
@@ -1280,7 +1281,7 @@ export function CableMapView({
 										paddingBottom: canvasBottomPadding,
 										paddingLeft: canvasSidePadding,
 									}}>
-									<MapTitle />
+									<MapTitle snapshotKind={data.snapshotKind} />
 
 									<div className="border-b-2 border-dashed border-zinc-400/90 pb-3 pt-6 dark:border-zinc-700">
 										<div
@@ -1288,7 +1289,7 @@ export function CableMapView({
 											style={{
 												gridTemplateColumns: boardColumns,
 											}}>
-											<LeftZoneHeader />
+											<LeftZoneHeader snapshotKind={data.snapshotKind} />
 											<div />
 											<PathHeader side="dirty" />
 											<span className="pb-1 text-center text-base font-semibold text-zinc-900 dark:text-zinc-100 select-none">
@@ -1296,7 +1297,7 @@ export function CableMapView({
 											</span>
 											<PathHeader side="clean" />
 											<div />
-											<RightZoneHeader />
+											<RightZoneHeader snapshotKind={data.snapshotKind} />
 										</div>
 									</div>
 

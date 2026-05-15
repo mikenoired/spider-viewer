@@ -20,6 +20,7 @@ import type {
 	GraphManualRoomView,
 	GraphRoomView,
 	HistoryEntryView,
+	SnapshotKind,
 	SnapshotSummaryView,
 } from "./shared";
 import { shaftBucketLabels } from "./shared";
@@ -27,6 +28,7 @@ import { shaftBucketLabels } from "./shared";
 type HistoryQueryOptions = {
 	backdatedOnly?: boolean;
 	level?: string | null;
+	snapshotKind?: SnapshotKind;
 };
 
 type DbClient = ReturnType<typeof getDb>;
@@ -86,10 +88,11 @@ function getCableCopperMassKg(row: {
 	return threadLength * threadCount * cableCrossSection * copperDensityKgPerMeterPerMm2;
 }
 
-async function getActiveSnapshot(db: DbClient) {
+async function getActiveSnapshot(db: DbClient, snapshotKind: SnapshotKind) {
 	const [snapshot] = await db
 		.select({
 			id: importSnapshots.id,
+			snapshotKind: importSnapshots.snapshotKind,
 			fileName: importSnapshots.fileName,
 			fileType: importSnapshots.fileType,
 			rowCount: importSnapshots.rowCount,
@@ -98,7 +101,7 @@ async function getActiveSnapshot(db: DbClient) {
 		})
 		.from(importSnapshots)
 		.innerJoin(users, eq(users.id, importSnapshots.importedByUserId))
-		.where(eq(importSnapshots.isActive, true))
+		.where(and(eq(importSnapshots.snapshotKind, snapshotKind), eq(importSnapshots.isActive, true)))
 		.orderBy(desc(importSnapshots.createdAt))
 		.limit(1);
 
@@ -447,6 +450,7 @@ function buildSnapshotSummary(
 ): SnapshotSummaryView {
 	return {
 		id: snapshot.id,
+		snapshotKind: snapshot.snapshotKind,
 		fileName: snapshot.fileName,
 		fileType: snapshot.fileType,
 		rowCount: snapshot.rowCount,
@@ -459,13 +463,16 @@ function buildSnapshotSummary(
 	};
 }
 
-export async function getActiveDashboardData(): Promise<DashboardData> {
+export async function getActiveDashboardData(
+	snapshotKind: SnapshotKind = "demolition"
+): Promise<DashboardData> {
 	const db = getDb();
-	const snapshot = await getActiveSnapshot(db);
+	const snapshot = await getActiveSnapshot(db, snapshotKind);
 
 	if (!snapshot) {
 		return {
 			snapshot: null,
+			snapshotKind,
 			levels: [],
 		};
 	}
@@ -483,6 +490,7 @@ export async function getActiveDashboardData(): Promise<DashboardData> {
 
 	return {
 		snapshot: buildSnapshotSummary(snapshot, levels, groups.size, allPrimaryRooms),
+		snapshotKind,
 		levels,
 	};
 }
@@ -504,6 +512,10 @@ function buildHistoryConditions(range?: DateRangeInput, options: HistoryQueryOpt
 
 	if (options.level?.trim()) {
 		conditions.push(eq(graphGroups.level, options.level.trim()));
+	}
+
+	if (options.snapshotKind) {
+		conditions.push(eq(importSnapshots.snapshotKind, options.snapshotKind));
 	}
 
 	return conditions;
@@ -531,6 +543,7 @@ export async function getHistoryEntries(range?: DateRangeInput, options: History
 		})
 		.from(cableChangeAuditLogs)
 		.leftJoin(graphGroups, eq(graphGroups.id, cableChangeAuditLogs.groupId))
+		.leftJoin(importSnapshots, eq(importSnapshots.id, cableChangeAuditLogs.snapshotId))
 		.where(conditions.length > 0 ? and(...conditions) : undefined)
 		.orderBy(desc(cableChangeAuditLogs.changedAt));
 

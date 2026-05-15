@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { eq } from "drizzle-orm";
 import * as Xlsx from "xlsx";
 
 import type { AuthSession } from "@/lib/auth/shared";
@@ -14,7 +15,7 @@ import {
 } from "@/lib/db/schema";
 import { enToRuVisual } from "@/lib/utils";
 
-import { supportedWorkbookExtensions, supportedWorkbookMimeTypes } from "./shared";
+import { supportedWorkbookExtensions, supportedWorkbookMimeTypes, type SnapshotKind } from "./shared";
 
 type GraphSide = (typeof graphSideEnum.enumValues)[number];
 type GraphSubzone = (typeof graphSubzoneEnum.enumValues)[number] | null;
@@ -100,6 +101,25 @@ const workbookColumnIndexes = {
 	route: 31,
 } as const;
 
+const installationWorkbookColumnIndexes = {
+	cableJournal: 0,
+	threadNumber: 6,
+	cableMarking: 7,
+	cableType: 10,
+	cableSection: 11,
+	fromRoom: 13,
+	fromEquipmentName: 14,
+	fromRow: 15,
+	fromEquipment: 16,
+	toEquipment: 19,
+	toEquipmentName: 20,
+	toRow: 21,
+	toRoom: 24,
+	projectLength: 25,
+	actualLength: 26,
+	route: 30,
+} as const;
+
 const maxWorkbookFileSizeBytes = 15 * 1024 * 1024;
 const maxWorkbookRowCount = 20_000;
 const requiredWorkbookColumnIndexes = [
@@ -129,6 +149,12 @@ function parseLocaleNumber(value: string) {
 
 function parseInteger(value: string) {
 	return Math.round(parseLocaleNumber(value));
+}
+
+function parseCableCoreCount(value: string) {
+	const match = value.match(/(\d+)\s*[xх×]/i);
+
+	return match ? Number(match[1]) : 1;
 }
 
 function getWorkbookCell(row: string[], columnIndex: number) {
@@ -223,6 +249,14 @@ function getFarthestShaft(shaftValues: ParsedCableRow["shaftValues"]) {
 	return shaftValues.length > 0 ? Math.max(...shaftValues.map((entry) => entry.shaft)) : null;
 }
 
+function getFarthestInstallationShaft(route: string, fromRow: string, toRow: string) {
+	const routeShafts = [...route.matchAll(/\b([1-4])\b/g)].map((match) => Number(match[1]));
+	const rowShafts = [fromRow, toRow].map(parseInteger).filter((value) => value >= 1 && value <= 4);
+	const shafts = [...routeShafts, ...rowShafts];
+
+	return shafts.length > 0 ? Math.max(...shafts) : null;
+}
+
 function hasRequiredRowData({
 	cableLabel,
 	level,
@@ -279,6 +313,79 @@ function parseWorkbookDataRow(rawRow: string[], index: number, headerRow: string
 		farthestShaft: getFarthestShaft(shaftValues),
 		shaftValues,
 		route: getWorkbookCell(row, workbookColumnIndexes.route),
+		rawRow: row,
+	} satisfies ParsedCableRow;
+}
+
+function getInstallationLevel(fromRow: string, toRow: string) {
+	const row = fromRow || toRow;
+
+	return row ? `Ряд ${row}` : "Ряд не указан";
+}
+
+function createInstallationCableLabel(row: string[]) {
+	const marking = getWorkbookCell(row, installationWorkbookColumnIndexes.cableMarking);
+	const cableType = getWorkbookCell(row, installationWorkbookColumnIndexes.cableType);
+	const cableSection = getWorkbookCell(row, installationWorkbookColumnIndexes.cableSection);
+
+	return [marking, cableType, cableSection].filter(Boolean).join(" ");
+}
+
+function parseInstallationSideRow(rawRow: string[], index: number, side: GraphSide) {
+	const row = rawRow.map(normalizeCellValue);
+	const cableLabel = createInstallationCableLabel(row);
+	const cableNumber = getWorkbookCell(row, installationWorkbookColumnIndexes.threadNumber);
+	const fromRoom = enToRuVisual(getWorkbookCell(row, installationWorkbookColumnIndexes.fromRoom));
+	const toRoom = enToRuVisual(getWorkbookCell(row, installationWorkbookColumnIndexes.toRoom));
+	const fromRow = getWorkbookCell(row, installationWorkbookColumnIndexes.fromRow);
+	const toRow = getWorkbookCell(row, installationWorkbookColumnIndexes.toRow);
+	const fromEquipment = getWorkbookCell(row, installationWorkbookColumnIndexes.fromEquipment);
+	const toEquipment = getWorkbookCell(row, installationWorkbookColumnIndexes.toEquipment);
+	const primaryRoom = side === "dirty" ? fromEquipment : toEquipment;
+	const secondaryRoom = side === "dirty" ? toEquipment : fromEquipment;
+	const route = getWorkbookCell(row, installationWorkbookColumnIndexes.route);
+	const level = getInstallationLevel(side === "dirty" ? fromRow : toRow, side === "dirty" ? toRow : fromRow);
+	const levelOrder =
+		parseLocaleNumber(side === "dirty" ? fromRow : toRow) || parseLocaleNumber(fromRow || toRow);
+	const actualLength = parseLocaleNumber(
+		getWorkbookCell(row, installationWorkbookColumnIndexes.actualLength)
+	);
+	const projectLength = parseLocaleNumber(
+		getWorkbookCell(row, installationWorkbookColumnIndexes.projectLength)
+	);
+	const totalLength = actualLength > 0 ? actualLength : projectLength;
+	const cableSection = getWorkbookCell(row, installationWorkbookColumnIndexes.cableSection);
+	const sourceZone = side === "dirty" ? fromRoom : toRoom;
+	const farthestShaft = getFarthestInstallationShaft(route, fromRow, toRow);
+
+	if (!cableLabel || !primaryRoom || !sourceZone) {
+		return null;
+	}
+
+	return {
+		sourceRowIndex: index + 3,
+		cableLabel,
+		cableJournal: getWorkbookCell(row, installationWorkbookColumnIndexes.cableJournal),
+		cableNumber,
+		repeatFrom: "",
+		repeatTo: "",
+		repeatKks: "",
+		fromRoom: primaryRoom,
+		fromLocation: side === "dirty" ? fromRoom : toRoom,
+		fromEquipment: side === "dirty" ? fromEquipment : toEquipment,
+		toRoom: secondaryRoom,
+		threadLength: totalLength,
+		threadCount: Math.max(1, parseCableCoreCount(cableSection)),
+		totalLength,
+		level,
+		levelOrder,
+		fromZone: sourceZone,
+		toZone: side === "dirty" ? toRoom : fromRoom,
+		graphSide: side,
+		graphSubzone: side === "dirty" ? "dirty" : "clean",
+		farthestShaft,
+		shaftValues: [],
+		route,
 		rawRow: row,
 	} satisfies ParsedCableRow;
 }
@@ -396,6 +503,51 @@ export function parseWorkbookRows(fileName: string, buffer: Buffer) {
 
 	if (parsedRows.length === 0) {
 		throw new Error(`В "${fileName}" не удалось найти валидные строки на листе "Общ".`);
+	}
+
+	return parsedRows;
+}
+
+function getInstallationWorkbookSheet(workbook: Xlsx.WorkBook) {
+	const sheet = workbook.Sheets.УСБТ ?? workbook.Sheets["Лист1"];
+
+	if (!sheet) {
+		throw new Error('В файле монтажа отсутствует лист "УСБТ".');
+	}
+
+	return sheet;
+}
+
+export function parseInstallationWorkbookRows(fileName: string, buffer: Buffer) {
+	const workbook = Xlsx.read(buffer, {
+		type: "buffer",
+		cellDates: false,
+		raw: false,
+	});
+	const sheet = getInstallationWorkbookSheet(workbook);
+	const rawRows = Xlsx.utils.sheet_to_json<string[]>(sheet, {
+		header: 1,
+		raw: false,
+		defval: "",
+		blankrows: false,
+	});
+
+	if (rawRows.length < 3) {
+		throw new Error("Файл монтажа не содержит данных для импорта карты.");
+	}
+
+	validateWorkbookRowCount(rawRows.length - 2);
+
+	const parsedRows = rawRows
+		.slice(2)
+		.flatMap((rawRow, index) => [
+			parseInstallationSideRow(rawRow, index, "dirty"),
+			parseInstallationSideRow(rawRow, index, "clean"),
+		])
+		.filter((row): row is ParsedCableRow => row !== null);
+
+	if (parsedRows.length === 0) {
+		throw new Error(`В "${fileName}" не удалось найти валидные строки монтажа.`);
 	}
 
 	return parsedRows;
@@ -539,23 +691,40 @@ export async function ensureUploadFile(formData: FormData) {
 	};
 }
 
-export async function importWorkbookFromFormData(formData: FormData, session: AuthSession) {
+function parseRowsForSnapshotKind(fileName: string, buffer: Buffer, snapshotKind: SnapshotKind) {
+	return snapshotKind === "installation"
+		? parseInstallationWorkbookRows(fileName, buffer)
+		: parseWorkbookRows(fileName, buffer);
+}
+
+export async function importWorkbookFromFormData(
+	formData: FormData,
+	session: AuthSession,
+	options: {
+		snapshotKind?: SnapshotKind;
+	} = {}
+) {
 	const { file, fileType, buffer } = await ensureUploadFile(formData);
-	const parsedRows = parseWorkbookRows(file.name, buffer);
+	const snapshotKind = options.snapshotKind ?? "demolition";
+	const parsedRows = parseRowsForSnapshotKind(file.name, buffer, snapshotKind);
 	const { groups, orderedLevels, sideSummary } = aggregateGroups(parsedRows);
 	const checksum = createHash("sha256").update(buffer).digest("hex");
 	const db = getDb();
 	const now = new Date();
 
 	const [snapshot] = await db.transaction(async (tx) => {
-		await tx.update(importSnapshots).set({
-			isActive: false,
-			updatedAt: now,
-		});
+		await tx
+			.update(importSnapshots)
+			.set({
+				isActive: false,
+				updatedAt: now,
+			})
+			.where(eq(importSnapshots.snapshotKind, snapshotKind));
 
 		const [createdSnapshot] = await tx
 			.insert(importSnapshots)
 			.values({
+				snapshotKind,
 				fileName: file.name,
 				fileType,
 				checksum,

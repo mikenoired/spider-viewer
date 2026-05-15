@@ -15,7 +15,12 @@ import {
 
 export const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
 	const { getActiveDashboardData } = await import("./queries.server");
-	return getActiveDashboardData();
+	return getActiveDashboardData("demolition");
+});
+
+export const getInstallationDashboardData = createServerFn({ method: "GET" }).handler(async () => {
+	const { getActiveDashboardData } = await import("./queries.server");
+	return getActiveDashboardData("installation");
 });
 
 export const uploadWorkbook = createServerFn({ method: "POST" })
@@ -136,7 +141,7 @@ export const downloadDailyHistoryDocx = createServerFn({ method: "POST" })
 
 		const { createDailyHistoryDocx } = await import("./history.server");
 		const { buildDailyHistoryReportFileName } = await import("./report-utils");
-		const buffer = await createDailyHistoryDocx(data.level);
+		const buffer = await createDailyHistoryDocx(data.level, data.snapshotKind);
 		const fileName = data.fileName?.trim() || buildDailyHistoryReportFileName(data.level);
 
 		return new Response(new Uint8Array(buffer), {
