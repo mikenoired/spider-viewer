@@ -35,6 +35,11 @@ export const installationPendingStatusEnum = pgEnum("installation_pending_status
 	"discarded",
 ]);
 export const installationKksItemTypeEnum = pgEnum("installation_kks_item_type", ["mechanism", "cable"]);
+export const priorityRoomKanbanStatusEnum = pgEnum("priority_room_kanban_status", [
+	"in_progress",
+	"done",
+	"checked",
+]);
 
 export const users = pgTable(
 	"users",
@@ -384,6 +389,72 @@ export const installationPendingChanges = pgTable(
 	]
 );
 
+export const priorityRoomLists = pgTable(
+	"priority_room_lists",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		snapshotId: uuid("snapshot_id")
+			.notNull()
+			.references(() => importSnapshots.id, { onDelete: "cascade" }),
+		authorName: text("author_name").notNull(),
+		fileName: text("file_name").notNull(),
+		fileType: text("file_type").notNull(),
+		roomCount: integer("room_count").notNull().default(0),
+		importedByUserId: uuid("imported_by_user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [index("priority_room_lists_snapshot_created_idx").on(table.snapshotId, table.createdAt)]
+);
+
+export const priorityRoomEntries = pgTable(
+	"priority_room_entries",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		listId: uuid("list_id")
+			.notNull()
+			.references(() => priorityRoomLists.id, { onDelete: "cascade" }),
+		snapshotId: uuid("snapshot_id")
+			.notNull()
+			.references(() => importSnapshots.id, { onDelete: "cascade" }),
+		roomName: text("room_name").notNull(),
+		normalizedRoomName: text("normalized_room_name").notNull(),
+		sortOrder: integer("sort_order").notNull().default(0),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("priority_room_entries_snapshot_room_idx").on(table.snapshotId, table.normalizedRoomName),
+		uniqueIndex("priority_room_entries_list_room_unique").on(table.listId, table.normalizedRoomName),
+	]
+);
+
+export const priorityRoomKanbanStates = pgTable(
+	"priority_room_kanban_states",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		snapshotId: uuid("snapshot_id")
+			.notNull()
+			.references(() => importSnapshots.id, { onDelete: "cascade" }),
+		roomId: uuid("room_id")
+			.notNull()
+			.references(() => graphGroupRooms.id, { onDelete: "cascade" }),
+		status: priorityRoomKanbanStatusEnum("status").notNull().default("in_progress"),
+		updatedByUserId: uuid("updated_by_user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		checkedByUserId: uuid("checked_by_user_id").references(() => users.id, { onDelete: "set null" }),
+		checkedAt: timestamp("checked_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("priority_room_kanban_states_snapshot_status_idx").on(table.snapshotId, table.status),
+		uniqueIndex("priority_room_kanban_states_snapshot_room_unique").on(table.snapshotId, table.roomId),
+	]
+);
+
 export const changeAuditLogs = pgTable(
 	"change_audit_logs",
 	{
@@ -472,5 +543,8 @@ export type InstallationSnapshot = typeof installationSnapshots.$inferSelect;
 export type InstallationKksGroup = typeof installationKksGroups.$inferSelect;
 export type InstallationKksItem = typeof installationKksItems.$inferSelect;
 export type InstallationPendingChange = typeof installationPendingChanges.$inferSelect;
+export type PriorityRoomList = typeof priorityRoomLists.$inferSelect;
+export type PriorityRoomEntry = typeof priorityRoomEntries.$inferSelect;
+export type PriorityRoomKanbanState = typeof priorityRoomKanbanStates.$inferSelect;
 export type ChangeAuditLog = typeof changeAuditLogs.$inferSelect;
 export type CableChangeAuditLog = typeof cableChangeAuditLogs.$inferSelect;
