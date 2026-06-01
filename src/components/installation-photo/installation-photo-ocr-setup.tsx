@@ -30,7 +30,7 @@ export function InstallationPhotoOcrSetup({
 		<div className="flex">
 			<Card className="w-full" size="sm">
 				<CardHeader>
-					<CardTitle>Подготовьте OCR для offline-работы</CardTitle>
+					<CardTitle>Подготовьте OCR для офлайн-работы</CardTitle>
 					<CardDescription>
 						Чтобы отмечать монтаж по фото без интернета, один раз скачайте модель на это устройство.
 					</CardDescription>
@@ -61,7 +61,7 @@ export function InstallationPhotoOcrSetup({
 
 function getSetupDescription(status: InstallationPhotoAssetState["status"]) {
 	if (status === "unsupported") {
-		return "Браузер не поддерживает offline-кэш, поэтому добавление фото будет недоступно.";
+		return "Браузер не поддерживает офлайн-кэш, поэтому добавление фото будет недоступно.";
 	}
 
 	return "Пока модель не скачана, добавление фото в канбан отключено.";

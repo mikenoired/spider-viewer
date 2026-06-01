@@ -1,17 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import * as Xlsx from "xlsx";
 
 import type { AuthSession } from "@/lib/auth/shared";
-import { getTodayIsoInMoscow } from "@/lib/cable-map/report-utils";
 import { getDb } from "@/lib/db";
-import {
-	cableChangeAuditLogs,
-	cableProgress,
-	graphGroupRooms,
-	graphGroups,
-	importedCableRows,
-	importSnapshots,
-} from "@/lib/db/schema";
+import { installationKksItems, installationSnapshots } from "@/lib/db/schema";
+import { enToRuVisual } from "@/lib/utils";
 
 import { ensureUploadFile } from "../cable-map/import.server";
 
@@ -22,9 +15,11 @@ type WorkbookProfile = {
 		doneColumns: number[];
 	}>;
 };
+type DbClient = ReturnType<typeof getDb>;
+type ActiveInstallationKksItem = Awaited<ReturnType<typeof getActiveInstallationKksItems>>[number];
 
 const ignoredWorkValues = new Set(["", "-", "нет", "не требуется", "отсутствует", "********"]);
-const cableTokenPattern = /\b[0-9][0-9A-ZА-ЯЁ/-]*[KК][0-9A-ZА-ЯЁ/-]+\b/gi;
+const cableTokenPattern = /(?<![0-9A-ZА-ЯЁ/-])[0-9][0-9A-ZА-ЯЁ/-]*[KК][0-9A-ZА-ЯЁ/-]+(?![0-9A-ZА-ЯЁ/-])/gi;
 const workbookProfiles: WorkbookProfile[] = [
 	{
 		sheetName: "ЭМР ИК",
@@ -52,7 +47,7 @@ function normalizeValue(value: unknown) {
 }
 
 function normalizeCableToken(value: string) {
-	return value.toUpperCase().replaceAll("К", "K").replace(/\s+/g, "");
+	return enToRuVisual(value).toUpperCase().replace(/\s+/g, "");
 }
 
 function getCableTokens(value: unknown) {
@@ -141,58 +136,35 @@ function parseCompletedCableTokens(fileName: string, buffer: Buffer) {
 	return tokens;
 }
 
-function extractImportedCableToken(cableLabel: string) {
-	return getCableTokens(cableLabel)[0] ?? normalizeCableToken(cableLabel.split(/\s+/)[0] ?? cableLabel);
+async function getActiveInstallationSnapshot(db: DbClient) {
+	const [snapshot] = await db
+		.select({
+			id: installationSnapshots.id,
+		})
+		.from(installationSnapshots)
+		.where(eq(installationSnapshots.isActive, true))
+		.orderBy(desc(installationSnapshots.createdAt))
+		.limit(1);
+
+	return snapshot ?? null;
 }
 
-async function getActiveInstallationCableRows() {
-	const db = getDb();
-
+async function getActiveInstallationKksItems(db: DbClient, snapshotId: string) {
 	return db
 		.select({
-			snapshotId: importedCableRows.snapshotId,
-			cableRowId: importedCableRows.id,
-			cableLabel: importedCableRows.cableLabel,
-			shaft: importedCableRows.farthestShaft,
-			groupId: graphGroups.id,
-			roomId: graphGroupRooms.id,
-			roomName: graphGroupRooms.roomName,
-			progress: cableProgress.progress,
+			id: installationKksItems.id,
+			name: installationKksItems.name,
+			itemType: installationKksItems.itemType,
+			isDone: installationKksItems.isDone,
 		})
-		.from(importedCableRows)
-		.innerJoin(
-			importSnapshots,
-			and(
-				eq(importSnapshots.id, importedCableRows.snapshotId),
-				eq(importSnapshots.snapshotKind, "installation"),
-				eq(importSnapshots.isActive, true)
-			)
-		)
-		.innerJoin(
-			graphGroups,
-			and(
-				eq(graphGroups.snapshotId, importedCableRows.snapshotId),
-				eq(graphGroups.graphSide, importedCableRows.graphSide),
-				eq(graphGroups.graphSubzone, importedCableRows.graphSubzone),
-				eq(graphGroups.sourceZone, importedCableRows.fromZone),
-				eq(graphGroups.level, importedCableRows.level)
-			)
-		)
-		.innerJoin(
-			graphGroupRooms,
-			and(
-				eq(graphGroupRooms.groupId, graphGroups.id),
-				eq(graphGroupRooms.roomRole, "primary"),
-				eq(graphGroupRooms.roomName, importedCableRows.fromRoom)
-			)
-		)
-		.leftJoin(
-			cableProgress,
-			and(
-				eq(cableProgress.snapshotId, importedCableRows.snapshotId),
-				eq(cableProgress.cableRowId, importedCableRows.id)
-			)
-		);
+		.from(installationKksItems)
+		.where(eq(installationKksItems.snapshotId, snapshotId));
+}
+
+function getMatchedItems(items: ActiveInstallationKksItem[], completedCableTokens: Set<string>) {
+	return items.filter(
+		(item) => item.itemType === "cable" && completedCableTokens.has(normalizeCableToken(item.name))
+	);
 }
 
 function chunkValues<T>(values: T[], size: number) {
@@ -224,11 +196,16 @@ export async function importInstallationProgressFromFormData(formData: FormData,
 		})
 	);
 	const completedCableTokens = new Set(tokenSets.flatMap((tokens) => [...tokens]));
-	const activeRows = await getActiveInstallationCableRows();
-	const matchedRows = activeRows.filter((row) =>
-		completedCableTokens.has(extractImportedCableToken(row.cableLabel))
-	);
-	const changedRows = matchedRows.filter((row) => (row.progress ?? 0) !== 100);
+	const db = getDb();
+	const snapshot = await getActiveInstallationSnapshot(db);
+
+	if (!snapshot) {
+		throw new Error("Активный набор данных монтажа не найден.");
+	}
+
+	const activeItems = await getActiveInstallationKksItems(db, snapshot.id);
+	const matchedRows = getMatchedItems(activeItems, completedCableTokens);
+	const changedRows = matchedRows.filter((row) => !row.isDone);
 
 	if (matchedRows.length === 0) {
 		return {
@@ -239,60 +216,26 @@ export async function importInstallationProgressFromFormData(formData: FormData,
 		};
 	}
 
-	const db = getDb();
 	const now = new Date();
-	const effectiveDate = getTodayIsoInMoscow();
 
 	await db.transaction(async (tx) => {
 		for (const chunk of chunkValues(changedRows, 500)) {
 			if (chunk.length === 0) continue;
 
 			await tx
-				.insert(cableProgress)
-				.values(
-					chunk.map((row) => ({
-						snapshotId: row.snapshotId,
-						groupId: row.groupId,
-						roomId: row.roomId,
-						cableRowId: row.cableRowId,
-						progress: 100,
-						effectiveDate,
-						updatedByUserId: session.id,
-						updatedAt: now,
-						createdAt: now,
-					}))
-				)
-				.onConflictDoUpdate({
-					target: [cableProgress.snapshotId, cableProgress.cableRowId],
-					set: {
-						progress: 100,
-						effectiveDate,
-						updatedByUserId: session.id,
-						updatedAt: now,
-					},
-				});
-		}
-
-		if (changedRows.length > 0) {
-			await tx.insert(cableChangeAuditLogs).values(
-				changedRows.map((row) => ({
-					snapshotId: row.snapshotId,
-					groupId: row.groupId,
-					roomId: row.roomId,
-					cableRowId: row.cableRowId,
-					roomName: row.roomName,
-					cableLabel: row.cableLabel,
-					shaft: row.shaft ?? 0,
-					userId: session.id,
-					userLogin: session.login,
-					changedAt: now,
-					effectiveDate,
-					isBackdated: false,
-					oldProgress: row.progress ?? 0,
-					newProgress: 100,
-					createdAt: now,
-				}))
-			);
+				.update(installationKksItems)
+				.set({
+					isDone: true,
+					revision: sql`${installationKksItems.revision} + 1`,
+					updatedByUserId: session.id,
+					updatedAt: now,
+				})
+				.where(
+					inArray(
+						installationKksItems.id,
+						chunk.map((row) => row.id)
+					)
+				);
 		}
 	});
 
@@ -303,3 +246,7 @@ export async function importInstallationProgressFromFormData(formData: FormData,
 		changedCableCount: changedRows.length,
 	};
 }
+
+export const __installationProgressImportTestUtils = {
+	parseCompletedCableTokens,
+};

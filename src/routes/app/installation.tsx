@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { CableMapView } from "@/components/cable-map/cable-map-view";
-import { canEditProgress, canManageManualRooms } from "@/lib/auth/shared";
-import { getInstallationDashboardData } from "@/lib/cable-map/functions";
+import { InstallationBoard } from "@/components/installation/installation-board";
+import { canEditInstallation } from "@/lib/auth/shared";
+import { getInstallationBoardData } from "@/lib/installation/functions";
 
 export const Route = createFileRoute("/app/installation")({
-	loader: async () => getInstallationDashboardData(),
+	loader: async () => getInstallationBoardData(),
 	component: InstallationPage,
 });
 
@@ -15,12 +15,5 @@ function InstallationPage() {
 
 	if (!auth) return null;
 
-	return (
-		<CableMapView
-			data={data}
-			canEditProgress={canEditProgress(auth.role)}
-			canManageManualRooms={canManageManualRooms(auth.role)}
-			role={auth.role}
-		/>
-	);
+	return <InstallationBoard initialData={data} canEdit={canEditInstallation(auth.role)} />;
 }

@@ -118,7 +118,7 @@ export async function warmInstallationPhotoOcrAssets(
 	onProgress: (progress: InstallationPhotoAssetProgress) => void
 ) {
 	if (!canUseOfflineOcrStorage()) {
-		throw new Error("Браузер не поддерживает offline-кэш для OCR.");
+		throw new Error("Браузер не поддерживает офлайн-кэш для OCR.");
 	}
 
 	await waitForOfflineCacheReady();

@@ -653,7 +653,6 @@ function getFileType(fileName: string) {
 	return extension as (typeof supportedWorkbookExtensions)[number];
 }
 
-// TODO: Add more file validation
 export async function ensureUploadFile(formData: FormData, fieldName = "file") {
 	const file = formData.get(fieldName);
 

@@ -102,7 +102,7 @@ export function AppShell({ children, user }: { children: React.ReactNode; user: 
 						aria-hidden={chromeHidden}
 						inert={chromeHidden ? true : undefined}
 						className={cn(
-							"fixed top-0 right-0 left-0 z-50 flex h-[calc(2.5rem+env(safe-area-inset-top))] items-center gap-2 border-b bg-background/95 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-sm transition-[opacity,transform] duration-300 ease-out md:left-(--app-shell-sidebar-offset)",
+							"fixed top-0 right-0 left-0 z-50 flex h-[calc(2.5rem+env(safe-area-inset-top))] items-center gap-2 border-b bg-background px-2 pt-[env(safe-area-inset-top)] transition-[opacity,transform] duration-300 ease-out md:left-(--app-shell-sidebar-offset)",
 							chromeHidden && "pointer-events-none -translate-y-full opacity-0"
 						)}>
 						<Button
@@ -359,11 +359,11 @@ function ApprovalAccountsButton({ pathname }: { pathname: string }) {
 				className="hidden sm:inline-flex">
 				<Link to="/app/users">
 					<UserCheckIcon data-icon="inline-start" />
-					Подтверждение учёток
+					Пользователи
 				</Link>
 			</Button>
 			<Button asChild variant={isUsersPage ? "secondary" : "outline"} size="icon-sm" className="sm:hidden">
-				<Link to="/app/users" aria-label="Подтверждение учётных записей">
+				<Link to="/app/users" aria-label="Пользователи">
 					<UserCheckIcon />
 				</Link>
 			</Button>

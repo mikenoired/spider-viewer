@@ -4,29 +4,31 @@ import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import type { SnapshotSummaryView } from "@/lib/cable-map/shared";
 import {
 	uploadInstallationProgressWorkbooks,
 	uploadInstallationWorkbook,
 } from "@/lib/installation/functions";
+import type { InstallationSnapshotView } from "@/lib/installation/shared";
 
 import { InstallationImportPanel } from "./installation-import-panel";
 
-export function InstallationImportForm({ snapshot }: { snapshot: SnapshotSummaryView | null }) {
+export function InstallationImportForm({ snapshot }: { snapshot: InstallationSnapshotView | null }) {
 	const router = useRouter();
 	const [importing, setImporting] = useState(false);
 	const [importingProgress, setImportingProgress] = useState(false);
 
-	async function handleUpload(file: File) {
+	async function handleUpload(file: File, baseFile: File | null) {
 		setImporting(true);
 
 		try {
 			const formData = new FormData();
 			formData.set("file", file);
+			if (baseFile) formData.set("baseFile", baseFile);
+
 			const result = await uploadInstallationWorkbook({ data: formData });
 
 			await router.invalidate();
-			toast.success(`Карта монтажа импортирована: ${result.rowCount} строк, ${result.groupCount} групп.`);
+			toast.success(`Монтаж импортирован: ${result.kksCount} KKS, ${result.groupCount} групп.`);
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Не удалось импортировать монтаж.");
 		} finally {

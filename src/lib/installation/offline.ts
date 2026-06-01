@@ -39,7 +39,7 @@ function openInstallationDb() {
 				});
 			}
 		};
-		request.onerror = () => reject(request.error ?? createOfflineError("Не удалось открыть offline-кэш."));
+		request.onerror = () => reject(request.error ?? createOfflineError("Не удалось открыть офлайн-кэш."));
 		request.onsuccess = () => resolve(request.result);
 	});
 }
@@ -58,9 +58,9 @@ function runStoreRequest<T>(
 				transaction.oncomplete = () => db.close();
 				transaction.onerror = () => {
 					db.close();
-					reject(transaction.error ?? createOfflineError("Ошибка offline-хранилища."));
+					reject(transaction.error ?? createOfflineError("Ошибка офлайн-хранилища."));
 				};
-				request.onerror = () => reject(request.error ?? createOfflineError("Ошибка offline-запроса."));
+				request.onerror = () => reject(request.error ?? createOfflineError("Ошибка офлайн-запроса."));
 				request.onsuccess = () => resolve(request.result);
 			})
 	);
@@ -122,7 +122,7 @@ export async function queueInstallationOutboxChanges(changes: InstallationOfflin
 		};
 		transaction.onerror = () => {
 			db.close();
-			reject(transaction.error ?? createOfflineError("Не удалось сохранить offline-очередь."));
+			reject(transaction.error ?? createOfflineError("Не удалось сохранить офлайн-очередь."));
 		};
 	});
 }
@@ -144,7 +144,7 @@ export async function removeInstallationOutboxChanges(clientMutationIds: string[
 		};
 		transaction.onerror = () => {
 			db.close();
-			reject(transaction.error ?? createOfflineError("Не удалось очистить очередь offline-изменений."));
+			reject(transaction.error ?? createOfflineError("Не удалось очистить очередь офлайн-изменений."));
 		};
 	});
 }

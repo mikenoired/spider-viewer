@@ -120,7 +120,7 @@ export function SummaryCard({
 					<CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
 					<CardDescription className="text-2xl font-semibold text-foreground">{value}</CardDescription>
 				</div>
-				<div className="rounded-xl border bg-muted/30 p-2 text-muted-foreground">{icon}</div>
+				<div className="rounded-lg border bg-muted/30 p-2 text-muted-foreground">{icon}</div>
 			</CardHeader>
 			<CardContent className="pt-0 text-sm text-muted-foreground">{description}</CardContent>
 		</Card>

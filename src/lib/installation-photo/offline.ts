@@ -47,10 +47,10 @@ function runPhotoStoreRequest<T>(
 				transaction.oncomplete = () => db.close();
 				transaction.onerror = () => {
 					db.close();
-					reject(transaction.error ?? createPhotoStorageError("Ошибка offline-хранилища фото."));
+					reject(transaction.error ?? createPhotoStorageError("Ошибка офлайн-хранилища фото."));
 				};
 				request.onerror = () =>
-					reject(request.error ?? createPhotoStorageError("Ошибка offline-запроса фото."));
+					reject(request.error ?? createPhotoStorageError("Ошибка офлайн-запроса фото."));
 				request.onsuccess = () => resolve(request.result);
 			})
 	);

@@ -16,7 +16,7 @@ export function ConflictBanner() {
 			<TriangleAlertIcon className="mt-0.5 shrink-0 text-destructive" />
 			<div>
 				<div className="font-medium">Решите конфликт слияния перед сохранением в доске</div>
-				<div className="text-muted-foreground">Выберите серверное состояние или offline-изменение.</div>
+				<div className="text-muted-foreground">Выберите состояние на сервере или офлайн-изменение.</div>
 			</div>
 		</div>
 	);
@@ -50,7 +50,7 @@ export function ProcessingChangeRow({
 				/>
 				<ChoiceButton
 					active={value === change.desiredDone}
-					label="Offline"
+					label="Офлайн"
 					value={getStatusLabel(change.desiredDone)}
 					onClick={() => onChange(change.desiredDone)}
 				/>

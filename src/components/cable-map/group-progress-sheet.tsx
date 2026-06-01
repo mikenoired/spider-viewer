@@ -204,8 +204,8 @@ function GroupProgressTrigger({
 				onClick={onOpen}
 				className={cn(
 					variant === "map"
-						? "relative flex h-full w-full flex-col rounded-[8px] border border-zinc-400/80 bg-white/90 px-3 py-2 text-left text-zinc-900 shadow-sm transition hover:border-zinc-500 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950/80 dark:text-zinc-100 dark:hover:border-zinc-500 dark:hover:bg-zinc-800 cursor-pointer"
-						: "flex min-h-40 w-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left transition hover:border-primary/40 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60",
+						? "relative flex h-full w-full flex-col rounded-lg border border-zinc-400/80 bg-white/90 px-3 py-2 text-left text-zinc-900 transition hover:border-zinc-500 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950/80 dark:text-zinc-100 dark:hover:border-zinc-500 dark:hover:bg-zinc-800 cursor-pointer"
+						: "flex min-h-40 w-full flex-col gap-3 rounded-lg border border-border bg-card p-4 text-left transition hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60",
 					!hasRooms && "pointer-events-none",
 					className
 				)}
@@ -226,9 +226,7 @@ function GroupProgressTrigger({
 					<>
 						<div className="flex items-start justify-between gap-3">
 							<div className="flex flex-col gap-1">
-								<div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-									Основной блок помещений
-								</div>
+								<div className="text-xs uppercase text-muted-foreground">Основной блок помещений</div>
 								<div className="text-sm font-medium">{group.primaryRooms.length} помещений</div>
 							</div>
 							<Badge variant="secondary">{group.averageProgress}%</Badge>
@@ -271,14 +269,14 @@ function GroupProgressControls({
 }) {
 	if (!canEdit) {
 		return (
-			<div className="rounded-2xl border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+			<div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
 				Режим просмотра: редактирование доступно только админам и супер-админам.
 			</div>
 		);
 	}
 
 	return (
-		<div className="grid gap-2 rounded-2xl border bg-muted/30 p-3 sm:flex sm:flex-wrap sm:items-center">
+		<div className="grid gap-2 rounded-lg border bg-muted/30 p-3 sm:flex sm:flex-wrap sm:items-center">
 			<Button type="button" onClick={onSave} disabled={!isDirty || pending} className="h-10 sm:h-8">
 				{pending ? (
 					<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
@@ -341,7 +339,7 @@ function CableProgressEditor({
 	const metaParts = [cable.cableNumber, cable.cableJournal].filter(Boolean);
 
 	return (
-		<div className="grid gap-3 rounded-xl border bg-background/80 p-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-center">
+		<div className="grid gap-3 rounded-lg border bg-background/80 p-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-center">
 			<div className="min-w-0 space-y-2">
 				<div className="flex flex-wrap items-center gap-2">
 					<div className="min-w-0 flex-1 text-sm font-medium break-words text-foreground">
@@ -413,7 +411,7 @@ function GroupProgressTable({
 
 					return (
 						<Fragment key={room.id}>
-							<TableRow className="block rounded-xl border sm:table-row sm:rounded-none sm:border-x-0">
+							<TableRow className="block rounded-lg border sm:table-row sm:rounded-none sm:border-x-0">
 								<TableCell className="px-3 py-2 font-medium sm:table-cell sm:p-2" data-label="Помещение">
 									<button
 										type="button"
@@ -463,7 +461,7 @@ function GroupProgressTable({
 							{isExpanded ? (
 								<TableRow className="block border-0 sm:table-row">
 									<TableCell colSpan={5} className="px-0 pt-0 pb-3 sm:p-3">
-										<div className="mx-3 grid gap-2 rounded-2xl border bg-muted/20 p-3 sm:mx-0">
+										<div className="mx-3 grid gap-2 rounded-lg border bg-muted/20 p-3 sm:mx-0">
 											{room.cables.length > 0 ? (
 												room.cables.map((cable) => (
 													<CableProgressEditor
@@ -476,7 +474,7 @@ function GroupProgressTable({
 													/>
 												))
 											) : (
-												<div className="rounded-xl border border-dashed px-4 py-6 text-sm text-muted-foreground">
+												<div className="rounded-lg border border-dashed px-4 py-6 text-sm text-muted-foreground">
 													Для этого помещения кабели не найдены.
 												</div>
 											)}

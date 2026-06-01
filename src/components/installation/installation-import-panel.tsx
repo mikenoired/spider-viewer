@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import type { SnapshotSummaryView } from "@/lib/cable-map/shared";
+import type { InstallationSnapshotView } from "@/lib/installation/shared";
 
 export function InstallationImportPanel({
 	canEdit,
@@ -21,11 +21,12 @@ export function InstallationImportPanel({
 	canEdit: boolean;
 	importing: boolean;
 	importingProgress: boolean;
-	snapshot: SnapshotSummaryView | null;
-	onUpload: (file: File) => Promise<void>;
+	snapshot: InstallationSnapshotView | null;
+	onUpload: (file: File, baseFile: File | null) => Promise<void>;
 	onProgressUpload: (files: File[]) => Promise<void>;
 }) {
 	const [file, setFile] = useState<File | null>(null);
+	const [baseFile, setBaseFile] = useState<File | null>(null);
 	const [progressFiles, setProgressFiles] = useState<File[]>([]);
 
 	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -36,8 +37,9 @@ export function InstallationImportPanel({
 			return;
 		}
 
-		await onUpload(file);
+		await onUpload(file, baseFile);
 		setFile(null);
+		setBaseFile(null);
 		event.currentTarget.reset();
 	}
 
@@ -59,7 +61,7 @@ export function InstallationImportPanel({
 			<CardHeader>
 				<CardTitle>Данные монтажа</CardTitle>
 				<CardDescription>
-					Импорт workbook УСБТ строит карту монтажа в том же формате, что и карта демонтажа.
+					Импорт первоочередных карточек собирает группы KKS и переносит готовность из базы кабелей.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.7fr)]">
@@ -67,7 +69,7 @@ export function InstallationImportPanel({
 					<form className="flex flex-col gap-4" onSubmit={handleSubmit}>
 						<FieldGroup>
 							<Field>
-								<FieldLabel htmlFor="installation-file">Файл карты монтажа</FieldLabel>
+								<FieldLabel htmlFor="installation-file">Файл первоочередных карточек</FieldLabel>
 								<Input
 									id="installation-file"
 									type="file"
@@ -76,7 +78,22 @@ export function InstallationImportPanel({
 									onChange={(event) => setFile(event.target.files?.[0] ?? null)}
 								/>
 								<FieldDescription>
-									Ожидается workbook с листом `УСБТ`. Повторный импорт заменит активную карту монтажа.
+									Ожидается workbook с группами «Арматура», «ИК» и другими карточками. Повторный импорт
+									заменит активный набор данных монтажа.
+								</FieldDescription>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor="installation-base-file">База кабелей для контроля</FieldLabel>
+								<Input
+									id="installation-base-file"
+									type="file"
+									accept=".ods,.xlsx,.xls"
+									disabled={!canEdit || importing}
+									onChange={(event) => setBaseFile(event.target.files?.[0] ?? null)}
+								/>
+								<FieldDescription>
+									Необязательный файл. Если в базе кабель отмечен как проложенный, он сразу попадёт в
+									«Готово».
 								</FieldDescription>
 							</Field>
 						</FieldGroup>
@@ -86,12 +103,10 @@ export function InstallationImportPanel({
 							) : (
 								<UploadIcon data-icon="inline-start" />
 							)}
-							Импортировать карту
+							Импортировать монтаж
 						</Button>
 					</form>
-					<form
-						className="flex flex-col gap-4 rounded-xl border bg-muted/20 p-3"
-						onSubmit={handleProgressSubmit}>
+					<form className="flex flex-col gap-4 border-t pt-4" onSubmit={handleProgressSubmit}>
 						<FieldGroup>
 							<Field>
 								<FieldLabel htmlFor="installation-progress-files">Файлы выполненных работ</FieldLabel>
@@ -104,8 +119,7 @@ export function InstallationImportPanel({
 									onChange={(event) => setProgressFiles(Array.from(event.target.files ?? []))}
 								/>
 								<FieldDescription>
-									Поддержаны журналы готовности ИК и ДУ. Найденные кабели отмечаются как 100% и попадают в
-									отчёт.
+									Поддержаны журналы готовности ИК и ДУ. Найденные кабели отмечаются готовыми в доске.
 								</FieldDescription>
 							</Field>
 						</FieldGroup>
@@ -128,17 +142,17 @@ export function InstallationImportPanel({
 	);
 }
 
-function SnapshotSummary({ snapshot }: { snapshot: SnapshotSummaryView | null }) {
+function SnapshotSummary({ snapshot }: { snapshot: InstallationSnapshotView | null }) {
 	if (!snapshot) {
 		return (
-			<div className="rounded-lg border border-dashed px-4 py-6 text-sm text-muted-foreground">
+			<div className="border-t px-1 py-4 text-sm text-muted-foreground lg:border-l lg:border-t-0 lg:pl-4">
 				Активные данные монтажа пока не загружены.
 			</div>
 		);
 	}
 
 	return (
-		<div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4">
+		<div className="flex flex-col gap-3 border-t pt-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
 			<div className="flex items-start gap-3">
 				<div className="rounded-md border bg-background p-2 text-muted-foreground">
 					<FileSpreadsheetIcon />
@@ -150,9 +164,9 @@ function SnapshotSummary({ snapshot }: { snapshot: SnapshotSummaryView | null })
 			</div>
 			<div className="grid grid-cols-2 gap-2 text-sm">
 				<SummaryItem label="Групп" value={String(snapshot.groupCount)} />
-				<SummaryItem label="Кабелей" value={String(snapshot.rowCount)} />
-				<SummaryItem label="Уровней" value={String(snapshot.levelCount)} />
-				<SummaryItem label="Прогресс" value={`${snapshot.averageProgress}%`} />
+				<SummaryItem label="KKS" value={String(snapshot.kksCount)} />
+				<SummaryItem label="Кабелей" value={String(snapshot.cableCount)} />
+				<SummaryItem label="Готово из базы" value={String(snapshot.baseDoneCount)} />
 			</div>
 		</div>
 	);
@@ -160,7 +174,7 @@ function SnapshotSummary({ snapshot }: { snapshot: SnapshotSummaryView | null })
 
 function SummaryItem({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="rounded-md border bg-background px-3 py-2">
+		<div>
 			<div className="text-xs text-muted-foreground">{label}</div>
 			<div className="text-base font-medium">{value}</div>
 		</div>

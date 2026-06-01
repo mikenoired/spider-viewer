@@ -49,13 +49,13 @@ export async function saveInstallationKksState(input: SaveInstallationKksInput, 
 	const snapshot = await getActiveSnapshot(db, input.snapshotId);
 
 	if (!snapshot) {
-		throw new Error("Активный snapshot монтажа не найден.");
+		throw new Error("Активный набор данных монтажа не найден.");
 	}
 
 	const item = await getInstallationItem(db, input);
 
 	if (!item) {
-		throw new Error("KKS не найден в активном snapshot монтажа.");
+		throw new Error("KKS не найден в активном наборе данных монтажа.");
 	}
 
 	if (item.revision !== input.baseRevision) {
@@ -131,14 +131,14 @@ export async function submitInstallationOfflineChanges(
 	const snapshot = await getActiveSnapshot(db, input.snapshotId);
 
 	if (!snapshot) {
-		throw new Error("Активный snapshot монтажа не найден.");
+		throw new Error("Активный набор данных монтажа не найден.");
 	}
 
 	const itemIds = [...new Set(input.changes.map((change) => change.kksItemId))];
 	const currentItems = await getCurrentItems(db, input.snapshotId, itemIds);
 
 	if (currentItems.length !== itemIds.length) {
-		throw new Error("Не все KKS найдены для обработки offline-изменений.");
+		throw new Error("Не все KKS найдены для обработки офлайн-изменений.");
 	}
 
 	const currentDoneByItemId = new Map(currentItems.map((item) => [item.id, item.isDone]));
