@@ -13,6 +13,7 @@ import {
 	PercentIcon,
 	PlusIcon,
 	RefreshCcwIcon,
+	StarIcon,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -30,6 +31,8 @@ import { buildDailyHistoryReportFileName } from "@/lib/cable-map/report-utils";
 import type { DashboardData } from "@/lib/cable-map/shared";
 import { cn, downloadResponseFile } from "@/lib/utils";
 
+import { InstallationKanbanBoard } from "../installation-kanban-board";
+import { PriorityRoomListsCard } from "../priority-room-lists-card";
 import { boardColumns, boardWidth } from "./config";
 import { LevelBandView } from "./level-band-view";
 import { LeftZoneHeader, MapTitle, PathHeader, RightZoneHeader, SummaryCard } from "./map-header";
@@ -170,6 +173,16 @@ function getDailyReportExportErrorMessage(error: unknown, level?: string) {
 	return level ? `Не удалось выгрузить отчёт по уровню ${level}.` : "Не удалось выгрузить ежедневный отчёт.";
 }
 
+function getInteractiveMapTitle(snapshotKind: DashboardData["snapshotKind"]) {
+	return snapshotKind === "installation" ? "Интерактивная карта монтажа" : "Интерактивная карта демонтажа";
+}
+
+function getEmptySnapshotDescription(snapshotKind: DashboardData["snapshotKind"]) {
+	return snapshotKind === "installation"
+		? 'Сначала нужно импортировать файл монтажа, после чего появится интерактивная карта монтажа.'
+		: 'Сначала нужно импортировать файл с листом "Общ", после чего появится интерактивная карта демонтажа.';
+}
+
 async function exportDailyReport(snapshotKind: DashboardData["snapshotKind"], level?: string) {
 	const fileName = buildDailyHistoryReportFileName(level);
 	const response = await downloadDailyHistoryDocx({
@@ -225,6 +238,7 @@ export function CableMapView({
 	const [isDragging, setIsDragging] = useState(false);
 	const [isFullscreen, setIsFullscreen] = useState(false);
 	const [overlayLocks, setOverlayLocks] = useState<Record<string, boolean>>({});
+	const [highlightedRoomId, setHighlightedRoomId] = useState<string | null>(null);
 	const canExportDailyReport = canViewAudit(role);
 	const isOverlayOpen = Object.keys(overlayLocks).length > 0;
 	const levelBands = useMemo(() => buildLevelBands(data.levels), [data.levels]);
@@ -971,10 +985,7 @@ export function CableMapView({
 			<Card className="border-dashed">
 				<CardHeader>
 					<CardTitle>Активный граф пока не загружен</CardTitle>
-					<CardDescription>
-						Сначала нужно импортировать файл с листом {'"Общ"'}, после чего появится интерактивная карта
-						демонтажа.
-					</CardDescription>
+					<CardDescription>{getEmptySnapshotDescription(data.snapshotKind)}</CardDescription>
 				</CardHeader>
 				<CardContent className="flex flex-wrap items-center gap-3">
 					<Badge variant="secondary">Ожидание данных</Badge>
@@ -1025,6 +1036,22 @@ export function CableMapView({
 				</Card>
 			</div>
 
+			{data.snapshotKind === "installation" ? (
+				<div className="grid gap-4 px-4">
+					<PriorityRoomListsCard
+						canUpload={canUploadSnapshot(role)}
+						priorityLists={data.priorityLists}
+						priorityRoomCount={data.priorityRoomCount}
+					/>
+					<InstallationKanbanBoard
+						rooms={data.priorityKanbanRooms}
+						canVerify={role === "super-admin"}
+						highlightedRoomId={highlightedRoomId}
+						onHoverRoom={setHighlightedRoomId}
+					/>
+				</div>
+			) : null}
+
 			<div
 				className="px-4 pb-4"
 				style={isFullscreen && workspaceHeight > 0 ? { minHeight: workspaceHeight } : undefined}>
@@ -1058,7 +1085,9 @@ export function CableMapView({
 						<div className="border-b border-border/70 px-4 py-3">
 							<div className="flex flex-wrap items-center justify-between gap-3">
 								<div className="min-w-0">
-									<div className="text-sm font-semibold text-foreground">Интерактивная карта демонтажа</div>
+									<div className="text-sm font-semibold text-foreground">
+										{getInteractiveMapTitle(data.snapshotKind)}
+									</div>
 									<div className="text-sm text-muted-foreground">
 										Перетягивайте карту в любом направлении, масштабируйте сцену и разворачивайте ее на весь
 										экран.
@@ -1066,6 +1095,14 @@ export function CableMapView({
 								</div>
 
 								<div className="flex flex-wrap items-center gap-2">
+									{data.snapshotKind === "installation" && data.priorityRoomCount > 0 ? (
+										<Badge
+											variant="outline"
+											className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/50 dark:bg-amber-500/10 dark:text-amber-100">
+											<StarIcon className="mr-1 size-3.5" />
+											Приоритетных помещений: {data.priorityRoomCount}
+										</Badge>
+									) : null}
 									<div className="flex items-center gap-1 rounded-lg border border-border/80 bg-background/90 p-1">
 										<Button
 											type="button"
@@ -1311,6 +1348,8 @@ export function CableMapView({
 													isExportingReport={exportingLevel === band.level}
 													onExportDailyReport={handleDailyReportExport}
 													isLast={index === levelBands.length - 1}
+													highlightedRoomId={highlightedRoomId}
+													onHoverRoom={setHighlightedRoomId}
 												/>
 											))}
 										</div>

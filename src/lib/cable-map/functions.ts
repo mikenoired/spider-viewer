@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireRole } from "@/lib/auth/guards";
-import { canEditProgress, canViewAudit } from "@/lib/auth/shared";
+import { requireRole, requireSession } from "@/lib/auth/guards";
+import { canEditProgress, canUploadSnapshot, canViewAudit } from "@/lib/auth/shared";
 
 import {
 	createManualRoomSchema,
@@ -11,6 +11,7 @@ import {
 	exportDailyHistorySchema,
 	exportHistorySchema,
 	saveCableProgressSchema,
+	updatePriorityRoomKanbanStatusSchema,
 } from "./shared";
 
 export const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
@@ -29,6 +30,27 @@ export const uploadWorkbook = createServerFn({ method: "POST" })
 		const session = await requireRole(["super-admin"]);
 		const { importWorkbookFromFormData } = await import("./import.server");
 		return importWorkbookFromFormData(data, session);
+	});
+
+export const uploadPriorityRoomList = createServerFn({ method: "POST" })
+	.inputValidator((input: FormData) => input)
+	.handler(async ({ data }) => {
+		const session = await requireRole(["super-admin"]);
+
+		if (!canUploadSnapshot(session.role)) {
+			throw new Error("Недостаточно прав для загрузки списков.");
+		}
+
+		const { importPriorityRoomListFromFormData } = await import("./priority-room-lists.server");
+		return importPriorityRoomListFromFormData(data, session);
+	});
+
+export const updatePriorityRoomKanbanStatus = createServerFn({ method: "POST" })
+	.inputValidator(updatePriorityRoomKanbanStatusSchema)
+	.handler(async ({ data }) => {
+		const session = await requireSession();
+		const { updatePriorityRoomKanbanState } = await import("./priority-room-kanban.server");
+		return updatePriorityRoomKanbanState(data, session);
 	});
 
 export const saveCableProgress = createServerFn({ method: "POST" })

@@ -31,6 +31,8 @@ export const LevelBandView = memo(function LevelBandView({
 	isExportingReport,
 	onExportDailyReport,
 	isLast,
+	highlightedRoomId,
+	onHoverRoom,
 }: {
 	band: LevelBand;
 	bandIndex: number;
@@ -42,6 +44,8 @@ export const LevelBandView = memo(function LevelBandView({
 	isExportingReport: boolean;
 	onExportDailyReport: (level: string) => void;
 	isLast: boolean;
+	highlightedRoomId?: string | null;
+	onHoverRoom?: (roomId: string | null) => void;
 }) {
 	const isFirst = bandIndex === 0;
 	const displayedLevelLabel = getDisplayedLevelLabel(band.level);
@@ -107,6 +111,8 @@ export const LevelBandView = memo(function LevelBandView({
 						canEditProgress={canEditProgress}
 						canManageManualRooms={canManageManualRooms}
 						onOverlayOpenChange={onOverlayOpenChange}
+						highlightedRoomId={highlightedRoomId}
+						onHoverRoom={onHoverRoom}
 					/>
 				);
 			})}
@@ -122,6 +128,8 @@ const LevelBandRowView = memo(function LevelBandRowView({
 	canEditProgress,
 	canManageManualRooms,
 	onOverlayOpenChange,
+	highlightedRoomId,
+	onHoverRoom,
 }: {
 	dirtyGroup: LevelBand["rows"][number]["dirtyGroup"];
 	cleanGroup: LevelBand["rows"][number]["cleanGroup"];
@@ -130,6 +138,8 @@ const LevelBandRowView = memo(function LevelBandRowView({
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
 	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
+	highlightedRoomId?: string | null;
+	onHoverRoom?: (roomId: string | null) => void;
 }) {
 	return (
 		<>
@@ -139,6 +149,8 @@ const LevelBandRowView = memo(function LevelBandRowView({
 					canEditProgress={canEditProgress}
 					canManageManualRooms={canManageManualRooms}
 					onOverlayOpenChange={onOverlayOpenChange}
+					highlightedRoomId={highlightedRoomId}
+					onHoverRoom={onHoverRoom}
 				/>
 			</div>
 
@@ -164,6 +176,8 @@ const LevelBandRowView = memo(function LevelBandRowView({
 					canEditProgress={canEditProgress}
 					canManageManualRooms={canManageManualRooms}
 					onOverlayOpenChange={onOverlayOpenChange}
+					highlightedRoomId={highlightedRoomId}
+					onHoverRoom={onHoverRoom}
 				/>
 			</div>
 		</>
