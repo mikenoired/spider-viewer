@@ -22,11 +22,15 @@ export const LeftRoomArea = memo(function LeftRoomArea({
 	canEditProgress,
 	canManageManualRooms,
 	onOverlayOpenChange,
+	highlightedRoomId,
+	onHoverRoom,
 }: {
 	group: GraphGroupView | null;
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
 	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
+	highlightedRoomId?: string | null;
+	onHoverRoom?: (roomId: string | null) => void;
 }) {
 	if (!group) return;
 
@@ -42,6 +46,8 @@ export const LeftRoomArea = memo(function LeftRoomArea({
 				canEdit={canEditProgress}
 				variant="map"
 				onOverlayOpenChange={onOverlayOpenChange}
+				highlightedRoomId={highlightedRoomId}
+				onHoverRoom={onHoverRoom}
 			/>
 		</div>
 	);
@@ -52,11 +58,15 @@ export const RightRoomArea = memo(function RightRoomArea({
 	canEditProgress,
 	canManageManualRooms,
 	onOverlayOpenChange,
+	highlightedRoomId,
+	onHoverRoom,
 }: {
 	group: GraphGroupView | null;
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
 	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
+	highlightedRoomId?: string | null;
+	onHoverRoom?: (roomId: string | null) => void;
 }) {
 	if (!group) return;
 
@@ -68,6 +78,8 @@ export const RightRoomArea = memo(function RightRoomArea({
 				variant="map"
 				align="right"
 				onOverlayOpenChange={onOverlayOpenChange}
+				highlightedRoomId={highlightedRoomId}
+				onHoverRoom={onHoverRoom}
 			/>
 			<ManualRoomBlock
 				group={group}
