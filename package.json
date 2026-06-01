@@ -9,6 +9,7 @@
 		"start:prod": "NODE_ENV=production node ./scripts/serve.mjs",
 		"start:railway": "NODE_ENV=production HOST=0.0.0.0 node ./scripts/serve.mjs",
 		"preview": "vite preview",
+		"predeploy": "node ./scripts/predeploy.mjs",
 		"test": "vitest run",
 		"db:generate": "bunx --bun drizzle-kit generate",
 		"db:migrate": "bunx --bun drizzle-kit migrate",
