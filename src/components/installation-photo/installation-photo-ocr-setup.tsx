@@ -27,8 +27,8 @@ export function InstallationPhotoOcrSetup({
 	const canPrepare = assetState.status !== "unsupported";
 
 	return (
-		<div className="flex min-h-[calc(100svh-var(--app-shell-header-height)-8rem)] items-center justify-center">
-			<Card className="w-full max-w-xl" size="sm">
+		<div className="flex">
+			<Card className="w-full" size="sm">
 				<CardHeader>
 					<CardTitle>Подготовьте OCR для offline-работы</CardTitle>
 					<CardDescription>

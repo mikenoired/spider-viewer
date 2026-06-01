@@ -65,12 +65,12 @@ export function ProcessingGroupSheet({
 		<Sheet open={open} onOpenChange={onOpenChange}>
 			<SheetContent
 				side={isMobile ? "bottom" : "right"}
-				className="max-h-[85vh] w-full gap-0 pb-[calc(env(safe-area-inset-bottom)+1rem)] md:max-h-none md:max-w-xl">
-				<SheetHeader className="border-b">
+				className="h-[85svh] max-h-[85svh] w-full gap-0 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+1rem)] md:h-full md:max-h-none md:max-w-xl">
+				<SheetHeader className="shrink-0 border-b">
 					<SheetTitle>{group.name}</SheetTitle>
 					<SheetDescription>Проверьте offline-изменения перед переносом в доску.</SheetDescription>
 				</SheetHeader>
-				<div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4">
+				<div className="flex flex-col gap-3 p-4">
 					{group.hasConflicts ? <ConflictBanner /> : null}
 					{group.changes.map((change) => (
 						<ProcessingChangeRow

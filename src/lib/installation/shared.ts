@@ -2,9 +2,11 @@ import * as z from "zod";
 
 export const installationColumnIds = ["not_started", "in_progress", "done", "processing"] as const;
 export const installationVisibleColumnIds = ["not_started", "in_progress", "done"] as const;
+export const installationKksItemTypes = ["mechanism", "cable"] as const;
 
 export type InstallationColumnId = (typeof installationColumnIds)[number];
 export type InstallationVisibleColumnId = (typeof installationVisibleColumnIds)[number];
+export type InstallationKksItemType = (typeof installationKksItemTypes)[number];
 
 export const installationColumnLabels = {
 	not_started: "Не начато",
@@ -16,6 +18,11 @@ export const installationColumnLabels = {
 export type InstallationKksView = {
 	id: string;
 	name: string;
+	itemType: InstallationKksItemType;
+	sourceSheet: string;
+	sourceRowIndex: number;
+	sourceColumnLabel: string;
+	matchedInCableBase: boolean;
 	isDone: boolean;
 	revision: number;
 	updatedAt: string;
@@ -60,6 +67,10 @@ export type InstallationSnapshotView = {
 	rowCount: number;
 	groupCount: number;
 	kksCount: number;
+	cableCount: number;
+	mechanismCount: number;
+	baseMatchedCount: number;
+	baseDoneCount: number;
 	createdAt: string;
 };
 

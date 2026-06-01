@@ -24,6 +24,7 @@ export const graphSideLabels = {
 	dirty: "Демонтаж кабеля САЭ со стороны грязной зоны",
 	clean: "Демонтаж кабеля САЭ со стороны чистой зоны",
 } as const;
+type GraphSideLabels = Record<keyof typeof graphSideLabels, string>;
 
 export const graphSideLabelsBySnapshotKind = {
 	demolition: graphSideLabels,
@@ -31,12 +32,13 @@ export const graphSideLabelsBySnapshotKind = {
 		dirty: "Монтаж кабеля: сторона «Откуда»",
 		clean: "Монтаж кабеля: сторона «Куда»",
 	},
-} as const satisfies Record<SnapshotKind, typeof graphSideLabels>;
+} as const satisfies Record<SnapshotKind, GraphSideLabels>;
 
 export const graphSubzoneLabels = {
 	dirty: "Грязная зона",
 	clean: "Чистая зона",
 } as const;
+type GraphSubzoneLabels = Record<keyof typeof graphSubzoneLabels, string>;
 
 export const graphSubzoneLabelsBySnapshotKind = {
 	demolition: graphSubzoneLabels,
@@ -44,7 +46,7 @@ export const graphSubzoneLabelsBySnapshotKind = {
 		dirty: "Откуда",
 		clean: "Куда",
 	},
-} as const satisfies Record<SnapshotKind, typeof graphSubzoneLabels>;
+} as const satisfies Record<SnapshotKind, GraphSubzoneLabels>;
 
 export const shaftBucketLabels = {
 	0: "Не заходит в КШ",
