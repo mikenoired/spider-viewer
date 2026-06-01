@@ -50,7 +50,7 @@ async function runPredeploy() {
 	assertRuntimeFiles();
 
 	process.stdout.write("[predeploy] Applying database schema\n");
-	await runCommand(drizzleKitBin, ["push"]);
+	await runCommand(drizzleKitBin, ["push", "--verbose"]);
 
 	process.stdout.write("[predeploy] Seeding configured superusers\n");
 	await runCommand("node", ["./scripts/seed-superusers.mjs"]);
