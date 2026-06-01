@@ -6,12 +6,43 @@ import { existsSync } from "node:fs";
 const requiredEnvironmentVariables = ["DATABASE_URL", "AUTH_SUPERUSERS_JSON"];
 const drizzleKitBin = "./node_modules/.bin/drizzle-kit";
 
+function getRequiredEnvironmentVariable(name) {
+	const value = process.env[name];
+
+	if (!value) {
+		throw new Error(`Missing required predeploy env: ${name}.`);
+	}
+
+	return value;
+}
+
+function assertUnquotedEnvironmentVariable(name, value) {
+	if (value.startsWith('"') || value.endsWith('"')) {
+		throw new Error(`${name} must not include wrapping quotes in Railway Variables.`);
+	}
+}
+
+function assertResolvedRailwayReference(name, value) {
+	if (value.includes("${{")) {
+		throw new Error(`${name} contains an unresolved Railway reference: ${value}.`);
+	}
+}
+
 function assertRequiredEnvironment() {
 	const missingVariables = requiredEnvironmentVariables.filter((name) => !process.env[name]);
 
 	if (missingVariables.length > 0) {
 		throw new Error(`Missing required predeploy env: ${missingVariables.join(", ")}.`);
 	}
+
+	const databaseUrl = getRequiredEnvironmentVariable("DATABASE_URL");
+	const superusersJson = getRequiredEnvironmentVariable("AUTH_SUPERUSERS_JSON");
+
+	assertUnquotedEnvironmentVariable("DATABASE_URL", databaseUrl);
+	assertUnquotedEnvironmentVariable("AUTH_SUPERUSERS_JSON", superusersJson);
+	assertResolvedRailwayReference("DATABASE_URL", databaseUrl);
+
+	JSON.parse(superusersJson);
 }
 
 function assertRuntimeFiles() {
@@ -50,7 +81,7 @@ async function runPredeploy() {
 	assertRuntimeFiles();
 
 	process.stdout.write("[predeploy] Applying database schema\n");
-	await runCommand(drizzleKitBin, ["push", "--verbose"]);
+	await runCommand(drizzleKitBin, ["push", "--verbose", "--force"]);
 
 	process.stdout.write("[predeploy] Seeding configured superusers\n");
 	await runCommand("node", ["./scripts/seed-superusers.mjs"]);
