@@ -104,27 +104,30 @@ export function InstallationBoard({
 				outboxCount={board.outboxCount}
 				onRefresh={() => void handleRefresh()}
 			/>
-			{board.hasSnapshot && photoOcrAssets.shouldShowSetup ? (
-				<InstallationPhotoOcrSetup
-					assetState={photoOcrAssets.assetState}
-					assetProgress={photoOcrAssets.assetProgress}
-					preparingAssets={photoOcrAssets.preparingAssets}
-					onPrepareAssets={photoOcrAssets.prepareAssets}
-					onDismiss={photoOcrAssets.dismissSetup}
-				/>
-			) : board.hasSnapshot ? (
+			{board.hasSnapshot ? (
 				<>
-					<InstallationPhotoPanel
-						snapshotId={board.data.snapshot?.id ?? null}
-						knownItems={photoKnownItems}
-						canEdit={canEdit}
-						assetState={photoOcrAssets.assetState}
-						assetProgress={photoOcrAssets.assetProgress}
-						preparingAssets={photoOcrAssets.preparingAssets}
-						ocrReady={photoOcrAssets.isReady}
-						onPrepareAssets={photoOcrAssets.prepareAssets}
-						onApplyCandidates={handleApplyPhotoCandidates}
-					/>
+					<div className={photoOcrAssets.shouldShowSetup ? "grid gap-4 xl:grid-cols-2" : "grid gap-4"}>
+						{photoOcrAssets.shouldShowSetup ? (
+							<InstallationPhotoOcrSetup
+								assetState={photoOcrAssets.assetState}
+								assetProgress={photoOcrAssets.assetProgress}
+								preparingAssets={photoOcrAssets.preparingAssets}
+								onPrepareAssets={photoOcrAssets.prepareAssets}
+								onDismiss={photoOcrAssets.dismissSetup}
+							/>
+						) : null}
+						<InstallationPhotoPanel
+							snapshotId={board.data.snapshot?.id ?? null}
+							knownItems={photoKnownItems}
+							canEdit={canEdit}
+							assetState={photoOcrAssets.assetState}
+							assetProgress={photoOcrAssets.assetProgress}
+							preparingAssets={photoOcrAssets.preparingAssets}
+							ocrReady={photoOcrAssets.isReady}
+							onPrepareAssets={photoOcrAssets.prepareAssets}
+							onApplyCandidates={handleApplyPhotoCandidates}
+						/>
+					</div>
 					<ProcessingColumn
 						groups={board.data.processingGroups}
 						onOpen={(group) => setProcessingGroupId(group.id)}

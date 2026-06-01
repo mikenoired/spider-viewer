@@ -47,7 +47,7 @@ import type { AuthSession } from "@/lib/auth/shared";
 import { canManageUsers, canUploadSnapshot, canViewAudit, PROJECT_NAME, roleLabels } from "@/lib/auth/shared";
 import { cn } from "@/lib/utils";
 
-import { LogoutMenuItem } from "./logout-button";
+import { LogoutConfirmDialog, LogoutMenuItem } from "./logout-button";
 import { ThemeMenuItem } from "./theme-toggle";
 
 type AppShellChromeContextValue = {
@@ -260,78 +260,90 @@ function MobileNavigationSheet({
 
 function SidebarUserMenu({ user, mobile = false }: { user: AuthSession; mobile?: boolean }) {
 	const [open, setOpen] = useState(false);
+	const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+
+	function handleLogoutSelect() {
+		setOpen(false);
+		window.requestAnimationFrame(() => setLogoutConfirmOpen(true));
+	}
 
 	return (
-		<DropdownMenu open={open} onOpenChange={setOpen}>
-			<DropdownMenuTrigger asChild>
-				<Button
-					type="button"
-					variant="ghost"
-					className={cn(
-						"h-auto w-full justify-start gap-3 rounded-lg px-2! py-2 text-left hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground",
-						mobile
-							? "min-h-11 border bg-muted/20"
-							: "group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-					)}
-					aria-label="Меню пользователя">
-					<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold">
-						{getInitials(user.login)}
-					</div>
-					<div className={cn("min-w-0 flex-1", !mobile && "group-data-[collapsible=icon]:hidden")}>
-						<div className="truncate text-sm font-medium">{user.login}</div>
-					</div>
-					<ChevronsUpDownIcon
-						data-icon="inline-end"
-						className={cn("ml-auto text-muted-foreground", !mobile && "group-data-[collapsible=icon]:hidden")}
-					/>
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent
-				side="right"
-				align="end"
-				className="w-(--radix-dropdown-menu-trigger-width) min-w-56">
-				<DropdownMenuLabel className="px-2 py-2">
-					<div className="flex items-center gap-3">
-						<div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold">
+		<>
+			<DropdownMenu open={open} onOpenChange={setOpen}>
+				<DropdownMenuTrigger asChild>
+					<Button
+						type="button"
+						variant="ghost"
+						className={cn(
+							"h-auto w-full justify-start gap-3 rounded-lg px-2! py-2 text-left hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground",
+							mobile
+								? "min-h-11 border bg-muted/20"
+								: "group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+						)}
+						aria-label="Меню пользователя">
+						<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold">
 							{getInitials(user.login)}
 						</div>
-						<div className="min-w-0">
-							<div className="truncate text-sm font-medium text-foreground">{user.login}</div>
-							<div className="mt-1">
-								<Badge variant="secondary">{roleLabels[user.role]}</Badge>
+						<div className={cn("min-w-0 flex-1", !mobile && "group-data-[collapsible=icon]:hidden")}>
+							<div className="truncate text-sm font-medium">{user.login}</div>
+						</div>
+						<ChevronsUpDownIcon
+							data-icon="inline-end"
+							className={cn(
+								"ml-auto text-muted-foreground",
+								!mobile && "group-data-[collapsible=icon]:hidden"
+							)}
+						/>
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent
+					side="right"
+					align="end"
+					className="w-(--radix-dropdown-menu-trigger-width) min-w-56">
+					<DropdownMenuLabel className="px-2 py-2">
+						<div className="flex items-center gap-3">
+							<div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold">
+								{getInitials(user.login)}
+							</div>
+							<div className="min-w-0">
+								<div className="truncate text-sm font-medium text-foreground">{user.login}</div>
+								<div className="mt-1">
+									<Badge variant="secondary">{roleLabels[user.role]}</Badge>
+								</div>
 							</div>
 						</div>
-					</div>
-				</DropdownMenuLabel>
-				<DropdownMenuSeparator />
-				<DropdownMenuGroup>
-					<ThemeMenuItem />
-				</DropdownMenuGroup>
-				{canManageUsers(user.role) ? (
-					<>
-						<DropdownMenuSeparator />
-						<DropdownMenuGroup>
-							<DropdownMenuItem asChild onSelect={() => setOpen(false)}>
-								<Link to="/app/users" search={{ create: true }}>
-									<UserPlusIcon />
-									Создать пользователя
-								</Link>
-							</DropdownMenuItem>
-							<DropdownMenuItem asChild onSelect={() => setOpen(false)}>
-								<Link to="/app/users">
-									<UsersIcon />
-									Управление профилями
-								</Link>
-							</DropdownMenuItem>
-						</DropdownMenuGroup>
-					</>
-				) : null}
-				<DropdownMenuSeparator />
-				<DropdownMenuGroup>
-					<LogoutMenuItem onBeforeOpen={() => setOpen(false)} />
-				</DropdownMenuGroup>
-			</DropdownMenuContent>
-		</DropdownMenu>
+					</DropdownMenuLabel>
+					<DropdownMenuSeparator />
+					<DropdownMenuGroup>
+						<ThemeMenuItem />
+					</DropdownMenuGroup>
+					{canManageUsers(user.role) ? (
+						<>
+							<DropdownMenuSeparator />
+							<DropdownMenuGroup>
+								<DropdownMenuItem asChild onSelect={() => setOpen(false)}>
+									<Link to="/app/users" search={{ create: true }}>
+										<UserPlusIcon />
+										Создать пользователя
+									</Link>
+								</DropdownMenuItem>
+								<DropdownMenuItem asChild onSelect={() => setOpen(false)}>
+									<Link to="/app/users">
+										<UsersIcon />
+										Управление профилями
+									</Link>
+								</DropdownMenuItem>
+							</DropdownMenuGroup>
+						</>
+					) : null}
+					<DropdownMenuSeparator />
+					<DropdownMenuGroup>
+						<LogoutMenuItem onSelect={handleLogoutSelect} />
+					</DropdownMenuGroup>
+				</DropdownMenuContent>
+			</DropdownMenu>
+			<LogoutConfirmDialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen} />
+		</>
 	);
 }
 

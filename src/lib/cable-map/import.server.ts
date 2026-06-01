@@ -273,7 +273,7 @@ function hasRequiredRowData({
 	return cableLabel !== "" && level !== "" && fromZone !== "" && (fromRoom !== "" || toRoom !== "");
 }
 
-function parseWorkbookDataRow(rawRow: string[], index: number, headerRow: string[]) {
+function parseWorkbookDataRow(rawRow: string[], index: number, headerRow: string[]): ParsedCableRow | null {
 	const row = rawRow.map(normalizeCellValue);
 	const cableLabel = getWorkbookCell(row, workbookColumnIndexes.cableLabel);
 	const level = getWorkbookCell(row, workbookColumnIndexes.level);
@@ -331,7 +331,7 @@ function createInstallationCableLabel(row: string[]) {
 	return [marking, cableType, cableSection].filter(Boolean).join(" ");
 }
 
-function parseInstallationSideRow(rawRow: string[], index: number, side: GraphSide) {
+function parseInstallationSideRow(rawRow: string[], index: number, side: GraphSide): ParsedCableRow | null {
 	const row = rawRow.map(normalizeCellValue);
 	const cableLabel = createInstallationCableLabel(row);
 	const cableNumber = getWorkbookCell(row, installationWorkbookColumnIndexes.threadNumber);
@@ -467,7 +467,7 @@ function chunkValues<T>(values: T[], size: number) {
 	return chunks;
 }
 
-export function parseWorkbookRows(fileName: string, buffer: Buffer) {
+export function parseWorkbookRows(fileName: string, buffer: Buffer): ParsedCableRow[] {
 	const workbook = Xlsx.read(buffer, {
 		type: "buffer",
 		cellDates: false,
@@ -518,7 +518,7 @@ function getInstallationWorkbookSheet(workbook: Xlsx.WorkBook) {
 	return sheet;
 }
 
-export function parseInstallationWorkbookRows(fileName: string, buffer: Buffer) {
+export function parseInstallationWorkbookRows(fileName: string, buffer: Buffer): ParsedCableRow[] {
 	const workbook = Xlsx.read(buffer, {
 		type: "buffer",
 		cellDates: false,
@@ -654,8 +654,8 @@ function getFileType(fileName: string) {
 }
 
 // TODO: Add more file validation
-export async function ensureUploadFile(formData: FormData) {
-	const file = formData.get("file");
+export async function ensureUploadFile(formData: FormData, fieldName = "file") {
+	const file = formData.get(fieldName);
 
 	if (!(file instanceof File)) throw new Error("Выберите файл для импорта.");
 
@@ -691,7 +691,11 @@ export async function ensureUploadFile(formData: FormData) {
 	};
 }
 
-function parseRowsForSnapshotKind(fileName: string, buffer: Buffer, snapshotKind: SnapshotKind) {
+function parseRowsForSnapshotKind(
+	fileName: string,
+	buffer: Buffer,
+	snapshotKind: SnapshotKind
+): ParsedCableRow[] {
 	return snapshotKind === "installation"
 		? parseInstallationWorkbookRows(fileName, buffer)
 		: parseWorkbookRows(fileName, buffer);

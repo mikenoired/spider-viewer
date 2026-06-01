@@ -34,6 +34,7 @@ export const installationPendingStatusEnum = pgEnum("installation_pending_status
 	"applied",
 	"discarded",
 ]);
+export const installationKksItemTypeEnum = pgEnum("installation_kks_item_type", ["mechanism", "cable"]);
 
 export const users = pgTable(
 	"users",
@@ -273,6 +274,10 @@ export const installationSnapshots = pgTable(
 			.$type<{
 				groupCount: number;
 				kksCount: number;
+				cableCount?: number;
+				mechanismCount?: number;
+				baseMatchedCount?: number;
+				baseDoneCount?: number;
 			}>()
 			.notNull()
 			.default({
@@ -298,6 +303,7 @@ export const installationKksGroups = pgTable(
 			.notNull()
 			.references(() => installationSnapshots.id, { onDelete: "cascade" }),
 		name: text("name").notNull(),
+		sourceSheet: text("source_sheet").notNull().default(""),
 		sortOrder: integer("sort_order").notNull().default(0),
 		kksCount: integer("kks_count").notNull().default(0),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -319,6 +325,12 @@ export const installationKksItems = pgTable(
 			.notNull()
 			.references(() => installationKksGroups.id, { onDelete: "cascade" }),
 		name: text("name").notNull(),
+		itemType: installationKksItemTypeEnum("item_type").notNull().default("cable"),
+		sourceSheet: text("source_sheet").notNull().default(""),
+		sourceRowIndex: integer("source_row_index").notNull().default(0),
+		sourceColumnIndex: integer("source_column_index").notNull().default(0),
+		sourceColumnLabel: text("source_column_label").notNull().default(""),
+		matchedInCableBase: boolean("matched_in_cable_base").notNull().default(false),
 		sortOrder: integer("sort_order").notNull().default(0),
 		isDone: boolean("is_done").notNull().default(false),
 		revision: integer("revision").notNull().default(1),

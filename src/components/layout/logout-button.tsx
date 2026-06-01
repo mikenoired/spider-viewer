@@ -38,29 +38,32 @@ export function LogoutButton({ className }: { className?: string }) {
 	);
 }
 
-export function LogoutMenuItem({
-	className,
-	onBeforeOpen,
+export function LogoutMenuItem({ className, onSelect }: { className?: string; onSelect: () => void }) {
+	return (
+		<DropdownMenuItem
+			variant="destructive"
+			className={cn(className)}
+			onSelect={(event) => {
+				event.preventDefault();
+				onSelect();
+			}}>
+			<LogOutIcon />
+			Выйти из аккаунта
+		</DropdownMenuItem>
+	);
+}
+
+export function LogoutConfirmDialog({
+	open,
+	onOpenChange,
 }: {
-	className?: string;
-	onBeforeOpen?: () => void;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
 }) {
-	const [open, setOpen] = useState(false);
-	const { handleLogout, pending } = useLogoutAction(() => setOpen(false));
+	const { handleLogout, pending } = useLogoutAction(() => onOpenChange(false));
 
 	return (
-		<AlertDialog open={open} onOpenChange={setOpen}>
-			<DropdownMenuItem
-				variant="destructive"
-				className={cn(className)}
-				onSelect={(event) => {
-					event.preventDefault();
-					onBeforeOpen?.();
-					window.requestAnimationFrame(() => setOpen(true));
-				}}>
-				<LogOutIcon />
-				Выйти из аккаунта
-			</DropdownMenuItem>
+		<AlertDialog open={open} onOpenChange={onOpenChange}>
 			<LogoutDialogContent pending={pending} onConfirm={handleLogout} />
 		</AlertDialog>
 	);

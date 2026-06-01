@@ -14,6 +14,8 @@ export function KksGroupCard({
 	className?: string;
 }) {
 	const showProgress = shouldShowInstallationProgress(group);
+	const cableCount = group.kksItems.filter((item) => item.itemType === "cable").length;
+	const mechanismCount = group.kksItems.filter((item) => item.itemType === "mechanism").length;
 
 	return (
 		<button
@@ -23,7 +25,12 @@ export function KksGroupCard({
 				"flex w-full flex-col gap-3 rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent/50",
 				className
 			)}>
-			<div className="text-sm font-medium text-foreground">{group.name}</div>
+			<div className="flex flex-col gap-1">
+				<div className="text-sm font-medium text-foreground">{group.name}</div>
+				<div className="text-xs text-muted-foreground">
+					{mechanismCount} механизмов, {cableCount} кабелей
+				</div>
+			</div>
 			{showProgress ? (
 				<div className="flex flex-col gap-2">
 					<div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
