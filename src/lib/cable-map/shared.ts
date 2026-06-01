@@ -6,6 +6,7 @@ export const supportedWorkbookMimeTypes = [
 	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 	"application/vnd.ms-excel",
 ] as const;
+export const supportedPriorityListExtensions = [...supportedWorkbookExtensions] as const;
 
 export const snapshotKinds = ["demolition", "installation"] as const;
 export type SnapshotKind = (typeof snapshotKinds)[number];
@@ -93,6 +94,17 @@ export const exportDailyHistorySchema = z.object({
 	level: z.string().trim().min(1).optional().nullable(),
 	snapshotKind: z.enum(snapshotKinds).optional().default("demolition"),
 });
+export const priorityRoomListAuthorSchema = z
+	.string()
+	.trim()
+	.min(2, "Укажите автора списка.")
+	.max(120, "Имя автора не должно быть длиннее 120 символов.");
+export const priorityRoomKanbanStatuses = ["in_progress", "done", "checked"] as const;
+export const priorityRoomKanbanStatusSchema = z.enum(priorityRoomKanbanStatuses);
+export const updatePriorityRoomKanbanStatusSchema = z.object({
+	roomId: z.string().uuid(),
+	status: priorityRoomKanbanStatusSchema,
+});
 
 export type DateRangeInput = z.infer<typeof dateRangeSchema>;
 export type SaveCableProgressInput = z.infer<typeof saveCableProgressSchema>;
@@ -101,6 +113,8 @@ export type DeleteManualRoomInput = z.infer<typeof deleteManualRoomSchema>;
 export type ExportHistoryInput = z.infer<typeof exportHistorySchema>;
 export type ExportBackdatedInput = ExportHistoryInput;
 export type ExportDailyHistoryInput = z.infer<typeof exportDailyHistorySchema>;
+export type PriorityRoomKanbanStatus = z.infer<typeof priorityRoomKanbanStatusSchema>;
+export type UpdatePriorityRoomKanbanStatusInput = z.infer<typeof updatePriorityRoomKanbanStatusSchema>;
 
 export type HistoryEntryView = {
 	id: string;
@@ -147,6 +161,8 @@ export type GraphRoomView = {
 	totalLength: number;
 	progress: number;
 	roomRole: "primary" | "secondary";
+	priorityAuthors: string[];
+	kanbanStatus: PriorityRoomKanbanStatus;
 	cables: GraphCableView[];
 };
 
@@ -188,9 +204,40 @@ export type SnapshotSummaryView = {
 	averageProgress: number;
 };
 
+export type PriorityRoomListView = {
+	id: string;
+	authorName: string;
+	fileName: string;
+	fileType: string;
+	roomCount: number;
+	importedByLogin: string;
+	createdAt: string;
+};
+
+export type PriorityKanbanRoomView = {
+	roomId: string;
+	roomName: string;
+	groupId: string;
+	level: string;
+	sourceZone: string;
+	graphSide: "dirty" | "clean";
+	progress: number;
+	cableCount: number;
+	threadCount: number;
+	priorityAuthors: string[];
+	status: PriorityRoomKanbanStatus;
+	updatedAt: string | null;
+	updatedByLogin: string | null;
+	checkedAt: string | null;
+	checkedByLogin: string | null;
+};
+
 export type DashboardData = {
 	snapshot: SnapshotSummaryView | null;
 	snapshotKind: SnapshotKind;
+	priorityLists: PriorityRoomListView[];
+	priorityRoomCount: number;
+	priorityKanbanRooms: PriorityKanbanRoomView[];
 	levels: Array<{
 		level: string;
 		levelOrder: number;

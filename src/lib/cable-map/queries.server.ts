@@ -9,8 +9,12 @@ import {
 	importedCableRows,
 	importSnapshots,
 	manualGraphRooms,
+	priorityRoomEntries,
+	priorityRoomKanbanStates,
+	priorityRoomLists,
 	users,
 } from "@/lib/db/schema";
+import { enToRuVisual } from "@/lib/utils";
 
 import type {
 	DashboardData,
@@ -20,6 +24,9 @@ import type {
 	GraphManualRoomView,
 	GraphRoomView,
 	HistoryEntryView,
+	PriorityKanbanRoomView,
+	PriorityRoomListView,
+	PriorityRoomKanbanStatus,
 	SnapshotKind,
 	SnapshotSummaryView,
 } from "./shared";
@@ -194,10 +201,141 @@ async function getDashboardManualRoomRows(db: DbClient, rows: DashboardGroupRow[
 		.where(and(inArray(manualGraphRooms.sourceZone, sourceZones), inArray(manualGraphRooms.level, levels)));
 }
 
+async function getPriorityRoomRows(db: DbClient, snapshotId: string) {
+	return db
+		.select({
+			roomName: priorityRoomEntries.roomName,
+			normalizedRoomName: priorityRoomEntries.normalizedRoomName,
+			authorName: priorityRoomLists.authorName,
+		})
+		.from(priorityRoomEntries)
+		.innerJoin(priorityRoomLists, eq(priorityRoomLists.id, priorityRoomEntries.listId))
+		.where(eq(priorityRoomEntries.snapshotId, snapshotId));
+}
+
+async function getPriorityRoomLists(db: DbClient, snapshotId: string) {
+	return db
+		.select({
+			id: priorityRoomLists.id,
+			authorName: priorityRoomLists.authorName,
+			fileName: priorityRoomLists.fileName,
+			fileType: priorityRoomLists.fileType,
+			roomCount: priorityRoomLists.roomCount,
+			importedByLogin: users.login,
+			createdAt: priorityRoomLists.createdAt,
+		})
+		.from(priorityRoomLists)
+		.innerJoin(users, eq(users.id, priorityRoomLists.importedByUserId))
+		.where(eq(priorityRoomLists.snapshotId, snapshotId))
+		.orderBy(desc(priorityRoomLists.createdAt));
+}
+
+async function getPriorityKanbanStateRows(db: DbClient, snapshotId: string) {
+	return db
+		.select({
+			roomId: priorityRoomKanbanStates.roomId,
+			status: priorityRoomKanbanStates.status,
+			updatedByUserId: priorityRoomKanbanStates.updatedByUserId,
+			checkedByUserId: priorityRoomKanbanStates.checkedByUserId,
+			updatedAt: priorityRoomKanbanStates.updatedAt,
+			checkedAt: priorityRoomKanbanStates.checkedAt,
+		})
+		.from(priorityRoomKanbanStates)
+		.where(eq(priorityRoomKanbanStates.snapshotId, snapshotId));
+}
+
+async function getUserLoginsById(db: DbClient, userIds: string[]) {
+	const uniqueUserIds = [...new Set(userIds.filter(Boolean))];
+
+	if (uniqueUserIds.length === 0) {
+		return new Map<string, string>();
+	}
+
+	const rows = await db
+		.select({
+			id: users.id,
+			login: users.login,
+		})
+		.from(users)
+		.where(inArray(users.id, uniqueUserIds));
+
+	return new Map(rows.map((row) => [row.id, row.login]));
+}
+
 type DashboardSnapshotRow = NonNullable<Awaited<ReturnType<typeof getActiveSnapshot>>>;
 type DashboardGroupRow = Awaited<ReturnType<typeof getDashboardGroupRows>>[number];
 type DashboardImportedRow = Awaited<ReturnType<typeof getDashboardImportedRows>>[number];
 type DashboardManualRoomRow = Awaited<ReturnType<typeof getDashboardManualRoomRows>>[number];
+type PriorityRoomRow = Awaited<ReturnType<typeof getPriorityRoomRows>>[number];
+type PriorityKanbanStateRow = Awaited<ReturnType<typeof getPriorityKanbanStateRows>>[number];
+
+type PriorityKanbanMeta = {
+	status: PriorityRoomKanbanStatus;
+	updatedAt: string | null;
+	updatedByLogin: string | null;
+	checkedAt: string | null;
+	checkedByLogin: string | null;
+};
+
+function normalizePriorityRoomName(value: string) {
+	return enToRuVisual(value)
+		.replace(/\s+/g, " ")
+		.trim()
+		.toLowerCase();
+}
+
+function buildPriorityAuthorsByRoom(rows: PriorityRoomRow[]) {
+	const priorityAuthorsByRoom = new Map<string, string[]>();
+
+	for (const row of rows) {
+		const roomKey = normalizePriorityRoomName(row.normalizedRoomName || row.roomName);
+		const authors = priorityAuthorsByRoom.get(roomKey) ?? [];
+
+		if (!authors.includes(row.authorName)) {
+			authors.push(row.authorName);
+			authors.sort((left, right) => left.localeCompare(right, "ru", { sensitivity: "base" }));
+			priorityAuthorsByRoom.set(roomKey, authors);
+		}
+	}
+
+	return priorityAuthorsByRoom;
+}
+
+function getPriorityAuthors(priorityAuthorsByRoom: Map<string, string[]>, roomName: string) {
+	return priorityAuthorsByRoom.get(normalizePriorityRoomName(roomName)) ?? [];
+}
+
+async function buildPriorityKanbanMetaByRoom(db: DbClient, rows: PriorityKanbanStateRow[]) {
+	const userLoginsById = await getUserLoginsById(
+		db,
+		rows.flatMap((row) => [row.updatedByUserId, row.checkedByUserId ?? ""])
+	);
+	const metaByRoom = new Map<string, PriorityKanbanMeta>();
+
+	for (const row of rows) {
+		metaByRoom.set(row.roomId, {
+			status: row.status,
+			updatedAt: toIsoString(row.updatedAt),
+			updatedByLogin: userLoginsById.get(row.updatedByUserId) ?? null,
+			checkedAt: toIsoString(row.checkedAt),
+			checkedByLogin: row.checkedByUserId ? (userLoginsById.get(row.checkedByUserId) ?? null) : null,
+		});
+	}
+
+	return metaByRoom;
+}
+
+function getPriorityKanbanMeta(metaByRoom: Map<string, PriorityKanbanMeta>, roomId: string): PriorityKanbanMeta {
+	return (
+		metaByRoom.get(roomId) ?? {
+			status: "in_progress",
+			updatedAt: null,
+			updatedByLogin: null,
+			checkedAt: null,
+			checkedByLogin: null,
+		}
+	);
+}
 
 function buildCopperMassByGroup(importedRows: DashboardImportedRow[]) {
 	const copperMassByGroup = new Map<string, number>();
@@ -258,7 +396,11 @@ function createGraphGroup(row: DashboardGroupRow, copperMassByGroup: Map<string,
 	};
 }
 
-function buildGraphRoom(row: DashboardGroupRow): GraphRoomView | null {
+function buildGraphRoom(
+	row: DashboardGroupRow,
+	priorityAuthorsByRoom: Map<string, string[]>,
+	kanbanMetaByRoom: Map<string, PriorityKanbanMeta>
+): GraphRoomView | null {
 	if (!row.roomId || !row.roomName || !row.roomRole) {
 		return null;
 	}
@@ -271,6 +413,8 @@ function buildGraphRoom(row: DashboardGroupRow): GraphRoomView | null {
 		totalLength: row.roomTotalLength ?? 0,
 		progress: 0,
 		roomRole: row.roomRole,
+		priorityAuthors: getPriorityAuthors(priorityAuthorsByRoom, row.roomName),
+		kanbanStatus: getPriorityKanbanMeta(kanbanMetaByRoom, row.roomId).status,
 		cables: [],
 	};
 }
@@ -288,13 +432,18 @@ function appendRoomToGroup(group: GraphGroupView, room: GraphRoomView | null) {
 	group.secondaryRooms.push(room);
 }
 
-function buildGroups(rows: DashboardGroupRow[], copperMassByGroup: Map<string, number>) {
+function buildGroups(
+	rows: DashboardGroupRow[],
+	copperMassByGroup: Map<string, number>,
+	priorityAuthorsByRoom: Map<string, string[]>,
+	kanbanMetaByRoom: Map<string, PriorityKanbanMeta>
+) {
 	const groups = new Map<string, GraphGroupView>();
 
 	for (const row of rows) {
 		const group = groups.get(row.groupId) ?? createGraphGroup(row, copperMassByGroup);
 		groups.set(row.groupId, group);
-		appendRoomToGroup(group, buildGraphRoom(row));
+		appendRoomToGroup(group, buildGraphRoom(row, priorityAuthorsByRoom, kanbanMetaByRoom));
 	}
 
 	return groups;
@@ -463,6 +612,54 @@ function buildSnapshotSummary(
 	};
 }
 
+function buildPriorityListSummary(rows: Awaited<ReturnType<typeof getPriorityRoomLists>>): PriorityRoomListView[] {
+	return rows.map((row) => ({
+		id: row.id,
+		authorName: row.authorName,
+		fileName: row.fileName,
+		fileType: row.fileType,
+		roomCount: row.roomCount,
+		importedByLogin: row.importedByLogin,
+		createdAt: toIsoString(row.createdAt),
+	}));
+}
+
+function buildPriorityKanbanRooms(
+	groups: Map<string, GraphGroupView>,
+	kanbanMetaByRoom: Map<string, PriorityKanbanMeta>
+): PriorityKanbanRoomView[] {
+	const rooms: PriorityKanbanRoomView[] = [];
+
+	for (const group of groups.values()) {
+		for (const room of group.primaryRooms) {
+			if (room.priorityAuthors.length === 0) {
+				continue;
+			}
+
+			const meta = getPriorityKanbanMeta(kanbanMetaByRoom, room.id);
+			rooms.push({
+				roomId: room.id,
+				roomName: room.roomName,
+				groupId: group.id,
+				level: group.level,
+				sourceZone: group.sourceZone,
+				graphSide: group.graphSide,
+				progress: room.progress,
+				cableCount: room.cableCount,
+				threadCount: room.threadCount,
+				priorityAuthors: room.priorityAuthors,
+				status: meta.status,
+				updatedAt: meta.updatedAt,
+				updatedByLogin: meta.updatedByLogin,
+				checkedAt: meta.checkedAt,
+				checkedByLogin: meta.checkedByLogin,
+			});
+		}
+	}
+
+	return rooms.sort((left, right) => compareRoomNames(left.roomName, right.roomName));
+}
+
 export async function getActiveDashboardData(
 	snapshotKind: SnapshotKind = "demolition"
 ): Promise<DashboardData> {
@@ -473,17 +670,25 @@ export async function getActiveDashboardData(
 		return {
 			snapshot: null,
 			snapshotKind,
+			priorityLists: [],
+			priorityRoomCount: 0,
+			priorityKanbanRooms: [],
 			levels: [],
 		};
 	}
 
-	const [rows, importedRows] = await Promise.all([
+	const [rows, importedRows, priorityRows, priorityLists, kanbanStateRows] = await Promise.all([
 		getDashboardGroupRows(db, snapshot.id),
 		getDashboardImportedRows(db, snapshot.id),
+		getPriorityRoomRows(db, snapshot.id),
+		getPriorityRoomLists(db, snapshot.id),
+		getPriorityKanbanStateRows(db, snapshot.id),
 	]);
 	const manualRoomRows = await getDashboardManualRoomRows(db, rows);
 	const copperMassByGroup = buildCopperMassByGroup(importedRows);
-	const groups = buildGroups(rows, copperMassByGroup);
+	const priorityAuthorsByRoom = buildPriorityAuthorsByRoom(priorityRows);
+	const kanbanMetaByRoom = await buildPriorityKanbanMetaByRoom(db, kanbanStateRows);
+	const groups = buildGroups(rows, copperMassByGroup, priorityAuthorsByRoom, kanbanMetaByRoom);
 	appendImportedCablesToGroups(groups, importedRows);
 	const manualRoomsByGroup = buildManualRoomsByGroup(manualRoomRows);
 	const { levels, allPrimaryRooms } = buildDashboardLevels(groups, manualRoomsByGroup);
@@ -491,6 +696,9 @@ export async function getActiveDashboardData(
 	return {
 		snapshot: buildSnapshotSummary(snapshot, levels, groups.size, allPrimaryRooms),
 		snapshotKind,
+		priorityLists: buildPriorityListSummary(priorityLists),
+		priorityRoomCount: priorityAuthorsByRoom.size,
+		priorityKanbanRooms: buildPriorityKanbanRooms(groups, kanbanMetaByRoom),
 		levels,
 	};
 }

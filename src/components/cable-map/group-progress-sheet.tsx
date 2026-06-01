@@ -10,6 +10,7 @@ import {
 	LoaderCircleIcon,
 	RotateCcwIcon,
 	SaveIcon,
+	StarIcon,
 	TriangleAlertIcon,
 } from "lucide-react";
 import { Fragment, memo, useCallback, useEffect, useMemo, useState } from "react";
@@ -54,6 +55,7 @@ type DraftRoom = {
 	cableCount: number;
 	threadCount: number;
 	totalLength: number;
+	priorityAuthors: string[];
 	cables: DraftCable[];
 };
 
@@ -83,6 +85,7 @@ function createDraftRooms(group: GraphGroupView): DraftRoom[] {
 		cableCount: room.cableCount,
 		threadCount: room.threadCount,
 		totalLength: room.totalLength,
+		priorityAuthors: room.priorityAuthors,
 		cables: room.cables.map((cable) => ({ ...cable })),
 	}));
 }
@@ -189,6 +192,8 @@ function GroupProgressTrigger({
 	className,
 	hasRooms,
 	onOpen,
+	highlightedRoomId,
+	onHoverRoom,
 }: {
 	group: GraphGroupView;
 	variant: "default" | "map";
@@ -196,6 +201,8 @@ function GroupProgressTrigger({
 	className?: string;
 	hasRooms: boolean;
 	onOpen: () => void;
+	highlightedRoomId?: string | null;
+	onHoverRoom?: (roomId: string | null) => void;
 }) {
 	return (
 		<div className="flex w-full items-center justify-center">
@@ -217,8 +224,25 @@ function GroupProgressTrigger({
 							align === "right" && "text-right"
 						)}>
 						{group.primaryRooms.map((room) => (
-							<span key={room.id} className="select-none">
-								{room.roomName.length > 15 ? `${room.roomName.slice(0, 15)}...` : room.roomName}
+							<span
+								key={room.id}
+								onMouseEnter={() => onHoverRoom?.(room.id)}
+								onMouseLeave={() => onHoverRoom?.(null)}
+								className={cn(
+									"select-none",
+									highlightedRoomId === room.id &&
+										"ring-2 ring-amber-400 ring-offset-1 ring-offset-background",
+									room.priorityAuthors.length > 0 &&
+										"rounded-md bg-amber-100 px-1.5 py-1 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100"
+								)}>
+								<span className="block">
+									{room.roomName.length > 15 ? `${room.roomName.slice(0, 15)}...` : room.roomName}
+								</span>
+								{room.priorityAuthors.length > 0 ? (
+									<span className="mt-0.5 block truncate text-[10px] font-medium opacity-80">
+										{room.priorityAuthors.join(", ")}
+									</span>
+								) : null}
 							</span>
 						))}
 					</div>
@@ -427,7 +451,24 @@ function GroupProgressTable({
 													<ChevronRightIcon className="size-4" />
 												)}
 											</span>
-											<span className="truncate">{room.roomName}</span>
+											<span className="min-w-0">
+												<span className="truncate">{room.roomName}</span>
+												{room.priorityAuthors.length > 0 ? (
+													<span className="mt-1 flex flex-wrap gap-1">
+														<Badge
+															variant="outline"
+															className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/50 dark:bg-amber-500/10 dark:text-amber-100">
+															<StarIcon className="mr-1 size-3.5" />
+															Приоритет
+														</Badge>
+														{room.priorityAuthors.map((author) => (
+															<Badge key={author} variant="secondary" className="max-w-full truncate">
+																{author}
+															</Badge>
+														))}
+													</span>
+												) : null}
+											</span>
 										</span>
 										<Badge variant="secondary" className="shrink-0 sm:hidden">
 											{roomProgress}%
@@ -499,6 +540,8 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 	align = "left",
 	className,
 	onOverlayOpenChange,
+	highlightedRoomId,
+	onHoverRoom,
 }: {
 	group: GraphGroupView;
 	canEdit: boolean;
@@ -506,6 +549,8 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 	align?: "left" | "right";
 	className?: string;
 	onOverlayOpenChange?: (overlayId: string, open: boolean) => void;
+	highlightedRoomId?: string | null;
+	onHoverRoom?: (roomId: string | null) => void;
 }) {
 	const router = useRouter();
 	const [open, setOpen] = useState(false);
@@ -586,6 +631,8 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 					className={className}
 					hasRooms={hasRooms}
 					onOpen={() => setOpen(true)}
+					highlightedRoomId={highlightedRoomId}
+					onHoverRoom={onHoverRoom}
 				/>
 
 				<SheetContent
