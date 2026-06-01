@@ -233,7 +233,7 @@ export function useInstallationBoard(initialData: InstallationBoardData, canEdit
 
 		await queueInstallationOutboxChange(change);
 		setOutboxCount((current) => current + 1);
-		toast.info("Изменение сохранено offline и будет синхронизировано позже.");
+		toast.info("Изменение сохранено офлайн и будет синхронизировано позже.");
 	}
 
 	async function queueOfflineChanges(currentSnapshotId: string, changes: InstallationKksChangeInput[]) {
@@ -251,7 +251,7 @@ export function useInstallationBoard(initialData: InstallationBoardData, canEdit
 
 		await queueInstallationOutboxChanges(offlineChanges);
 		setOutboxCount((current) => current + offlineChanges.length);
-		toast.info(`Offline-изменений добавлено: ${offlineChanges.length}.`);
+		toast.info(`Офлайн-изменений добавлено: ${offlineChanges.length}.`);
 	}
 
 	async function saveOnlineChange(
@@ -293,9 +293,9 @@ export function useInstallationBoard(initialData: InstallationBoardData, canEdit
 			await removeInstallationOutboxChanges(outboxChanges.map((change) => change.clientMutationId));
 			setOutboxCount(0);
 			await refresh();
-			toast.info("Offline-изменения перенесены в колонку «В обработке».");
+			toast.info("Офлайн-изменения перенесены в колонку «В обработке».");
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Не удалось синхронизировать offline-изменения.");
+			toast.error(error instanceof Error ? error.message : "Не удалось синхронизировать офлайн-изменения.");
 		}
 	}
 

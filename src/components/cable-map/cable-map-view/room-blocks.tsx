@@ -94,7 +94,7 @@ export const TotalThreadsBadge = memo(function TotalThreadsBadge({
 	if (!hasStartedProgress) {
 		return (
 			<div className="flex h-full items-center justify-center py-4">
-				<span className="rounded-[6px] border border-zinc-400/80 bg-[#fffdf3] px-2 py-1 text-center text-[11px] font-semibold text-zinc-700 shadow-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 select-none">
+				<span className="rounded-md border border-zinc-400/80 bg-[#fffdf3] px-2 py-1 text-center text-[11px] font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 select-none">
 					{displayThreadCount} н
 				</span>
 			</div>
@@ -103,7 +103,7 @@ export const TotalThreadsBadge = memo(function TotalThreadsBadge({
 
 	return (
 		<div className="flex h-full items-center justify-center py-4">
-			<div className="flex w-full flex-col gap-1 rounded-[10px] border border-zinc-400/80 bg-[#fffdf3] px-2 py-2 text-center text-zinc-700 shadow-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
+			<div className="flex w-full flex-col gap-1 rounded-lg border border-zinc-400/80 bg-[#fffdf3] px-2 py-2 text-center text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
 				<span className="rounded-[6px] bg-white/70 px-1 py-1 text-[13px] font-semibold leading-none dark:bg-zinc-900/80 select-none">
 					{group.averageProgress}%
 				</span>

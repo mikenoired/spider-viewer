@@ -67,8 +67,8 @@ export function SnapshotImportForm({ snapshot }: { snapshot: SnapshotSummaryView
 									onChange={(event) => setFile(event.target.files?.[0] ?? null)}
 								/>
 								<FieldDescription>
-									После повторного импорта активный snapshot будет заменён новым. Поддерживаются корректные
-									`.ods`, `.xlsx`, `.xls` файлы до 15 МБ.
+									После повторного импорта активный набор данных будет заменён новым. Поддерживаются
+									корректные `.ods`, `.xlsx`, `.xls` файлы до 15 МБ.
 								</FieldDescription>
 							</Field>
 						</FieldGroup>
@@ -87,7 +87,7 @@ export function SnapshotImportForm({ snapshot }: { snapshot: SnapshotSummaryView
 
 			<Card>
 				<CardHeader>
-					<CardTitle>Текущий активный snapshot</CardTitle>
+					<CardTitle>Текущий активный набор данных</CardTitle>
 					<CardDescription>
 						Этот блок помогает быстро сверить, что именно сейчас отображается на карте.
 					</CardDescription>
@@ -95,9 +95,9 @@ export function SnapshotImportForm({ snapshot }: { snapshot: SnapshotSummaryView
 				<CardContent className="flex flex-col gap-4">
 					{snapshot ? (
 						<>
-							<div className="rounded-2xl border bg-muted/20 p-4">
+							<div className="rounded-lg border bg-muted/20 p-4">
 								<div className="flex items-start gap-3">
-									<div className="rounded-xl border bg-background p-2 text-muted-foreground">
+									<div className="rounded-md border bg-background p-2 text-muted-foreground">
 										<FileSpreadsheetIcon />
 									</div>
 									<div className="flex flex-col gap-1">
@@ -116,8 +116,8 @@ export function SnapshotImportForm({ snapshot }: { snapshot: SnapshotSummaryView
 							</div>
 						</>
 					) : (
-						<div className="rounded-2xl border border-dashed px-4 py-6 text-sm text-muted-foreground">
-							Активный snapshot пока отсутствует.
+						<div className="rounded-lg border border-dashed px-4 py-6 text-sm text-muted-foreground">
+							Активный набор данных пока отсутствует.
 						</div>
 					)}
 				</CardContent>
@@ -128,8 +128,8 @@ export function SnapshotImportForm({ snapshot }: { snapshot: SnapshotSummaryView
 
 function InfoItem({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="rounded-2xl border bg-background px-3 py-2">
-			<div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
+		<div className="rounded-lg border bg-background px-3 py-2">
+			<div className="text-xs uppercase text-muted-foreground">{label}</div>
 			<div className="mt-1 text-lg font-semibold">{value}</div>
 		</div>
 	);

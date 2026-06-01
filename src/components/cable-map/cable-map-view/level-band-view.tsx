@@ -68,7 +68,7 @@ export const LevelBandView = memo(function LevelBandView({
 					} satisfies CSSProperties
 				}>
 				<div className="flex w-full flex-col items-center gap-3">
-					<div className="select-none text-3xl font-semibold leading-none tracking-[-0.03em] text-zinc-900 dark:text-zinc-100">
+					<div className="select-none text-3xl font-semibold leading-none text-zinc-900 dark:text-zinc-100">
 						{displayedLevelLabel}
 					</div>
 					{canExportDailyReport ? (

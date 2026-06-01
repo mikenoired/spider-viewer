@@ -57,7 +57,7 @@ function ManualRoomBlockContent({
 }) {
 	if (hasRooms) {
 		return (
-			<div className="flex w-full flex-col gap-2 rounded-[8px] border border-[#d2b55a] bg-amber-200 px-2 py-2 text-amber-950 shadow-sm dark:bg-amber-700 dark:text-amber-100">
+			<div className="flex w-full flex-col gap-2 rounded-lg border border-[#d2b55a] bg-amber-200 px-2 py-2 text-amber-950 dark:bg-amber-700 dark:text-amber-100">
 				<div className="flex flex-col gap-1">
 					{rooms.map((room) => (
 						<button
@@ -83,7 +83,7 @@ function ManualRoomBlockContent({
 	}
 
 	return (
-		<div className="flex h-full min-h-35 w-full flex-col items-center justify-center gap-3 rounded-[10px] border-2 border-dashed border-[#c6a643] bg-amber-200/50 px-3 py-4 text-center text-amber-950 shadow-sm dark:bg-amber-600/50 dark:text-amber-100">
+		<div className="flex h-full min-h-35 w-full flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-[#c6a643] bg-amber-200/50 px-3 py-4 text-center text-amber-950 dark:bg-amber-600/50 dark:text-amber-100">
 			{canManage ? <ManualRoomAddButton onClick={onAdd} /> : null}
 		</div>
 	);

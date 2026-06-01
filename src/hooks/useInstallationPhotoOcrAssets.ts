@@ -70,7 +70,7 @@ function usePhotoOcrAssetPreparation(setAssetState: Dispatch<SetStateAction<Inst
 		try {
 			await warmInstallationPhotoOcrAssets(setAssetProgress);
 			setAssetState(await getInstallationPhotoOcrAssetState());
-			toast.success("OCR-модель скачана для offline-работы.");
+			toast.success("OCR-модель скачана для офлайн-работы.");
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Не удалось скачать OCR-модель.");
 		} finally {

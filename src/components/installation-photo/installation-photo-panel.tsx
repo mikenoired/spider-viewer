@@ -113,7 +113,7 @@ function PhotoPanelHeader({
 	return (
 		<CardHeader>
 			<CardTitle>Фото монтажа</CardTitle>
-			<CardDescription>{kksCount} KKS в активном snapshot</CardDescription>
+			<CardDescription>{kksCount} KKS в активном монтаже</CardDescription>
 			<CardAction>
 				<Button
 					type="button"

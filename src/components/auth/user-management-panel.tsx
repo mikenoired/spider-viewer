@@ -80,7 +80,7 @@ function toFieldErrors(errors: Array<unknown>) {
 
 function EmptyTableState({ title, description }: { title: string; description: string }) {
 	return (
-		<div className="rounded-2xl border border-dashed px-4 py-8 text-sm text-muted-foreground">
+		<div className="rounded-lg border border-dashed px-4 py-8 text-sm text-muted-foreground">
 			<div className="font-medium text-foreground">{title}</div>
 			<div className="mt-1">{description}</div>
 		</div>
@@ -103,10 +103,10 @@ function SummaryCard({
 			<CardContent className="flex items-start justify-between gap-3 pt-6">
 				<div>
 					<div className="text-sm text-muted-foreground">{title}</div>
-					<div className="mt-2 text-3xl font-semibold tracking-[-0.03em]">{value}</div>
+					<div className="mt-2 text-3xl font-semibold">{value}</div>
 					<div className="mt-1 text-sm text-muted-foreground">{description}</div>
 				</div>
-				<div className="rounded-2xl border bg-muted/30 p-3 text-muted-foreground">
+				<div className="rounded-lg border bg-muted/30 p-3 text-muted-foreground">
 					<Icon />
 				</div>
 			</CardContent>
@@ -132,7 +132,7 @@ function UserTable({
 	}
 
 	return (
-		<div className="rounded-2xl border">
+		<div className="rounded-lg border">
 			<Table>
 				<TableHeader>
 					<TableRow>
@@ -436,7 +436,7 @@ export function UserManagementPanel({
 
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div>
-					<h1 className="text-2xl font-semibold tracking-[-0.03em]">Профили пользователей</h1>
+					<h1 className="text-2xl font-semibold">Профили пользователей</h1>
 					<p className="mt-1 text-sm text-muted-foreground">
 						Просмотр всех аккаунтов, создание пользователей и назначение ролей.
 					</p>

@@ -125,7 +125,7 @@ function JobBody({
 function getJobStatusLabel(job: InstallationPhotoJob) {
 	if (job.status === "recognizing") return "Распознается";
 	if (job.status === "review") return `Найдено: ${job.candidates.length}`;
-	if (job.status === "applied") return "Добавлено в offline-очередь";
+	if (job.status === "applied") return "Добавлено в офлайн-очередь";
 
 	return "Ошибка распознавания";
 }

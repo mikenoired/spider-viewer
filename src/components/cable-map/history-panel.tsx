@@ -272,7 +272,7 @@ export function HistoryPanel({
 
 			await downloadResponseFile(response, fileName);
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Не удалось выгрузить docx-отчёт.");
+			toast.error(error instanceof Error ? error.message : "Не удалось выгрузить DOCX-отчёт.");
 		} finally {
 			setExporting(false);
 		}
@@ -389,7 +389,7 @@ export function HistoryPanel({
 							sortedEntries.map((entry) => (
 								<TableRow
 									key={entry.id}
-									className="block rounded-xl border sm:table-row sm:rounded-none sm:border-x-0">
+									className="block rounded-lg border sm:table-row sm:rounded-none sm:border-x-0">
 									<TableCell
 										className="flex items-start justify-between gap-4 whitespace-normal px-3 py-2 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] sm:table-cell sm:p-2 sm:before:hidden"
 										data-label="Изменено">
@@ -446,7 +446,7 @@ export function HistoryPanel({
 						) : (
 							<TableRow>
 								<TableCell
-									colSpan={7}
+									colSpan={sortableColumns.length}
 									className="block h-auto px-4 py-8 text-center text-muted-foreground sm:table-cell sm:h-32">
 									За выбранный период записей не найдено.
 								</TableCell>

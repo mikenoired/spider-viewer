@@ -115,13 +115,7 @@ function getCenterBetweenPointers(first: PointerSnapshot, second: PointerSnapsho
 
 function FloatingContrastPanel({ className, children }: { className?: string; children: React.ReactNode }) {
 	return (
-		<div
-			className={cn(
-				"rounded-[1rem] border border-border/80 bg-background/88 shadow-lg backdrop-blur-md",
-				className
-			)}>
-			{children}
-		</div>
+		<div className={cn("rounded-lg border border-border/80 bg-background/95", className)}>{children}</div>
 	);
 }
 
@@ -1042,7 +1036,7 @@ export function CableMapView({
 							animate={{ opacity: 1 }}
 							exit={{ opacity: 0 }}
 							transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-							className="fixed inset-0 z-[80] bg-background/72 backdrop-blur-md"
+							className="fixed inset-0 z-[80] bg-background/80"
 						/>
 					) : null}
 				</AnimatePresence>
@@ -1056,7 +1050,7 @@ export function CableMapView({
 					aria-label={isFullscreen ? "Полноэкранная карта демонтажа" : undefined}
 					tabIndex={isFullscreen ? -1 : undefined}
 					className={cn(
-						"relative overflow-hidden rounded-[1.5rem] border border-border bg-card shadow-sm",
+						"relative overflow-hidden rounded-lg border border-border bg-card",
 						isFullscreen &&
 							"fixed inset-0 z-[90] flex rounded-none border-none bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-none"
 					)}>
@@ -1072,7 +1066,7 @@ export function CableMapView({
 								</div>
 
 								<div className="flex flex-wrap items-center gap-2">
-									<div className="flex items-center gap-1 rounded-full border border-border/80 bg-background/90 p-1 shadow-sm">
+									<div className="flex items-center gap-1 rounded-lg border border-border/80 bg-background/90 p-1">
 										<Button
 											type="button"
 											variant="ghost"
@@ -1174,7 +1168,7 @@ export function CableMapView({
 									transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1], delay: 0.02 }}
 									className="pointer-events-none absolute top-4 right-4 z-[95] flex max-w-[calc(100vw-2rem)] flex-col items-end gap-2 sm:top-6 sm:right-6">
 									<FloatingContrastPanel className="pointer-events-auto p-2">
-										<div className="flex items-center gap-1 rounded-[1rem]">
+										<div className="flex items-center gap-1 rounded-lg">
 											<Button
 												type="button"
 												variant="ghost"

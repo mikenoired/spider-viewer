@@ -21,7 +21,7 @@ export function InstallationStatusBar({
 					{isOnline ? <WifiIcon data-icon="inline-start" /> : <CloudOffIcon data-icon="inline-start" />}
 					{isOnline ? "Онлайн" : "Оффлайн"}
 				</Badge>
-				{outboxCount > 0 ? <Badge variant="outline">Offline-изменений: {outboxCount}</Badge> : null}
+				{outboxCount > 0 ? <Badge variant="outline">Офлайн-изменений: {outboxCount}</Badge> : null}
 			</div>
 			<Button type="button" variant="outline" onClick={onRefresh}>
 				<RefreshCcwIcon data-icon="inline-start" />
