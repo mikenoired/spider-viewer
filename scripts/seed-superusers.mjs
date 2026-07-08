@@ -1,12 +1,37 @@
 #!/usr/bin/env node
 
 import { randomBytes, scrypt } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { promisify } from "node:util";
 
 import postgres from "postgres";
 
 const scryptAsync = promisify(scrypt);
 const SCRYPT_KEY_LENGTH = 64;
+
+function loadLocalEnvFile(filePath = ".env") {
+	if (!existsSync(filePath)) return;
+
+	const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
+
+	for (const line of lines) {
+		const trimmedLine = line.trim();
+
+		if (!trimmedLine || trimmedLine.startsWith("#")) continue;
+
+		const match = /^(?:export\s+)?([\w.-]+)\s*=\s*(.*)$/.exec(trimmedLine);
+
+		if (!match) continue;
+
+		const [, key, rawValue] = match;
+
+		if (process.env[key] !== undefined) continue;
+
+		process.env[key] = rawValue.replace(/^(['"])(.*)\1$/, "$2");
+	}
+}
+
+loadLocalEnvFile();
 
 function normalizeLogin(login) {
 	return login.trim().toLowerCase();

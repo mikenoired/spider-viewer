@@ -1,5 +1,5 @@
-import * as Xlsx from "xlsx";
 import { and, eq } from "drizzle-orm";
+import * as Xlsx from "xlsx";
 
 import type { AuthSession } from "@/lib/auth/shared";
 import { getDb } from "@/lib/db";
@@ -54,7 +54,10 @@ function hasLegacyExcelSignature(buffer: Buffer) {
 	);
 }
 
-function hasExpectedWorkbookSignature(fileType: (typeof supportedPriorityListExtensions)[number], buffer: Buffer) {
+function hasExpectedWorkbookSignature(
+	fileType: (typeof supportedPriorityListExtensions)[number],
+	buffer: Buffer
+) {
 	if (fileType === "xls") {
 		return hasLegacyExcelSignature(buffer);
 	}
@@ -123,9 +126,7 @@ function parsePriorityRoomRows(fileName: string, buffer: Buffer) {
 	}
 
 	if (uniqueRooms.size > maxPriorityRoomCount) {
-		throw new Error(
-			`Список слишком большой: ${uniqueRooms.size} помещений. Лимит: ${maxPriorityRoomCount}.`
-		);
+		throw new Error(`Список слишком большой: ${uniqueRooms.size} помещений. Лимит: ${maxPriorityRoomCount}.`);
 	}
 
 	return [...uniqueRooms.entries()].map(([normalizedRoomName, roomName]) => ({

@@ -345,7 +345,9 @@ export function InstallationKanbanBoard({
 				},
 			});
 			await router.invalidate();
-			toast.success(`"${room.roomName}" перенесено в "${kanbanColumns.find((column) => column.status === status)?.title}".`);
+			toast.success(
+				`"${room.roomName}" перенесено в "${kanbanColumns.find((column) => column.status === status)?.title}".`
+			);
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Не удалось изменить статус комнаты.");
 		} finally {
