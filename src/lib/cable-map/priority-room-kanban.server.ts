@@ -2,12 +2,7 @@ import { and, eq } from "drizzle-orm";
 
 import type { AuthSession } from "@/lib/auth/shared";
 import { getDb } from "@/lib/db";
-import {
-	graphGroupRooms,
-	importSnapshots,
-	priorityRoomKanbanStates,
-	users,
-} from "@/lib/db/schema";
+import { graphGroupRooms, importSnapshots, priorityRoomKanbanStates, users } from "@/lib/db/schema";
 
 import type { UpdatePriorityRoomKanbanStatusInput } from "./shared";
 
