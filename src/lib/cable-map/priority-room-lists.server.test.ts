@@ -28,12 +28,7 @@ describe("priority room lists", () => {
 	});
 
 	it("parses the first non-empty cell of each row and removes duplicates", () => {
-		const buffer = createWorkbookBuffer([
-			["Помещение"],
-			["A101"],
-			["", "B202"],
-			["А101"],
-		]);
+		const buffer = createWorkbookBuffer([["Помещение"], ["A101"], ["", "B202"], ["А101"]]);
 
 		const rooms = __test__parsePriorityRoomRows("priority.xlsx", buffer);
 
