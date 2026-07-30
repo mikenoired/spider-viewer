@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { spawn } from "node:child_process";
 
@@ -659,7 +659,7 @@ async function runPredeploy() {
 	await syncDatabaseSchema();
 
 	process.stdout.write("[predeploy] Seeding configured superusers\n");
-	await runCommand("node", ["./scripts/seed-superusers.mjs"]);
+	await runCommand("bun", ["./seed-superusers.mjs"]);
 
 	process.stdout.write("[predeploy] Complete\n");
 }
