@@ -278,10 +278,7 @@ type PriorityKanbanMeta = {
 };
 
 function normalizePriorityRoomName(value: string) {
-	return enToRuVisual(value)
-		.replace(/\s+/g, " ")
-		.trim()
-		.toLowerCase();
+	return enToRuVisual(value).replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function buildPriorityAuthorsByRoom(rows: PriorityRoomRow[]) {
@@ -325,7 +322,10 @@ async function buildPriorityKanbanMetaByRoom(db: DbClient, rows: PriorityKanbanS
 	return metaByRoom;
 }
 
-function getPriorityKanbanMeta(metaByRoom: Map<string, PriorityKanbanMeta>, roomId: string): PriorityKanbanMeta {
+function getPriorityKanbanMeta(
+	metaByRoom: Map<string, PriorityKanbanMeta>,
+	roomId: string
+): PriorityKanbanMeta {
 	return (
 		metaByRoom.get(roomId) ?? {
 			status: "in_progress",
@@ -612,7 +612,9 @@ function buildSnapshotSummary(
 	};
 }
 
-function buildPriorityListSummary(rows: Awaited<ReturnType<typeof getPriorityRoomLists>>): PriorityRoomListView[] {
+function buildPriorityListSummary(
+	rows: Awaited<ReturnType<typeof getPriorityRoomLists>>
+): PriorityRoomListView[] {
 	return rows.map((row) => ({
 		id: row.id,
 		authorName: row.authorName,

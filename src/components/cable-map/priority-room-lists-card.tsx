@@ -60,7 +60,9 @@ export function PriorityRoomListsCard({
 			setAuthorName("");
 			setFile(null);
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Не удалось загрузить список приоритетных помещений.");
+			toast.error(
+				error instanceof Error ? error.message : "Не удалось загрузить список приоритетных помещений."
+			);
 		} finally {
 			setPending(false);
 		}
@@ -75,8 +77,8 @@ export function PriorityRoomListsCard({
 						Первоочередные помещения
 					</CardTitle>
 					<CardDescription>
-						Загрузите Excel-список с названиями помещений. Комнаты будут подсвечены на карте монтажа и
-						получат подпись автора.
+						Загрузите Excel-список с названиями помещений. Комнаты будут подсвечены на карте монтажа и получат
+						подпись автора.
 					</CardDescription>
 				</div>
 				<div className="flex flex-wrap gap-2">
@@ -142,9 +144,7 @@ export function PriorityRoomListsCard({
 											<Badge variant="outline">{list.roomCount} помещений</Badge>
 										</div>
 										<div className="truncate text-sm text-muted-foreground">{list.fileName}</div>
-										<div className="text-xs text-muted-foreground">
-											Загрузил: {list.importedByLogin}
-										</div>
+										<div className="text-xs text-muted-foreground">Загрузил: {list.importedByLogin}</div>
 									</div>
 								</div>
 							</div>
