@@ -179,7 +179,7 @@ function getInteractiveMapTitle(snapshotKind: DashboardData["snapshotKind"]) {
 
 function getEmptySnapshotDescription(snapshotKind: DashboardData["snapshotKind"]) {
 	return snapshotKind === "installation"
-		? 'Сначала нужно импортировать файл монтажа, после чего появится интерактивная карта монтажа.'
+		? "Сначала нужно импортировать файл монтажа, после чего появится интерактивная карта монтажа."
 		: 'Сначала нужно импортировать файл с листом "Общ", после чего появится интерактивная карта демонтажа.';
 }
 
