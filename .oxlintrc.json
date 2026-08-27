@@ -12,7 +12,9 @@
 		"no-useless-constructor": "error",
 		"prefer-const": "error",
 		"react/exhaustive-deps": "off",
+		"react/immutability": "off",
 		"react/jsx-no-useless-fragment": "error",
+		"react/set-state-in-effect": "off",
 		"typescript/consistent-type-imports": "error"
 	}
 }

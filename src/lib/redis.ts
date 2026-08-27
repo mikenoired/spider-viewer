@@ -1,8 +1,8 @@
-import { createClient } from "redis";
+import { createClient, type RedisClientType } from "redis";
 
 import { createLogger } from "@/lib/logger";
 
-type SpiderViewerRedisClient = ReturnType<typeof createClient>;
+type SpiderViewerRedisClient = RedisClientType;
 
 const logger = createLogger({ module: "redis" });
 
