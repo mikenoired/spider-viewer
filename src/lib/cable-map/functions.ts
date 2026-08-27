@@ -1,17 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireRole, requireSession } from "@/lib/auth/guards";
-import { canEditProgress, canUploadSnapshot, canViewAudit } from "@/lib/auth/shared";
+import { canEditProgress, canViewAudit } from "@/lib/auth/shared";
 
 import {
 	createManualRoomSchema,
 	dateRangeSchema,
 	deleteManualRoomSchema,
+	createRemarkSchema,
 	exportBackdatedSchema,
 	exportDailyHistorySchema,
 	exportHistorySchema,
 	saveCableProgressSchema,
+	updatePriorityListKanbanStatusSchema,
 	updatePriorityRoomKanbanStatusSchema,
+	updateRemarkStatusSchema,
 } from "./shared";
 
 export const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
@@ -24,6 +27,20 @@ export const getInstallationDashboardData = createServerFn({ method: "GET" }).ha
 	return getActiveDashboardData("installation");
 });
 
+export const convertNppToDocx = createServerFn({ method: "POST" })
+	.inputValidator((input: FormData) => input)
+	.handler(async ({ data }) => {
+		await requireSession();
+		const { convertNppFormData } = await import("@/lib/npp/server");
+		const { archive } = await convertNppFormData(data);
+		return new Response(new Uint8Array(archive), {
+			headers: {
+				"Content-Type": "application/zip",
+				"Content-Disposition": "attachment; filename=npp-docx-result.zip",
+			},
+		});
+	});
+
 export const uploadWorkbook = createServerFn({ method: "POST" })
 	.inputValidator((input: FormData) => input)
 	.handler(async ({ data }) => {
@@ -35,14 +52,40 @@ export const uploadWorkbook = createServerFn({ method: "POST" })
 export const uploadPriorityRoomList = createServerFn({ method: "POST" })
 	.inputValidator((input: FormData) => input)
 	.handler(async ({ data }) => {
-		const session = await requireRole(["super-admin"]);
-
-		if (!canUploadSnapshot(session.role)) {
-			throw new Error("Недостаточно прав для загрузки списков.");
-		}
+		const session = await requireSession();
 
 		const { importPriorityRoomListFromFormData } = await import("./priority-room-lists.server");
 		return importPriorityRoomListFromFormData(data, session);
+	});
+
+export const updatePriorityListKanbanStatus = createServerFn({ method: "POST" })
+	.inputValidator(updatePriorityListKanbanStatusSchema)
+	.handler(async ({ data }) => {
+		const session = await requireRole(["super-admin"]);
+		const { updatePriorityListKanbanStatus: updateStatus } = await import("./priority-list-kanban.server");
+		return updateStatus(data, session);
+	});
+
+export const getRemarksData = createServerFn({ method: "GET" }).handler(async () => {
+	await requireSession();
+	const { getRemarksData: getData } = await import("./remarks.server");
+	return getData();
+});
+
+export const createRemark = createServerFn({ method: "POST" })
+	.inputValidator(createRemarkSchema)
+	.handler(async ({ data }) => {
+		const session = await requireSession();
+		const { createRemark: create } = await import("./remarks.server");
+		return create(data, session);
+	});
+
+export const updateRemarkStatus = createServerFn({ method: "POST" })
+	.inputValidator(updateRemarkStatusSchema)
+	.handler(async ({ data }) => {
+		const session = await requireRole(["super-admin"]);
+		const { updateRemarkStatus: update } = await import("./remarks.server");
+		return update(data, session);
 	});
 
 export const updatePriorityRoomKanbanStatus = createServerFn({ method: "POST" })

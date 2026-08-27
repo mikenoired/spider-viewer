@@ -103,9 +103,34 @@ export const priorityRoomListAuthorSchema = z
 	.max(120, "Имя автора не должно быть длиннее 120 символов.");
 export const priorityRoomKanbanStatuses = ["in_progress", "done", "checked"] as const;
 export const priorityRoomKanbanStatusSchema = z.enum(priorityRoomKanbanStatuses);
+export const priorityListKanbanStatuses = [
+	"formed",
+	"in_progress",
+	"curator_review",
+	"adjustment",
+	"done",
+] as const;
+export const priorityListKanbanStatusSchema = z.enum(priorityListKanbanStatuses);
 export const updatePriorityRoomKanbanStatusSchema = z.object({
 	roomId: z.string().uuid(),
 	status: priorityRoomKanbanStatusSchema,
+});
+export const updatePriorityListKanbanStatusSchema = z.object({
+	listId: z.string().uuid(),
+	status: priorityListKanbanStatusSchema,
+});
+export const remarkTargetTypes = ["cable_change", "room_change", "priority_list"] as const;
+export const remarkTargetTypeSchema = z.enum(remarkTargetTypes);
+export const remarkStatuses = ["open", "resolved"] as const;
+export const remarkStatusSchema = z.enum(remarkStatuses);
+export const createRemarkSchema = z.object({
+	targetType: remarkTargetTypeSchema,
+	targetId: z.string().uuid(),
+	content: z.string().trim().min(3, "Опишите замечание.").max(4_000, "Замечание слишком длинное."),
+});
+export const updateRemarkStatusSchema = z.object({
+	remarkId: z.string().uuid(),
+	status: remarkStatusSchema,
 });
 
 export type DateRangeInput = z.infer<typeof dateRangeSchema>;
@@ -117,6 +142,12 @@ export type ExportBackdatedInput = ExportHistoryInput;
 export type ExportDailyHistoryInput = z.infer<typeof exportDailyHistorySchema>;
 export type PriorityRoomKanbanStatus = z.infer<typeof priorityRoomKanbanStatusSchema>;
 export type UpdatePriorityRoomKanbanStatusInput = z.infer<typeof updatePriorityRoomKanbanStatusSchema>;
+export type PriorityListKanbanStatus = z.infer<typeof priorityListKanbanStatusSchema>;
+export type UpdatePriorityListKanbanStatusInput = z.infer<typeof updatePriorityListKanbanStatusSchema>;
+export type RemarkTargetType = z.infer<typeof remarkTargetTypeSchema>;
+export type RemarkStatus = z.infer<typeof remarkStatusSchema>;
+export type CreateRemarkInput = z.infer<typeof createRemarkSchema>;
+export type UpdateRemarkStatusInput = z.infer<typeof updateRemarkStatusSchema>;
 
 export type HistoryEntryView = {
 	id: string;
@@ -214,6 +245,34 @@ export type PriorityRoomListView = {
 	roomCount: number;
 	importedByLogin: string;
 	createdAt: string;
+	status: PriorityListKanbanStatus;
+	statusUpdatedAt: string | null;
+	statusUpdatedByLogin: string | null;
+};
+
+export type RemarkView = {
+	id: string;
+	targetType: RemarkTargetType;
+	targetId: string;
+	targetLabel: string;
+	content: string;
+	status: RemarkStatus;
+	createdAt: string;
+	createdByLogin: string;
+	resolvedAt: string | null;
+	resolvedByLogin: string | null;
+};
+
+export type RemarkTargetView = {
+	type: RemarkTargetType;
+	id: string;
+	label: string;
+	details: string;
+};
+
+export type RemarksData = {
+	remarks: RemarkView[];
+	targets: RemarkTargetView[];
 };
 
 export type PriorityKanbanRoomView = {
