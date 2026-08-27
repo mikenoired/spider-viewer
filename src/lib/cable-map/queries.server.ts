@@ -221,6 +221,9 @@ async function getPriorityRoomLists(db: DbClient, snapshotId: string) {
 			fileName: priorityRoomLists.fileName,
 			fileType: priorityRoomLists.fileType,
 			roomCount: priorityRoomLists.roomCount,
+			status: priorityRoomLists.status,
+			statusUpdatedByUserId: priorityRoomLists.statusUpdatedByUserId,
+			statusUpdatedAt: priorityRoomLists.statusUpdatedAt,
 			importedByLogin: users.login,
 			createdAt: priorityRoomLists.createdAt,
 		})
@@ -612,9 +615,14 @@ function buildSnapshotSummary(
 	};
 }
 
-function buildPriorityListSummary(
+async function buildPriorityListSummary(
+	db: DbClient,
 	rows: Awaited<ReturnType<typeof getPriorityRoomLists>>
-): PriorityRoomListView[] {
+): Promise<PriorityRoomListView[]> {
+	const userLoginsById = await getUserLoginsById(
+		db,
+		rows.map((row) => row.statusUpdatedByUserId ?? "")
+	);
 	return rows.map((row) => ({
 		id: row.id,
 		authorName: row.authorName,
@@ -623,6 +631,11 @@ function buildPriorityListSummary(
 		roomCount: row.roomCount,
 		importedByLogin: row.importedByLogin,
 		createdAt: toIsoString(row.createdAt),
+		status: row.status,
+		statusUpdatedAt: row.statusUpdatedAt ? toIsoString(row.statusUpdatedAt) : null,
+		statusUpdatedByLogin: row.statusUpdatedByUserId
+			? (userLoginsById.get(row.statusUpdatedByUserId) ?? null)
+			: null,
 	}));
 }
 
@@ -698,7 +711,7 @@ export async function getActiveDashboardData(
 	return {
 		snapshot: buildSnapshotSummary(snapshot, levels, groups.size, allPrimaryRooms),
 		snapshotKind,
-		priorityLists: buildPriorityListSummary(priorityLists),
+		priorityLists: await buildPriorityListSummary(db, priorityLists),
 		priorityRoomCount: priorityAuthorsByRoom.size,
 		priorityKanbanRooms: buildPriorityKanbanRooms(groups, kanbanMetaByRoom),
 		levels,

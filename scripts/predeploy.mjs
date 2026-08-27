@@ -42,6 +42,9 @@ const enumDefinitions = [
 	["installation_pending_status", ["pending", "applied", "discarded"]],
 	["installation_kks_item_type", ["mechanism", "cable"]],
 	["priority_room_kanban_status", ["in_progress", "done", "checked"]],
+	["priority_list_kanban_status", ["formed", "in_progress", "curator_review", "adjustment", "done"]],
+	["remark_target_type", ["cable_change", "room_change", "priority_list"]],
+	["remark_status", ["open", "resolved"]],
 ];
 
 const tableDefinitions = [
@@ -254,7 +257,25 @@ const tableDefinitions = [
 			file_name text not null,
 			file_type text not null,
 			room_count integer not null default 0,
+			status priority_list_kanban_status not null default 'formed',
+			status_updated_by_user_id uuid,
+			status_updated_at timestamp with time zone,
 			imported_by_user_id uuid not null,
+			created_at timestamp with time zone not null default now(),
+			updated_at timestamp with time zone not null default now()
+		)`,
+	],
+	[
+		"remarks",
+		`create table if not exists remarks (
+			id uuid primary key default gen_random_uuid(),
+			target_type remark_target_type not null,
+			target_id uuid not null,
+			content text not null,
+			status remark_status not null default 'open',
+			created_by_user_id uuid not null,
+			resolved_by_user_id uuid,
+			resolved_at timestamp with time zone,
 			created_at timestamp with time zone not null default now(),
 			updated_at timestamp with time zone not null default now()
 		)`,
@@ -371,6 +392,9 @@ const columnDefinitions = [
 	["priority_room_lists", "file_name text not null default ''"],
 	["priority_room_lists", "file_type text not null default ''"],
 	["priority_room_lists", "room_count integer not null default 0"],
+	["priority_room_lists", "status priority_list_kanban_status not null default 'formed'"],
+	["priority_room_lists", "status_updated_by_user_id uuid"],
+	["priority_room_lists", "status_updated_at timestamp with time zone"],
 	["priority_room_lists", "imported_by_user_id uuid"],
 	["priority_room_lists", "updated_at timestamp with time zone not null default now()"],
 	["priority_room_entries", "list_id uuid"],
@@ -386,6 +410,14 @@ const columnDefinitions = [
 	["priority_room_kanban_states", "checked_at timestamp with time zone"],
 	["priority_room_kanban_states", "updated_at timestamp with time zone not null default now()"],
 	["cable_change_audit_logs", "cable_row_id uuid"],
+	["remarks", "target_type remark_target_type"],
+	["remarks", "target_id uuid"],
+	["remarks", "content text not null default ''"],
+	["remarks", "status remark_status not null default 'open'"],
+	["remarks", "created_by_user_id uuid"],
+	["remarks", "resolved_by_user_id uuid"],
+	["remarks", "resolved_at timestamp with time zone"],
+	["remarks", "updated_at timestamp with time zone not null default now()"],
 ];
 
 const legacyCleanupStatements = ["drop index if exists import_snapshots_single_active_unique"];
@@ -413,6 +445,8 @@ const indexStatements = [
 	"create index if not exists installation_pending_changes_snapshot_status_idx on installation_pending_changes (snapshot_id, status)",
 	"create unique index if not exists installation_pending_changes_client_mutation_unique on installation_pending_changes (client_mutation_id)",
 	"create index if not exists priority_room_lists_snapshot_created_idx on priority_room_lists (snapshot_id, created_at)",
+	"create index if not exists remarks_target_idx on remarks (target_type, target_id)",
+	"create index if not exists remarks_status_created_idx on remarks (status, created_at)",
 	"create index if not exists priority_room_entries_snapshot_room_idx on priority_room_entries (snapshot_id, normalized_room_name)",
 	"create unique index if not exists priority_room_entries_list_room_unique on priority_room_entries (list_id, normalized_room_name)",
 	"create index if not exists priority_room_kanban_states_snapshot_status_idx on priority_room_kanban_states (snapshot_id, status)",
@@ -570,6 +604,16 @@ const foreignKeyDefinitions = [
 		"id",
 		"restrict",
 	],
+	[
+		"priority_room_lists_status_updated_by_user_id_fk",
+		"priority_room_lists",
+		"status_updated_by_user_id",
+		"users",
+		"id",
+		"set null",
+	],
+	["remarks_created_by_user_id_fk", "remarks", "created_by_user_id", "users", "id", "restrict"],
+	["remarks_resolved_by_user_id_fk", "remarks", "resolved_by_user_id", "users", "id", "set null"],
 	[
 		"priority_room_entries_list_id_fk",
 		"priority_room_entries",

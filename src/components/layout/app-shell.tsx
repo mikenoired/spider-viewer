@@ -4,10 +4,12 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
 	ChevronsUpDownIcon,
 	FileClockIcon,
+	FileOutputIcon,
 	FileSpreadsheetIcon,
 	HistoryIcon,
 	KanbanIcon,
 	MapIcon,
+	MessageSquareIcon,
 	PanelLeftIcon,
 	UserCheckIcon,
 	UserPlusIcon,
@@ -377,7 +379,15 @@ function getInitials(value: string) {
 
 function getNavigationItems(role: AuthSession["role"]) {
 	const items: Array<{
-		to: "/app" | "/app/installation" | "/app/import" | "/app/history" | "/app/backdated" | "/app/users";
+		to:
+			| "/app"
+			| "/app/installation"
+			| "/app/import"
+			| "/app/history"
+			| "/app/backdated"
+			| "/app/users"
+			| "/app/remarks"
+			| "/app/npp-to-docx";
 		label: string;
 		icon: typeof MapIcon;
 	}> = [
@@ -390,6 +400,16 @@ function getNavigationItems(role: AuthSession["role"]) {
 			to: "/app/installation" as const,
 			label: "Монтаж",
 			icon: KanbanIcon,
+		},
+		{
+			to: "/app/remarks" as const,
+			label: "Замечания",
+			icon: MessageSquareIcon,
+		},
+		{
+			to: "/app/npp-to-docx" as const,
+			label: "NPP → DOCX",
+			icon: FileOutputIcon,
 		},
 	];
 
@@ -432,6 +452,8 @@ function getPageTitle(pathname: string) {
 		[
 			["/app/import", "Загрузка данных"],
 			["/app/installation", "Монтаж"],
+			["/app/remarks", "Замечания"],
+			["/app/npp-to-docx", "NPP → DOCX"],
 			["/app/history", "История изменений"],
 			["/app/backdated", "Изменения задним числом"],
 			["/app/users", "Пользователи"],
