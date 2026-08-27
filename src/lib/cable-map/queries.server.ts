@@ -623,7 +623,6 @@ async function buildPriorityListSummary(
 		db,
 		rows.map((row) => row.statusUpdatedByUserId ?? "")
 	);
-
 	return rows.map((row) => ({
 		id: row.id,
 		authorName: row.authorName,
