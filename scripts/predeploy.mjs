@@ -1,8 +1,33 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { spawn } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 
 import postgres from "postgres";
+
+function loadLocalEnvFile(filePath = ".env") {
+	if (!existsSync(filePath)) return;
+
+	const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
+
+	for (const line of lines) {
+		const trimmedLine = line.trim();
+
+		if (!trimmedLine || trimmedLine.startsWith("#")) continue;
+
+		const match = /^(?:export\s+)?([\w.-]+)\s*=\s*(.*)$/.exec(trimmedLine);
+
+		if (!match) continue;
+
+		const [, key, rawValue] = match;
+
+		if (process.env[key] !== undefined) continue;
+
+		process.env[key] = rawValue.replace(/^(['"])(.*)\1$/, "$2");
+	}
+}
+
+loadLocalEnvFile();
 
 const requiredEnvironmentVariables = ["DATABASE_URL", "AUTH_SUPERUSERS_JSON"];
 
@@ -16,6 +41,10 @@ const enumDefinitions = [
 	["graph_room_role", ["primary", "secondary"]],
 	["installation_pending_status", ["pending", "applied", "discarded"]],
 	["installation_kks_item_type", ["mechanism", "cable"]],
+	["priority_room_kanban_status", ["in_progress", "done", "checked"]],
+	["priority_list_kanban_status", ["formed", "in_progress", "curator_review", "adjustment", "done"]],
+	["remark_target_type", ["cable_change", "room_change", "priority_list"]],
+	["remark_status", ["open", "resolved"]],
 ];
 
 const tableDefinitions = [
@@ -220,6 +249,64 @@ const tableDefinitions = [
 		)`,
 	],
 	[
+		"priority_room_lists",
+		`create table if not exists priority_room_lists (
+			id uuid primary key default gen_random_uuid(),
+			snapshot_id uuid not null,
+			author_name text not null,
+			file_name text not null,
+			file_type text not null,
+			room_count integer not null default 0,
+			status priority_list_kanban_status not null default 'formed',
+			status_updated_by_user_id uuid,
+			status_updated_at timestamp with time zone,
+			imported_by_user_id uuid not null,
+			created_at timestamp with time zone not null default now(),
+			updated_at timestamp with time zone not null default now()
+		)`,
+	],
+	[
+		"remarks",
+		`create table if not exists remarks (
+			id uuid primary key default gen_random_uuid(),
+			target_type remark_target_type not null,
+			target_id uuid not null,
+			content text not null,
+			status remark_status not null default 'open',
+			created_by_user_id uuid not null,
+			resolved_by_user_id uuid,
+			resolved_at timestamp with time zone,
+			created_at timestamp with time zone not null default now(),
+			updated_at timestamp with time zone not null default now()
+		)`,
+	],
+	[
+		"priority_room_entries",
+		`create table if not exists priority_room_entries (
+			id uuid primary key default gen_random_uuid(),
+			list_id uuid not null,
+			snapshot_id uuid not null,
+			room_name text not null,
+			normalized_room_name text not null,
+			sort_order integer not null default 0,
+			created_at timestamp with time zone not null default now()
+		)`,
+	],
+	[
+		"priority_room_kanban_states",
+		`create table if not exists priority_room_kanban_states (
+			id uuid primary key default gen_random_uuid(),
+			snapshot_id uuid not null,
+			room_id uuid not null,
+			status priority_room_kanban_status not null default 'in_progress',
+			updated_by_user_id uuid not null,
+			checked_by_user_id uuid,
+			checked_at timestamp with time zone,
+			created_at timestamp with time zone not null default now(),
+			updated_at timestamp with time zone not null default now()
+		)`,
+	],
+	[
 		"change_audit_logs",
 		`create table if not exists change_audit_logs (
 			id uuid primary key default gen_random_uuid(),
@@ -300,7 +387,37 @@ const columnDefinitions = [
 	["installation_kks_items", "matched_in_cable_base boolean not null default false"],
 	["installation_kks_items", "updated_by_user_id uuid"],
 	["installation_pending_changes", "resolved_done boolean"],
+	["priority_room_lists", "snapshot_id uuid"],
+	["priority_room_lists", "author_name text not null default ''"],
+	["priority_room_lists", "file_name text not null default ''"],
+	["priority_room_lists", "file_type text not null default ''"],
+	["priority_room_lists", "room_count integer not null default 0"],
+	["priority_room_lists", "status priority_list_kanban_status not null default 'formed'"],
+	["priority_room_lists", "status_updated_by_user_id uuid"],
+	["priority_room_lists", "status_updated_at timestamp with time zone"],
+	["priority_room_lists", "imported_by_user_id uuid"],
+	["priority_room_lists", "updated_at timestamp with time zone not null default now()"],
+	["priority_room_entries", "list_id uuid"],
+	["priority_room_entries", "snapshot_id uuid"],
+	["priority_room_entries", "room_name text not null default ''"],
+	["priority_room_entries", "normalized_room_name text not null default ''"],
+	["priority_room_entries", "sort_order integer not null default 0"],
+	["priority_room_kanban_states", "snapshot_id uuid"],
+	["priority_room_kanban_states", "room_id uuid"],
+	["priority_room_kanban_states", "status priority_room_kanban_status not null default 'in_progress'"],
+	["priority_room_kanban_states", "updated_by_user_id uuid"],
+	["priority_room_kanban_states", "checked_by_user_id uuid"],
+	["priority_room_kanban_states", "checked_at timestamp with time zone"],
+	["priority_room_kanban_states", "updated_at timestamp with time zone not null default now()"],
 	["cable_change_audit_logs", "cable_row_id uuid"],
+	["remarks", "target_type remark_target_type"],
+	["remarks", "target_id uuid"],
+	["remarks", "content text not null default ''"],
+	["remarks", "status remark_status not null default 'open'"],
+	["remarks", "created_by_user_id uuid"],
+	["remarks", "resolved_by_user_id uuid"],
+	["remarks", "resolved_at timestamp with time zone"],
+	["remarks", "updated_at timestamp with time zone not null default now()"],
 ];
 
 const legacyCleanupStatements = ["drop index if exists import_snapshots_single_active_unique"];
@@ -327,6 +444,13 @@ const indexStatements = [
 	"create index if not exists installation_pending_changes_status_group_idx on installation_pending_changes (status, group_id)",
 	"create index if not exists installation_pending_changes_snapshot_status_idx on installation_pending_changes (snapshot_id, status)",
 	"create unique index if not exists installation_pending_changes_client_mutation_unique on installation_pending_changes (client_mutation_id)",
+	"create index if not exists priority_room_lists_snapshot_created_idx on priority_room_lists (snapshot_id, created_at)",
+	"create index if not exists remarks_target_idx on remarks (target_type, target_id)",
+	"create index if not exists remarks_status_created_idx on remarks (status, created_at)",
+	"create index if not exists priority_room_entries_snapshot_room_idx on priority_room_entries (snapshot_id, normalized_room_name)",
+	"create unique index if not exists priority_room_entries_list_room_unique on priority_room_entries (list_id, normalized_room_name)",
+	"create index if not exists priority_room_kanban_states_snapshot_status_idx on priority_room_kanban_states (snapshot_id, status)",
+	"create unique index if not exists priority_room_kanban_states_snapshot_room_unique on priority_room_kanban_states (snapshot_id, room_id)",
 	"create index if not exists change_audit_logs_changed_at_idx on change_audit_logs (changed_at)",
 	"create index if not exists change_audit_logs_effective_date_idx on change_audit_logs (effective_date)",
 	"create index if not exists change_audit_logs_backdated_effective_changed_idx on change_audit_logs (is_backdated, effective_date, changed_at)",
@@ -463,6 +587,80 @@ const foreignKeyDefinitions = [
 		"users",
 		"id",
 		"restrict",
+	],
+	[
+		"priority_room_lists_snapshot_id_fk",
+		"priority_room_lists",
+		"snapshot_id",
+		"import_snapshots",
+		"id",
+		"cascade",
+	],
+	[
+		"priority_room_lists_imported_by_user_id_fk",
+		"priority_room_lists",
+		"imported_by_user_id",
+		"users",
+		"id",
+		"restrict",
+	],
+	[
+		"priority_room_lists_status_updated_by_user_id_fk",
+		"priority_room_lists",
+		"status_updated_by_user_id",
+		"users",
+		"id",
+		"set null",
+	],
+	["remarks_created_by_user_id_fk", "remarks", "created_by_user_id", "users", "id", "restrict"],
+	["remarks_resolved_by_user_id_fk", "remarks", "resolved_by_user_id", "users", "id", "set null"],
+	[
+		"priority_room_entries_list_id_fk",
+		"priority_room_entries",
+		"list_id",
+		"priority_room_lists",
+		"id",
+		"cascade",
+	],
+	[
+		"priority_room_entries_snapshot_id_fk",
+		"priority_room_entries",
+		"snapshot_id",
+		"import_snapshots",
+		"id",
+		"cascade",
+	],
+	[
+		"priority_room_kanban_states_snapshot_id_fk",
+		"priority_room_kanban_states",
+		"snapshot_id",
+		"import_snapshots",
+		"id",
+		"cascade",
+	],
+	[
+		"priority_room_kanban_states_room_id_fk",
+		"priority_room_kanban_states",
+		"room_id",
+		"graph_group_rooms",
+		"id",
+		"cascade",
+	],
+	[
+		"priority_room_kanban_states_updated_by_user_id_fk",
+		"priority_room_kanban_states",
+		"updated_by_user_id",
+		"users",
+		"id",
+		"restrict",
+	],
+	[
+		"priority_room_kanban_states_checked_by_user_id_fk",
+		"priority_room_kanban_states",
+		"checked_by_user_id",
+		"users",
+		"id",
+		"set null",
 	],
 	[
 		"change_audit_logs_snapshot_id_fk",
@@ -659,7 +857,7 @@ async function runPredeploy() {
 	await syncDatabaseSchema();
 
 	process.stdout.write("[predeploy] Seeding configured superusers\n");
-	await runCommand("node", ["./scripts/seed-superusers.mjs"]);
+	await runCommand("bun", ["./seed-superusers.mjs"]);
 
 	process.stdout.write("[predeploy] Complete\n");
 }
