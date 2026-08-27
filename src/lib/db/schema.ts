@@ -40,6 +40,19 @@ export const priorityRoomKanbanStatusEnum = pgEnum("priority_room_kanban_status"
 	"done",
 	"checked",
 ]);
+export const priorityListKanbanStatusEnum = pgEnum("priority_list_kanban_status", [
+	"formed",
+	"in_progress",
+	"curator_review",
+	"adjustment",
+	"done",
+]);
+export const remarkTargetTypeEnum = pgEnum("remark_target_type", [
+	"cable_change",
+	"room_change",
+	"priority_list",
+]);
+export const remarkStatusEnum = pgEnum("remark_status", ["open", "resolved"]);
 
 export const users = pgTable(
 	"users",
@@ -400,6 +413,11 @@ export const priorityRoomLists = pgTable(
 		fileName: text("file_name").notNull(),
 		fileType: text("file_type").notNull(),
 		roomCount: integer("room_count").notNull().default(0),
+		status: priorityListKanbanStatusEnum("status").notNull().default("formed"),
+		statusUpdatedByUserId: uuid("status_updated_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		statusUpdatedAt: timestamp("status_updated_at", { withTimezone: true }),
 		importedByUserId: uuid("imported_by_user_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "restrict" }),
@@ -407,6 +425,28 @@ export const priorityRoomLists = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => [index("priority_room_lists_snapshot_created_idx").on(table.snapshotId, table.createdAt)]
+);
+
+export const remarks = pgTable(
+	"remarks",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		targetType: remarkTargetTypeEnum("target_type").notNull(),
+		targetId: uuid("target_id").notNull(),
+		content: text("content").notNull(),
+		status: remarkStatusEnum("status").notNull().default("open"),
+		createdByUserId: uuid("created_by_user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		resolvedByUserId: uuid("resolved_by_user_id").references(() => users.id, { onDelete: "set null" }),
+		resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("remarks_target_idx").on(table.targetType, table.targetId),
+		index("remarks_status_created_idx").on(table.status, table.createdAt),
+	]
 );
 
 export const priorityRoomEntries = pgTable(
@@ -546,5 +586,6 @@ export type InstallationPendingChange = typeof installationPendingChanges.$infer
 export type PriorityRoomList = typeof priorityRoomLists.$inferSelect;
 export type PriorityRoomEntry = typeof priorityRoomEntries.$inferSelect;
 export type PriorityRoomKanbanState = typeof priorityRoomKanbanStates.$inferSelect;
+export type Remark = typeof remarks.$inferSelect;
 export type ChangeAuditLog = typeof changeAuditLogs.$inferSelect;
 export type CableChangeAuditLog = typeof cableChangeAuditLogs.$inferSelect;

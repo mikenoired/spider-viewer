@@ -221,6 +221,9 @@ async function getPriorityRoomLists(db: DbClient, snapshotId: string) {
 			fileName: priorityRoomLists.fileName,
 			fileType: priorityRoomLists.fileType,
 			roomCount: priorityRoomLists.roomCount,
+			status: priorityRoomLists.status,
+			statusUpdatedByUserId: priorityRoomLists.statusUpdatedByUserId,
+			statusUpdatedAt: priorityRoomLists.statusUpdatedAt,
 			importedByLogin: users.login,
 			createdAt: priorityRoomLists.createdAt,
 		})
@@ -278,10 +281,7 @@ type PriorityKanbanMeta = {
 };
 
 function normalizePriorityRoomName(value: string) {
-	return enToRuVisual(value)
-		.replace(/\s+/g, " ")
-		.trim()
-		.toLowerCase();
+	return enToRuVisual(value).replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function buildPriorityAuthorsByRoom(rows: PriorityRoomRow[]) {
@@ -325,7 +325,10 @@ async function buildPriorityKanbanMetaByRoom(db: DbClient, rows: PriorityKanbanS
 	return metaByRoom;
 }
 
-function getPriorityKanbanMeta(metaByRoom: Map<string, PriorityKanbanMeta>, roomId: string): PriorityKanbanMeta {
+function getPriorityKanbanMeta(
+	metaByRoom: Map<string, PriorityKanbanMeta>,
+	roomId: string
+): PriorityKanbanMeta {
 	return (
 		metaByRoom.get(roomId) ?? {
 			status: "in_progress",
@@ -612,7 +615,15 @@ function buildSnapshotSummary(
 	};
 }
 
-function buildPriorityListSummary(rows: Awaited<ReturnType<typeof getPriorityRoomLists>>): PriorityRoomListView[] {
+async function buildPriorityListSummary(
+	db: DbClient,
+	rows: Awaited<ReturnType<typeof getPriorityRoomLists>>
+): Promise<PriorityRoomListView[]> {
+	const userLoginsById = await getUserLoginsById(
+		db,
+		rows.map((row) => row.statusUpdatedByUserId ?? "")
+	);
+
 	return rows.map((row) => ({
 		id: row.id,
 		authorName: row.authorName,
@@ -621,6 +632,11 @@ function buildPriorityListSummary(rows: Awaited<ReturnType<typeof getPriorityRoo
 		roomCount: row.roomCount,
 		importedByLogin: row.importedByLogin,
 		createdAt: toIsoString(row.createdAt),
+		status: row.status,
+		statusUpdatedAt: row.statusUpdatedAt ? toIsoString(row.statusUpdatedAt) : null,
+		statusUpdatedByLogin: row.statusUpdatedByUserId
+			? (userLoginsById.get(row.statusUpdatedByUserId) ?? null)
+			: null,
 	}));
 }
 
@@ -696,7 +712,7 @@ export async function getActiveDashboardData(
 	return {
 		snapshot: buildSnapshotSummary(snapshot, levels, groups.size, allPrimaryRooms),
 		snapshotKind,
-		priorityLists: buildPriorityListSummary(priorityLists),
+		priorityLists: await buildPriorityListSummary(db, priorityLists),
 		priorityRoomCount: priorityAuthorsByRoom.size,
 		priorityKanbanRooms: buildPriorityKanbanRooms(groups, kanbanMetaByRoom),
 		levels,

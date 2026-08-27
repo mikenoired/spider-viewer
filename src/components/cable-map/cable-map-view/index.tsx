@@ -179,7 +179,7 @@ function getInteractiveMapTitle(snapshotKind: DashboardData["snapshotKind"]) {
 
 function getEmptySnapshotDescription(snapshotKind: DashboardData["snapshotKind"]) {
 	return snapshotKind === "installation"
-		? 'Сначала нужно импортировать файл монтажа, после чего появится интерактивная карта монтажа.'
+		? "Сначала нужно импортировать файл монтажа, после чего появится интерактивная карта монтажа."
 		: 'Сначала нужно импортировать файл с листом "Общ", после чего появится интерактивная карта демонтажа.';
 }
 
@@ -1039,16 +1039,11 @@ export function CableMapView({
 			{data.snapshotKind === "installation" ? (
 				<div className="grid gap-4 px-4">
 					<PriorityRoomListsCard
-						canUpload={canUploadSnapshot(role)}
+						canUpload
 						priorityLists={data.priorityLists}
 						priorityRoomCount={data.priorityRoomCount}
 					/>
-					<InstallationKanbanBoard
-						rooms={data.priorityKanbanRooms}
-						canVerify={role === "super-admin"}
-						highlightedRoomId={highlightedRoomId}
-						onHoverRoom={setHighlightedRoomId}
-					/>
+					<InstallationKanbanBoard lists={data.priorityLists} canManage={role === "super-admin"} />
 				</div>
 			) : null}
 

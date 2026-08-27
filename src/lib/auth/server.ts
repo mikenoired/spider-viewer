@@ -21,10 +21,6 @@ import { createManagedUserSchema, updateManagedUserRoleSchema } from "./shared";
 
 const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
-declare global {
-	var __spiderViewerLegacyAuthUsersPromise__: Promise<void> | undefined;
-}
-
 function getJwtSecret() {
 	const secret = process.env.JWT_SECRET;
 
@@ -87,22 +83,9 @@ function toManagedUserView(user: {
 	} satisfies ManagedUserView;
 }
 
-async function reconcileLegacyAdminUsers() {
-	const db = getDb();
-	const now = new Date();
-
-	await db.update(users).set({ role: "user", updatedAt: now }).where(eq(users.role, "admin"));
-}
-
 async function ensureLegacyAuthUsersReconciled() {
-	if (!globalThis.__spiderViewerLegacyAuthUsersPromise__) {
-		globalThis.__spiderViewerLegacyAuthUsersPromise__ = reconcileLegacyAdminUsers().catch((error) => {
-			globalThis.__spiderViewerLegacyAuthUsersPromise__ = undefined;
-			throw error;
-		});
-	}
-
-	await globalThis.__spiderViewerLegacyAuthUsersPromise__;
+	// Legacy databases may not contain the removed `admin` enum value.
+	// Authentication must not issue a query with that unavailable value.
 }
 
 async function hasSuperAdminAccount() {
