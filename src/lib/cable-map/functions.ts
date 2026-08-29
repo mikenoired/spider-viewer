@@ -8,6 +8,8 @@ import {
 	dateRangeSchema,
 	deleteManualRoomSchema,
 	createRemarkSchema,
+	createKanbanRemarkSchema,
+	createTaskCommentSchema,
 	exportBackdatedSchema,
 	exportDailyHistorySchema,
 	exportHistorySchema,
@@ -15,6 +17,7 @@ import {
 	updatePriorityListKanbanStatusSchema,
 	updatePriorityRoomKanbanStatusSchema,
 	updateRemarkStatusSchema,
+	transitionKanbanTaskSchema,
 } from "./shared";
 
 export const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
@@ -58,13 +61,73 @@ export const uploadPriorityRoomList = createServerFn({ method: "POST" })
 		return importPriorityRoomListFromFormData(data, session);
 	});
 
+export const analyzeCableTaskList = createServerFn({ method: "POST" })
+	.inputValidator((input: FormData) => input)
+	.handler(async ({ data }) => {
+		const session = await requireSession();
+		const { analyzeCableTaskListFromFormData } = await import("./task-workflow.server");
+		return analyzeCableTaskListFromFormData(data, session);
+	});
+
+export const uploadCableTaskList = createServerFn({ method: "POST" })
+	.inputValidator((input: FormData) => input)
+	.handler(async ({ data }) => {
+		const session = await requireSession();
+		const { importCableTaskListFromFormData } = await import("./task-workflow.server");
+		return importCableTaskListFromFormData(data, session);
+	});
+
 export const updatePriorityListKanbanStatus = createServerFn({ method: "POST" })
 	.inputValidator(updatePriorityListKanbanStatusSchema)
 	.handler(async ({ data }) => {
 		const session = await requireRole(["super-admin"]);
-		const { updatePriorityListKanbanStatus: updateStatus } = await import("./priority-list-kanban.server");
-		return updateStatus(data, session);
+		const { transitionKanbanTask } = await import("./task-workflow.server");
+		return transitionKanbanTask({ ...data, action: "move" }, session);
 	});
+
+export const transitionKanbanTask = createServerFn({ method: "POST" })
+	.inputValidator(transitionKanbanTaskSchema)
+	.handler(async ({ data }) => {
+		const session = await requireSession();
+		const { transitionKanbanTask: transition } = await import("./task-workflow.server");
+		return transition(data, session);
+	});
+
+export const getKanbanTaskData = createServerFn({ method: "GET" })
+	.inputValidator((listId: string) => listId)
+	.handler(async ({ data }) => {
+		await requireSession();
+		const { getKanbanTaskData: getData } = await import("./task-workflow.server");
+		return getData(data);
+	});
+
+export const createTaskComment = createServerFn({ method: "POST" })
+	.inputValidator(createTaskCommentSchema)
+	.handler(async ({ data }) => {
+		const session = await requireSession();
+		const { createTaskComment: create } = await import("./task-workflow.server");
+		return create(data, session);
+	});
+
+export const createKanbanRemark = createServerFn({ method: "POST" })
+	.inputValidator(createKanbanRemarkSchema)
+	.handler(async ({ data }) => {
+		const session = await requireSession();
+		const { createKanbanRemark: create } = await import("./task-workflow.server");
+		return create(data, session);
+	});
+
+export const getMyNotifications = createServerFn({ method: "GET" }).handler(async () => {
+	const session = await requireSession();
+	const { getMyNotifications: getNotifications } = await import("./task-workflow.server");
+	return getNotifications(session);
+});
+
+export const getTaskRecipients = createServerFn({ method: "GET" }).handler(async () => {
+	await requireSession();
+	const { getTaskRecipients: getRecipients } = await import("./task-workflow.server");
+	return getRecipients();
+});
 
 export const getRemarksData = createServerFn({ method: "GET" }).handler(async () => {
 	await requireSession();

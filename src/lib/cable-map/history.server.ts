@@ -16,11 +16,13 @@ import { getDb } from "@/lib/db";
 import {
 	cableChangeAuditLogs,
 	cableProgress,
+	cables,
 	graphGroupRooms,
 	graphGroups,
 	importSnapshots,
 	importedCableRows,
 } from "@/lib/db/schema";
+import { createLogger } from "@/lib/logger";
 import { getRedis } from "@/lib/redis";
 
 import { getHistoryEntries } from "./queries.server";
@@ -29,6 +31,8 @@ import type { DateRangeInput, HistoryEntryView, SaveCableProgressInput, Snapshot
 
 const historyTableColumnWidths = [1500, 1300, 1400, 2600, 1500, 900, 900, 900] as const;
 const historyReportTableColumnWidths = [1500, 1300, 1400, 2400, 1400, 900, 900, 900, 1200] as const;
+const logger = createLogger({ module: "cable-progress-history" });
+const redisAuditTimeoutMs = 1_500;
 
 function getTodayInMoscow() {
 	return getTodayIsoInMoscow();
@@ -70,21 +74,36 @@ function createRangeLabel(range?: DateRangeInput) {
 async function pushAuditEntriesToRedis(entries: HistoryEntryView[]) {
 	if (entries.length === 0) return;
 
-	const redis = await getRedis();
-	const payloads = entries.map((entry) => JSON.stringify(entry));
+	try {
+		await Promise.race([
+			(async () => {
+				const redis = await getRedis();
+				const payloads = entries.map((entry) => JSON.stringify(entry));
+				await redis
+					.multi()
+					.lPush("spider-viewer:audit", payloads)
+					.lTrim("spider-viewer:audit", 0, 999)
+					.exec();
 
-	await redis.multi().lPush("spider-viewer:audit", payloads).lTrim("spider-viewer:audit", 0, 999).exec();
+				const backdatedPayloads = entries
+					.filter((entry) => entry.isBackdated)
+					.map((entry) => JSON.stringify(entry));
 
-	const backdatedPayloads = entries
-		.filter((entry) => entry.isBackdated)
-		.map((entry) => JSON.stringify(entry));
-
-	if (backdatedPayloads.length > 0) {
-		await redis
-			.multi()
-			.lPush("spider-viewer:audit:backdated", backdatedPayloads)
-			.lTrim("spider-viewer:audit:backdated", 0, 999)
-			.exec();
+				if (backdatedPayloads.length > 0) {
+					await redis
+						.multi()
+						.lPush("spider-viewer:audit:backdated", backdatedPayloads)
+						.lTrim("spider-viewer:audit:backdated", 0, 999)
+						.exec();
+				}
+			})(),
+			new Promise<never>((_, reject) => {
+				setTimeout(() => reject(new Error("Redis audit timeout")), redisAuditTimeoutMs);
+			}),
+		]);
+	} catch (error) {
+		// Redis is only a short-lived audit cache; the PostgreSQL transaction is already committed.
+		logger.warn({ err: error }, "Skipping Redis audit cache update");
 	}
 }
 
@@ -126,6 +145,7 @@ export async function saveCableProgressChanges(input: SaveCableProgressInput, se
 	const persistedCables = await db
 		.select({
 			id: importedCableRows.id,
+			cableId: importedCableRows.cableId,
 			cableLabel: importedCableRows.cableLabel,
 			fromRoom: importedCableRows.fromRoom,
 			fromZone: importedCableRows.fromZone,
@@ -228,6 +248,20 @@ export async function saveCableProgressChanges(input: SaveCableProgressInput, se
 						updatedAt: now,
 					},
 				});
+
+			const canonicalCableId = cableById.get(auditRow.cableRowId)?.cableId;
+
+			if (canonicalCableId) {
+				await tx
+					.update(cables)
+					.set({
+						progress: auditRow.newProgress,
+						progressUpdatedByUserId: session.id,
+						progressUpdatedAt: now,
+						updatedAt: now,
+					})
+					.where(eq(cables.id, canonicalCableId));
+			}
 		}
 
 		const insertedRows = await tx

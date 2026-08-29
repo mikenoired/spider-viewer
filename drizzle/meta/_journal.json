@@ -8,6 +8,13 @@
 			"when": 1783503122821,
 			"tag": "0000_worried_sumo",
 			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1788011060057,
+			"tag": "0001_lowly_obadiah_stane",
+			"breakpoints": true
 		}
 	]
 }

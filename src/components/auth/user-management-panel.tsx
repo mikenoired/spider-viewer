@@ -35,6 +35,7 @@ import {
 	approveUserRegistration,
 	createManagedUser,
 	rejectUserRegistration,
+	updateManagedUserDepartment,
 	updateManagedUserRole,
 } from "@/lib/auth/auth.functions";
 import type {
@@ -47,8 +48,10 @@ import {
 	assignableUserRoles,
 	createManagedUserFieldsSchema,
 	createManagedUserSchema,
+	departmentLabels,
 	roleLabels,
 	statusLabels,
+	userDepartments,
 } from "@/lib/auth/shared";
 import { cn } from "@/lib/utils";
 
@@ -138,6 +141,7 @@ function UserTable({
 					<TableRow>
 						<TableHead>Логин</TableHead>
 						<TableHead>Роль</TableHead>
+						<TableHead>Подразделение</TableHead>
 						<TableHead>Статус</TableHead>
 						<TableHead>Зарегистрирован</TableHead>
 						<TableHead>Рассмотрен</TableHead>
@@ -158,6 +162,7 @@ function UserTable({
 									{roleLabels[user.role]}
 								</Badge>
 							</TableCell>
+							<TableCell>{departmentLabels[user.department]}</TableCell>
 							<TableCell>
 								<Badge variant={getStatusBadgeVariant(user.status)}>{statusLabels[user.status]}</Badge>
 							</TableCell>
@@ -187,6 +192,7 @@ function CreateUserDialog({
 		password: "",
 		confirmPassword: "",
 		role: "user",
+		department: "tai",
 	};
 	const form = useForm({
 		defaultValues,
@@ -251,6 +257,40 @@ function CreateUserDialog({
 											onChange={(event) => field.handleChange(event.target.value)}
 											aria-invalid={errors.length > 0}
 										/>
+										<FieldError errors={errors} />
+									</Field>
+								);
+							}}
+						</form.Field>
+						<form.Field
+							name="department"
+							validators={{ onBlur: createManagedUserFieldsSchema.shape.department }}>
+							{(field) => {
+								const errors = toFieldErrors(field.state.meta.errors);
+
+								return (
+									<Field data-invalid={errors.length > 0 || undefined}>
+										<FieldLabel htmlFor={field.name}>Подразделение</FieldLabel>
+										<select
+											id={field.name}
+											name={field.name}
+											className={cn(
+												"h-8 w-full rounded-lg border border-input bg-background px-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+												errors.length > 0 &&
+													"border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40"
+											)}
+											value={field.state.value}
+											onBlur={field.handleBlur}
+											onChange={(event) =>
+												field.handleChange(event.target.value as CreateManagedUserInput["department"])
+											}
+											aria-invalid={errors.length > 0}>
+											{userDepartments.map((department) => (
+												<option key={department} value={department}>
+													{departmentLabels[department]}
+												</option>
+											))}
+										</select>
 										<FieldError errors={errors} />
 									</Field>
 								);
@@ -430,6 +470,21 @@ export function UserManagementPanel({
 		}
 	}
 
+	async function handleDepartmentChange(user: ManagedUserView, department: ManagedUserView["department"]) {
+		const actionKey = `department:${user.id}:${department}`;
+		setActiveAction(actionKey);
+
+		try {
+			await updateManagedUserDepartment({ data: { userId: user.id, department } });
+			toast.success("Подразделение пользователя обновлено.");
+			await refreshUsers();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Не удалось обновить подразделение пользователя.");
+		} finally {
+			setActiveAction(null);
+		}
+	}
+
 	return (
 		<div className="flex flex-col gap-4 px-4 pb-4">
 			<CreateUserDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={refreshUsers} />
@@ -537,23 +592,43 @@ export function UserManagementPanel({
 								actionSlot={(user) => {
 									const nextRole = user.role === "super-admin" ? "user" : "super-admin";
 									const actionKey = `role:${user.id}:${nextRole}`;
-									const isBusy = activeAction === actionKey;
+									const isBusy =
+										activeAction === actionKey || activeAction?.startsWith(`department:${user.id}:`);
 									const isLastSuperAdmin = user.role === "super-admin" && superAdminCount <= 1;
 
 									return (
-										<Button
-											type="button"
-											size="sm"
-											variant={nextRole === "super-admin" ? "default" : "outline"}
-											onClick={() => void handleRoleChange(user, nextRole)}
-											disabled={isBusy || isLastSuperAdmin}>
-											{isBusy ? (
-												<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
-											) : (
-												<UserCogIcon data-icon="inline-start" />
-											)}
-											{nextRole === "super-admin" ? "Сделать супер" : "Сделать пользователем"}
-										</Button>
+										<div className="flex items-center justify-end gap-2">
+											<select
+												aria-label={`Подразделение ${user.login}`}
+												className="h-8 rounded-md border bg-background px-2 text-xs"
+												value={user.department}
+												disabled={Boolean(activeAction?.startsWith(`department:${user.id}:`))}
+												onChange={(event) =>
+													void handleDepartmentChange(
+														user,
+														event.target.value as ManagedUserView["department"]
+													)
+												}>
+												{userDepartments.map((department) => (
+													<option key={department} value={department}>
+														{departmentLabels[department]}
+													</option>
+												))}
+											</select>
+											<Button
+												type="button"
+												size="sm"
+												variant={nextRole === "super-admin" ? "default" : "outline"}
+												onClick={() => void handleRoleChange(user, nextRole)}
+												disabled={isBusy || isLastSuperAdmin}>
+												{activeAction === actionKey ? (
+													<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
+												) : (
+													<UserCogIcon data-icon="inline-start" />
+												)}
+												{nextRole === "super-admin" ? "Сделать супер" : "Сделать пользователем"}
+											</Button>
+										</div>
 									);
 								}}
 							/>

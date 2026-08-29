@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import {
 	cableChangeAuditLogs,
+	cables,
 	cableProgress,
 	graphGroupRooms,
 	graphGroups,
@@ -12,6 +13,8 @@ import {
 	priorityRoomEntries,
 	priorityRoomKanbanStates,
 	priorityRoomLists,
+	remarks,
+	taskComments,
 	users,
 } from "@/lib/db/schema";
 import { enToRuVisual } from "@/lib/utils";
@@ -169,7 +172,7 @@ async function getDashboardImportedRows(db: DbClient, snapshotId: string) {
 			threadCount: importedCableRows.threadCount,
 			totalLength: importedCableRows.totalLength,
 			farthestShaft: importedCableRows.farthestShaft,
-			progress: cableProgress.progress,
+			progress: sql<number>`coalesce(${cables.progress}, ${cableProgress.progress}, 0)`,
 		})
 		.from(importedCableRows)
 		.leftJoin(
@@ -179,6 +182,7 @@ async function getDashboardImportedRows(db: DbClient, snapshotId: string) {
 				eq(cableProgress.cableRowId, importedCableRows.id)
 			)
 		)
+		.leftJoin(cables, eq(cables.id, importedCableRows.cableId))
 		.where(eq(importedCableRows.snapshotId, snapshotId));
 }
 
@@ -213,7 +217,7 @@ async function getPriorityRoomRows(db: DbClient, snapshotId: string) {
 		.where(eq(priorityRoomEntries.snapshotId, snapshotId));
 }
 
-async function getPriorityRoomLists(db: DbClient, snapshotId: string) {
+async function getPriorityRoomLists(db: DbClient) {
 	return db
 		.select({
 			id: priorityRoomLists.id,
@@ -221,6 +225,12 @@ async function getPriorityRoomLists(db: DbClient, snapshotId: string) {
 			fileName: priorityRoomLists.fileName,
 			fileType: priorityRoomLists.fileType,
 			roomCount: priorityRoomLists.roomCount,
+			senderDepartment: priorityRoomLists.senderDepartment,
+			recipientDepartment: priorityRoomLists.recipientDepartment,
+			responsibleUserId: priorityRoomLists.responsibleUserId,
+			acceptedAt: priorityRoomLists.acceptedAt,
+			completedAt: priorityRoomLists.completedAt,
+			verifiedAt: priorityRoomLists.verifiedAt,
 			status: priorityRoomLists.status,
 			statusUpdatedByUserId: priorityRoomLists.statusUpdatedByUserId,
 			statusUpdatedAt: priorityRoomLists.statusUpdatedAt,
@@ -229,7 +239,6 @@ async function getPriorityRoomLists(db: DbClient, snapshotId: string) {
 		})
 		.from(priorityRoomLists)
 		.innerJoin(users, eq(users.id, priorityRoomLists.importedByUserId))
-		.where(eq(priorityRoomLists.snapshotId, snapshotId))
 		.orderBy(desc(priorityRoomLists.createdAt));
 }
 
@@ -263,6 +272,32 @@ async function getUserLoginsById(db: DbClient, userIds: string[]) {
 		.where(inArray(users.id, uniqueUserIds));
 
 	return new Map(rows.map((row) => [row.id, row.login]));
+}
+
+async function getPriorityListActivityCounts(db: DbClient, listIds: string[]) {
+	if (listIds.length === 0) {
+		return { commentsByListId: new Map<string, number>(), remarksByListId: new Map<string, number>() };
+	}
+
+	const [commentRows, remarkRows] = await Promise.all([
+		db
+			.select({ listId: taskComments.listId, count: sql<number>`count(*)` })
+			.from(taskComments)
+			.where(inArray(taskComments.listId, listIds))
+			.groupBy(taskComments.listId),
+		db
+			.select({ listId: remarks.listId, count: sql<number>`count(*)` })
+			.from(remarks)
+			.where(inArray(remarks.listId, listIds))
+			.groupBy(remarks.listId),
+	]);
+
+	return {
+		commentsByListId: new Map(commentRows.map((row) => [row.listId, Number(row.count)])),
+		remarksByListId: new Map(
+			remarkRows.flatMap((row) => (row.listId ? [[row.listId, Number(row.count)] as const] : []))
+		),
+	};
 }
 
 type DashboardSnapshotRow = NonNullable<Awaited<ReturnType<typeof getActiveSnapshot>>>;
@@ -619,10 +654,16 @@ async function buildPriorityListSummary(
 	db: DbClient,
 	rows: Awaited<ReturnType<typeof getPriorityRoomLists>>
 ): Promise<PriorityRoomListView[]> {
-	const userLoginsById = await getUserLoginsById(
-		db,
-		rows.map((row) => row.statusUpdatedByUserId ?? "")
-	);
+	const [userLoginsById, activityCounts] = await Promise.all([
+		getUserLoginsById(
+			db,
+			rows.flatMap((row) => [row.statusUpdatedByUserId ?? "", row.responsibleUserId ?? ""])
+		),
+		getPriorityListActivityCounts(
+			db,
+			rows.map((row) => row.id)
+		),
+	]);
 	return rows.map((row) => ({
 		id: row.id,
 		authorName: row.authorName,
@@ -636,6 +677,14 @@ async function buildPriorityListSummary(
 		statusUpdatedByLogin: row.statusUpdatedByUserId
 			? (userLoginsById.get(row.statusUpdatedByUserId) ?? null)
 			: null,
+		senderDepartment: row.senderDepartment,
+		recipientDepartment: row.recipientDepartment,
+		responsibleLogin: row.responsibleUserId ? (userLoginsById.get(row.responsibleUserId) ?? null) : null,
+		acceptedAt: row.acceptedAt ? toIsoString(row.acceptedAt) : null,
+		completedAt: row.completedAt ? toIsoString(row.completedAt) : null,
+		verifiedAt: row.verifiedAt ? toIsoString(row.verifiedAt) : null,
+		commentCount: activityCounts.commentsByListId.get(row.id) ?? 0,
+		remarkCount: activityCounts.remarksByListId.get(row.id) ?? 0,
 	}));
 }
 
@@ -680,23 +729,23 @@ export async function getActiveDashboardData(
 ): Promise<DashboardData> {
 	const db = getDb();
 	const snapshot = await getActiveSnapshot(db, snapshotKind);
+	const priorityLists = await getPriorityRoomLists(db);
 
 	if (!snapshot) {
 		return {
 			snapshot: null,
 			snapshotKind,
-			priorityLists: [],
+			priorityLists: await buildPriorityListSummary(db, priorityLists),
 			priorityRoomCount: 0,
 			priorityKanbanRooms: [],
 			levels: [],
 		};
 	}
 
-	const [rows, importedRows, priorityRows, priorityLists, kanbanStateRows] = await Promise.all([
+	const [rows, importedRows, priorityRows, kanbanStateRows] = await Promise.all([
 		getDashboardGroupRows(db, snapshot.id),
 		getDashboardImportedRows(db, snapshot.id),
 		getPriorityRoomRows(db, snapshot.id),
-		getPriorityRoomLists(db, snapshot.id),
 		getPriorityKanbanStateRows(db, snapshot.id),
 	]);
 	const manualRoomRows = await getDashboardManualRoomRows(db, rows);

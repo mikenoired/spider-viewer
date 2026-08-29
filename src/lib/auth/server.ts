@@ -14,10 +14,15 @@ import type {
 	ManagedUsersView,
 	ManagedUserView,
 	RegisterInput,
+	UpdateManagedUserDepartmentInput,
 	UpdateManagedUserRoleInput,
 } from "./shared";
 import { AUTH_COOKIE_NAME, loginSchema, normalizeLogin, registerSchema } from "./shared";
-import { createManagedUserSchema, updateManagedUserRoleSchema } from "./shared";
+import {
+	createManagedUserSchema,
+	updateManagedUserDepartmentSchema,
+	updateManagedUserRoleSchema,
+} from "./shared";
 
 const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
@@ -69,6 +74,7 @@ function toManagedUserView(user: {
 	id: string;
 	login: string;
 	role: ManagedUserView["role"];
+	department: ManagedUserView["department"];
 	status: ManagedUserView["status"];
 	createdAt: Date;
 	reviewedAt: Date | null;
@@ -77,6 +83,7 @@ function toManagedUserView(user: {
 		id: user.id,
 		login: user.login,
 		role: user.role,
+		department: user.department,
 		status: user.status,
 		createdAt: user.createdAt.toISOString(),
 		reviewedAt: user.reviewedAt?.toISOString() ?? null,
@@ -123,6 +130,7 @@ async function createAndSignInBootstrapSuperAdmin(login: string, password: strin
 			login,
 			passwordHash,
 			role: "super-admin",
+			department: "tai",
 			status: "active",
 			reviewedByUserId: null,
 			reviewedAt: now,
@@ -133,6 +141,7 @@ async function createAndSignInBootstrapSuperAdmin(login: string, password: strin
 			id: users.id,
 			login: users.login,
 			role: users.role,
+			department: users.department,
 		});
 
 	if (!createdUser) throw new Error("Не удалось создать первого суперпользователя.");
@@ -141,6 +150,7 @@ async function createAndSignInBootstrapSuperAdmin(login: string, password: strin
 		id: createdUser.id,
 		login: createdUser.login,
 		role: createdUser.role,
+		department: createdUser.department,
 	} satisfies AuthSession;
 	const token = await createAuthToken(session);
 
@@ -178,6 +188,7 @@ export async function getCurrentSession() {
 				id: users.id,
 				login: users.login,
 				role: users.role,
+				department: users.department,
 				status: users.status,
 			})
 			.from(users)
@@ -193,6 +204,7 @@ export async function getCurrentSession() {
 			id: user.id,
 			login: user.login,
 			role: user.role,
+			department: user.department,
 		} satisfies AuthSession;
 	} catch {
 		deleteCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
@@ -211,6 +223,7 @@ export async function loginWithCredentials(input: LoginInput) {
 			login: users.login,
 			passwordHash: users.passwordHash,
 			role: users.role,
+			department: users.department,
 			status: users.status,
 		})
 		.from(users)
@@ -230,6 +243,7 @@ export async function loginWithCredentials(input: LoginInput) {
 		id: user.id,
 		login: user.login,
 		role: user.role,
+		department: user.department,
 	} satisfies AuthSession;
 
 	const token = await createAuthToken(session);
@@ -269,7 +283,7 @@ export async function registerWithCredentials(input: RegisterInput) {
 export async function createManagedUser(input: CreateManagedUserInput, creator: AuthSession) {
 	await ensureLegacyAuthUsersReconciled();
 
-	const { login, password, role } = createManagedUserSchema.parse(input);
+	const { login, password, role, department } = createManagedUserSchema.parse(input);
 	const normalizedLogin = normalizeLogin(login);
 	const db = getDb();
 	const now = new Date();
@@ -298,6 +312,7 @@ export async function createManagedUser(input: CreateManagedUserInput, creator: 
 			.set({
 				passwordHash,
 				role,
+				department,
 				status: "active",
 				reviewedByUserId: creator.id,
 				reviewedAt: now,
@@ -309,6 +324,7 @@ export async function createManagedUser(input: CreateManagedUserInput, creator: 
 			login: normalizedLogin,
 			passwordHash,
 			role,
+			department,
 			status: "active",
 			reviewedByUserId: creator.id,
 			reviewedAt: now,
@@ -363,6 +379,32 @@ export async function updateManagedUserRole(input: UpdateManagedUserRoleInput, r
 	return { success: true };
 }
 
+export async function updateManagedUserDepartment(
+	input: UpdateManagedUserDepartmentInput,
+	reviewer: AuthSession
+) {
+	await ensureLegacyAuthUsersReconciled();
+
+	const { userId, department } = updateManagedUserDepartmentSchema.parse(input);
+	const db = getDb();
+	const [user] = await db
+		.select({ id: users.id, status: users.status, department: users.department })
+		.from(users)
+		.where(eq(users.id, userId))
+		.limit(1);
+
+	if (!user) throw new Error("Пользователь не найден.");
+	if (user.status !== "active") throw new Error("Подразделение можно менять только активному пользователю.");
+	if (user.department === department) return { success: true };
+
+	await db
+		.update(users)
+		.set({ department, reviewedByUserId: reviewer.id, reviewedAt: new Date(), updatedAt: new Date() })
+		.where(eq(users.id, user.id));
+
+	return { success: true };
+}
+
 export async function getManagedUsers() {
 	await ensureLegacyAuthUsersReconciled();
 
@@ -372,6 +414,7 @@ export async function getManagedUsers() {
 			id: users.id,
 			login: users.login,
 			role: users.role,
+			department: users.department,
 			status: users.status,
 			createdAt: users.createdAt,
 			reviewedAt: users.reviewedAt,

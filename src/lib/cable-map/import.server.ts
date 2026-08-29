@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { eq } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import * as Xlsx from "xlsx";
 
 import type { AuthSession } from "@/lib/auth/shared";
@@ -8,6 +8,7 @@ import { getDb } from "@/lib/db";
 import {
 	graphGroupRooms,
 	graphGroups,
+	cables,
 	type graphSideEnum,
 	type graphSubzoneEnum,
 	importedCableRows,
@@ -121,7 +122,7 @@ const installationWorkbookColumnIndexes = {
 } as const;
 
 const maxWorkbookFileSizeBytes = 15 * 1024 * 1024;
-const maxWorkbookRowCount = 20_000;
+const maxWorkbookRowCount = 50_000;
 const requiredWorkbookColumnIndexes = [
 	workbookColumnIndexes.cableLabel,
 	workbookColumnIndexes.fromRoom,
@@ -138,6 +139,104 @@ function getTodayInMoscow() {
 
 function normalizeCellValue(value: unknown) {
 	return String(value ?? "").trim();
+}
+
+function normalizeCableIdentityPart(value: string) {
+	return enToRuVisual(value).replace(/\s+/g, " ").trim().toUpperCase();
+}
+
+export function getCableExternalKey(
+	row: Pick<ParsedCableRow, "cableJournal" | "cableNumber" | "cableLabel" | "fromRoom" | "toRoom">
+) {
+	const journal = normalizeCableIdentityPart(row.cableJournal);
+	const number = normalizeCableIdentityPart(row.cableNumber);
+
+	if (journal && number) {
+		return `journal:${journal}|number:${number}`;
+	}
+
+	return [row.cableLabel, row.fromRoom, row.toRoom].map(normalizeCableIdentityPart).join("|");
+}
+
+function chunk<T>(values: T[], size: number) {
+	const chunks: T[][] = [];
+
+	for (let start = 0; start < values.length; start += size) {
+		chunks.push(values.slice(start, start + size));
+	}
+
+	return chunks;
+}
+
+/**
+ * Older installations stored cable data only inside import snapshots. Populate the
+ * canonical base on demand and attach those rows without asking users to re-import
+ * a 26k-row source workbook.
+ */
+export async function ensureCanonicalCableBase() {
+	const db = getDb();
+	const sourceRows = await db
+		.select({
+			id: importedCableRows.id,
+			cableLabel: importedCableRows.cableLabel,
+			cableJournal: importedCableRows.cableJournal,
+			cableNumber: importedCableRows.cableNumber,
+			fromRoom: importedCableRows.fromRoom,
+			toRoom: importedCableRows.toRoom,
+		})
+		.from(importedCableRows)
+		.where(isNull(importedCableRows.cableId));
+
+	if (sourceRows.length === 0) return 0;
+
+	const recordsByKey = new Map(
+		sourceRows.map((row) => {
+			const externalKey = getCableExternalKey(row);
+			return [externalKey, { ...row, externalKey }] as const;
+		})
+	);
+	const now = new Date();
+
+	return db.transaction(async (tx) => {
+		const canonicalRows = await tx
+			.insert(cables)
+			.values(
+				[...recordsByKey.values()].map((row) => ({
+					externalKey: row.externalKey,
+					cableLabel: row.cableLabel,
+					cableJournal: row.cableJournal,
+					cableNumber: row.cableNumber,
+					fromRoom: row.fromRoom,
+					toRoom: row.toRoom,
+					createdAt: now,
+					updatedAt: now,
+				}))
+			)
+			.onConflictDoUpdate({
+				target: cables.externalKey,
+				set: { externalKey: sql`excluded.external_key` },
+			})
+			.returning({ id: cables.id, externalKey: cables.externalKey });
+		const canonicalIdByKey = new Map(canonicalRows.map((row) => [row.externalKey, row.id]));
+		const assignments = sourceRows.flatMap((row) => {
+			const cableId = canonicalIdByKey.get(getCableExternalKey(row));
+			return cableId ? [{ rowId: row.id, cableId }] : [];
+		});
+
+		for (const values of chunk(assignments, 500)) {
+			await tx.execute(sql`
+				update imported_cable_rows as source
+				set cable_id = assigned.cable_id
+				from (values ${sql.join(
+					values.map((value) => sql`(${value.rowId}::uuid, ${value.cableId}::uuid)`),
+					sql`, `
+				)}) as assigned(row_id, cable_id)
+				where source.id = assigned.row_id
+			`);
+		}
+
+		return assignments.length;
+	});
 }
 
 function parseLocaleNumber(value: string) {
@@ -710,6 +809,24 @@ export async function importWorkbookFromFormData(
 	const { file, fileType, buffer } = await ensureUploadFile(formData);
 	const snapshotKind = options.snapshotKind ?? "demolition";
 	const parsedRows = parseRowsForSnapshotKind(file.name, buffer, snapshotKind);
+	const canonicalCableRows = [
+		...new Map(
+			parsedRows.map(
+				(row) =>
+					[
+						getCableExternalKey(row),
+						{
+							externalKey: getCableExternalKey(row),
+							cableLabel: row.cableLabel,
+							cableJournal: row.cableJournal,
+							cableNumber: row.cableNumber,
+							fromRoom: row.fromRoom,
+							toRoom: row.toRoom,
+						},
+					] as const
+			)
+		).values(),
+	];
 	const { groups, orderedLevels, sideSummary } = aggregateGroups(parsedRows);
 	const checksum = createHash("sha256").update(buffer).digest("hex");
 	const db = getDb();
@@ -743,9 +860,33 @@ export async function importWorkbookFromFormData(
 			})
 			.returning();
 
+		const canonicalRows = await tx
+			.insert(cables)
+			.values(
+				canonicalCableRows.map((row) => ({
+					...row,
+					createdAt: now,
+					updatedAt: now,
+				}))
+			)
+			.onConflictDoUpdate({
+				target: cables.externalKey,
+				set: {
+					cableLabel: sql`excluded.cable_label`,
+					cableJournal: sql`excluded.cable_journal`,
+					cableNumber: sql`excluded.cable_number`,
+					fromRoom: sql`excluded.from_room`,
+					toRoom: sql`excluded.to_room`,
+					updatedAt: now,
+				},
+			})
+			.returning({ id: cables.id, externalKey: cables.externalKey });
+		const cableIdByKey = new Map(canonicalRows.map((row) => [row.externalKey, row.id]));
+
 		for (const chunk of chunkValues(
 			parsedRows.map((row) => ({
 				snapshotId: createdSnapshot.id,
+				cableId: cableIdByKey.get(getCableExternalKey(row)) ?? null,
 				...row,
 				createdAt: now,
 			})),
