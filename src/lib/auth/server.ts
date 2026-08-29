@@ -14,10 +14,15 @@ import type {
 	ManagedUsersView,
 	ManagedUserView,
 	RegisterInput,
+	UpdateManagedUserDepartmentInput,
 	UpdateManagedUserRoleInput,
 } from "./shared";
 import { AUTH_COOKIE_NAME, loginSchema, normalizeLogin, registerSchema } from "./shared";
-import { createManagedUserSchema, updateManagedUserRoleSchema } from "./shared";
+import {
+	createManagedUserSchema,
+	updateManagedUserDepartmentSchema,
+	updateManagedUserRoleSchema,
+} from "./shared";
 
 const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
@@ -369,6 +374,32 @@ export async function updateManagedUserRole(input: UpdateManagedUserRoleInput, r
 			reviewedAt: now,
 			updatedAt: now,
 		})
+		.where(eq(users.id, user.id));
+
+	return { success: true };
+}
+
+export async function updateManagedUserDepartment(
+	input: UpdateManagedUserDepartmentInput,
+	reviewer: AuthSession
+) {
+	await ensureLegacyAuthUsersReconciled();
+
+	const { userId, department } = updateManagedUserDepartmentSchema.parse(input);
+	const db = getDb();
+	const [user] = await db
+		.select({ id: users.id, status: users.status, department: users.department })
+		.from(users)
+		.where(eq(users.id, userId))
+		.limit(1);
+
+	if (!user) throw new Error("Пользователь не найден.");
+	if (user.status !== "active") throw new Error("Подразделение можно менять только активному пользователю.");
+	if (user.department === department) return { success: true };
+
+	await db
+		.update(users)
+		.set({ department, reviewedByUserId: reviewer.id, reviewedAt: new Date(), updatedAt: new Date() })
 		.where(eq(users.id, user.id));
 
 	return { success: true };

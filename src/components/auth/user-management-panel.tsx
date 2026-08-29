@@ -35,6 +35,7 @@ import {
 	approveUserRegistration,
 	createManagedUser,
 	rejectUserRegistration,
+	updateManagedUserDepartment,
 	updateManagedUserRole,
 } from "@/lib/auth/auth.functions";
 import type {
@@ -469,6 +470,21 @@ export function UserManagementPanel({
 		}
 	}
 
+	async function handleDepartmentChange(user: ManagedUserView, department: ManagedUserView["department"]) {
+		const actionKey = `department:${user.id}:${department}`;
+		setActiveAction(actionKey);
+
+		try {
+			await updateManagedUserDepartment({ data: { userId: user.id, department } });
+			toast.success("Подразделение пользователя обновлено.");
+			await refreshUsers();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Не удалось обновить подразделение пользователя.");
+		} finally {
+			setActiveAction(null);
+		}
+	}
+
 	return (
 		<div className="flex flex-col gap-4 px-4 pb-4">
 			<CreateUserDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={refreshUsers} />
@@ -576,23 +592,43 @@ export function UserManagementPanel({
 								actionSlot={(user) => {
 									const nextRole = user.role === "super-admin" ? "user" : "super-admin";
 									const actionKey = `role:${user.id}:${nextRole}`;
-									const isBusy = activeAction === actionKey;
+									const isBusy =
+										activeAction === actionKey || activeAction?.startsWith(`department:${user.id}:`);
 									const isLastSuperAdmin = user.role === "super-admin" && superAdminCount <= 1;
 
 									return (
-										<Button
-											type="button"
-											size="sm"
-											variant={nextRole === "super-admin" ? "default" : "outline"}
-											onClick={() => void handleRoleChange(user, nextRole)}
-											disabled={isBusy || isLastSuperAdmin}>
-											{isBusy ? (
-												<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
-											) : (
-												<UserCogIcon data-icon="inline-start" />
-											)}
-											{nextRole === "super-admin" ? "Сделать супер" : "Сделать пользователем"}
-										</Button>
+										<div className="flex items-center justify-end gap-2">
+											<select
+												aria-label={`Подразделение ${user.login}`}
+												className="h-8 rounded-md border bg-background px-2 text-xs"
+												value={user.department}
+												disabled={Boolean(activeAction?.startsWith(`department:${user.id}:`))}
+												onChange={(event) =>
+													void handleDepartmentChange(
+														user,
+														event.target.value as ManagedUserView["department"]
+													)
+												}>
+												{userDepartments.map((department) => (
+													<option key={department} value={department}>
+														{departmentLabels[department]}
+													</option>
+												))}
+											</select>
+											<Button
+												type="button"
+												size="sm"
+												variant={nextRole === "super-admin" ? "default" : "outline"}
+												onClick={() => void handleRoleChange(user, nextRole)}
+												disabled={isBusy || isLastSuperAdmin}>
+												{activeAction === actionKey ? (
+													<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
+												) : (
+													<UserCogIcon data-icon="inline-start" />
+												)}
+												{nextRole === "super-admin" ? "Сделать супер" : "Сделать пользователем"}
+											</Button>
+										</div>
 									);
 								}}
 							/>

@@ -5,6 +5,7 @@ import {
 	createManagedUserSchema,
 	loginSchema,
 	registerSchema,
+	updateManagedUserDepartmentSchema,
 	updateManagedUserRoleSchema,
 	userModerationSchema,
 } from "./shared";
@@ -47,6 +48,14 @@ export const updateManagedUserRole = createServerFn({ method: "POST" })
 		const reviewer = await requireRole(["super-admin"]);
 		const { updateManagedUserRole } = await import("./server");
 		return updateManagedUserRole(data, reviewer);
+	});
+
+export const updateManagedUserDepartment = createServerFn({ method: "POST" })
+	.inputValidator(updateManagedUserDepartmentSchema)
+	.handler(async ({ data }) => {
+		const reviewer = await requireRole(["super-admin"]);
+		const { updateManagedUserDepartment } = await import("./server");
+		return updateManagedUserDepartment(data, reviewer);
 	});
 
 export const getManagedUsers = createServerFn({ method: "GET" }).handler(async () => {

@@ -98,6 +98,13 @@ export const updateManagedUserRoleSchema = z.object({
 
 export type UpdateManagedUserRoleInput = z.infer<typeof updateManagedUserRoleSchema>;
 
+export const updateManagedUserDepartmentSchema = z.object({
+	userId: z.string().uuid("Некорректный идентификатор пользователя."),
+	department: userDepartmentSchema,
+});
+
+export type UpdateManagedUserDepartmentInput = z.infer<typeof updateManagedUserDepartmentSchema>;
+
 export const bootstrapSuperuserSchema = z.object({
 	login: loginValueSchema,
 	password: registrationPasswordSchema,
