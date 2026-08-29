@@ -3,7 +3,12 @@ import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import * as Xlsx from "xlsx";
 
-import { ensureUploadFile, hasExpectedWorkbookSignature, parseWorkbookRows } from "./import.server";
+import {
+	ensureUploadFile,
+	getCableExternalKey,
+	hasExpectedWorkbookSignature,
+	parseWorkbookRows,
+} from "./import.server";
 
 const workbookColumnIndexes = {
 	cableLabel: 0,
@@ -58,6 +63,30 @@ function createWorkbookRows() {
 }
 
 describe("workbook import validation", () => {
+	it("builds a stable canonical cable key from journal and number", () => {
+		expect(
+			getCableExternalKey({
+				cableLabel: "КВВГ 4x2,5",
+				cableJournal: "Ж-12",
+				cableNumber: "0042",
+				fromRoom: "А101",
+				toRoom: "Б202",
+			})
+		).toBe("journal:Ж-12|number:0042");
+	});
+
+	it("falls back to cable attributes when journal data is absent", () => {
+		expect(
+			getCableExternalKey({
+				cableLabel: "КВВГ 4x2,5",
+				cableJournal: "",
+				cableNumber: "",
+				fromRoom: "А101",
+				toRoom: "Б202",
+			})
+		).toBe("КВВГ 4Х2,5|А101|Б202");
+	});
+
 	it("accepts a valid workbook upload", async () => {
 		const buffer = createWorkbookBuffer(createWorkbookRows());
 		const formData = new FormData();

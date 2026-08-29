@@ -1,5 +1,7 @@
 import * as z from "zod";
 
+import { userDepartmentSchema } from "@/lib/auth/shared";
+
 export const supportedWorkbookExtensions = ["ods", "xlsx", "xls"] as const;
 export const supportedWorkbookMimeTypes = [
 	"application/vnd.oasis.opendocument.spreadsheet",
@@ -119,7 +121,25 @@ export const updatePriorityListKanbanStatusSchema = z.object({
 	listId: z.string().uuid(),
 	status: priorityListKanbanStatusSchema,
 });
-export const remarkTargetTypes = ["cable_change", "room_change", "priority_list"] as const;
+export const kanbanTaskActionSchema = z.enum(["move", "accept", "complete", "confirm", "return"]);
+export const transitionKanbanTaskSchema = z.object({
+	listId: z.string().uuid(),
+	action: kanbanTaskActionSchema,
+	status: priorityListKanbanStatusSchema.optional(),
+	recipientDepartment: userDepartmentSchema.optional(),
+});
+export const createTaskCommentSchema = z.object({
+	listId: z.string().uuid(),
+	content: z.string().trim().min(1, "Введите комментарий.").max(4_000, "Комментарий слишком длинный."),
+});
+export const createKanbanRemarkSchema = z.object({
+	listId: z.string().uuid(),
+	cableId: z.string().uuid().optional(),
+	content: z.string().trim().min(3, "Опишите замечание.").max(4_000, "Замечание слишком длинное."),
+	assignedDepartment: userDepartmentSchema.optional(),
+	assignedUserId: z.string().uuid().optional(),
+});
+export const remarkTargetTypes = ["cable_change", "room_change", "priority_list", "cable"] as const;
 export const remarkTargetTypeSchema = z.enum(remarkTargetTypes);
 export const remarkStatuses = ["open", "resolved"] as const;
 export const remarkStatusSchema = z.enum(remarkStatuses);
@@ -144,6 +164,9 @@ export type PriorityRoomKanbanStatus = z.infer<typeof priorityRoomKanbanStatusSc
 export type UpdatePriorityRoomKanbanStatusInput = z.infer<typeof updatePriorityRoomKanbanStatusSchema>;
 export type PriorityListKanbanStatus = z.infer<typeof priorityListKanbanStatusSchema>;
 export type UpdatePriorityListKanbanStatusInput = z.infer<typeof updatePriorityListKanbanStatusSchema>;
+export type TransitionKanbanTaskInput = z.infer<typeof transitionKanbanTaskSchema>;
+export type CreateTaskCommentInput = z.infer<typeof createTaskCommentSchema>;
+export type CreateKanbanRemarkInput = z.infer<typeof createKanbanRemarkSchema>;
 export type RemarkTargetType = z.infer<typeof remarkTargetTypeSchema>;
 export type RemarkStatus = z.infer<typeof remarkStatusSchema>;
 export type CreateRemarkInput = z.infer<typeof createRemarkSchema>;
@@ -248,6 +271,14 @@ export type PriorityRoomListView = {
 	status: PriorityListKanbanStatus;
 	statusUpdatedAt: string | null;
 	statusUpdatedByLogin: string | null;
+	senderDepartment: "tai" | "skm" | "commissioning" | "curator";
+	recipientDepartment: "tai" | "skm" | "commissioning" | "curator" | null;
+	responsibleLogin: string | null;
+	acceptedAt: string | null;
+	completedAt: string | null;
+	verifiedAt: string | null;
+	commentCount: number;
+	remarkCount: number;
 };
 
 export type RemarkView = {

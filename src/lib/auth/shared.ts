@@ -4,20 +4,24 @@ export const PROJECT_NAME = "Spider Viewer";
 
 export const userRoles = ["user", "admin", "super-admin"] as const;
 export const userStatuses = ["pending", "active", "rejected"] as const;
+export const userDepartments = ["tai", "skm", "commissioning", "curator"] as const;
 export const assignableUserRoles = ["user", "super-admin"] as const;
 
 export const userRoleSchema = z.enum(userRoles);
 export const userStatusSchema = z.enum(userStatuses);
+export const userDepartmentSchema = z.enum(userDepartments);
 export const assignableUserRoleSchema = z.enum(assignableUserRoles);
 
 export type UserRole = z.infer<typeof userRoleSchema>;
 export type UserStatus = z.infer<typeof userStatusSchema>;
+export type UserDepartment = z.infer<typeof userDepartmentSchema>;
 export type AssignableUserRole = z.infer<typeof assignableUserRoleSchema>;
 
 export type AuthSession = {
 	id: string;
 	login: string;
 	role: UserRole;
+	department: UserDepartment;
 };
 
 const loginValueSchema = z
@@ -74,6 +78,7 @@ export const createManagedUserFieldsSchema = z.object({
 	password: registrationPasswordSchema,
 	confirmPassword: z.string().max(128, "Подтверждение пароля не должно быть длиннее 128 символов."),
 	role: assignableUserRoleSchema,
+	department: userDepartmentSchema.default("tai"),
 });
 
 export const createManagedUserSchema = createManagedUserFieldsSchema.refine(
@@ -108,6 +113,7 @@ export type ManagedUserView = {
 	id: string;
 	login: string;
 	role: UserRole;
+	department: UserDepartment;
 	status: UserStatus;
 	createdAt: string;
 	reviewedAt: string | null;
@@ -123,6 +129,13 @@ export const roleLabels: Record<UserRole, string> = {
 	"user": "Пользователь",
 	"admin": "Админ",
 	"super-admin": "Супер-админ",
+};
+
+export const departmentLabels: Record<UserDepartment, string> = {
+	tai: "Цех ТАИ",
+	skm: "СКМ / монтаж",
+	commissioning: "Наладка",
+	curator: "Куратор",
 };
 
 export const statusLabels: Record<UserStatus, string> = {

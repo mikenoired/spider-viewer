@@ -15,10 +15,11 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 
-import { userRoles, userStatuses } from "@/lib/auth/shared";
+import { userDepartments, userRoles, userStatuses } from "@/lib/auth/shared";
 
 export const userRoleEnum = pgEnum("user_role", userRoles);
 export const userStatusEnum = pgEnum("user_status", userStatuses);
+export const userDepartmentEnum = pgEnum("user_department", userDepartments);
 export const snapshotSourceTypeEnum = pgEnum("snapshot_source_type", [
 	// Keep ODS for already stored snapshots; new uploads are limited in app code.
 	"ods",
@@ -51,6 +52,7 @@ export const remarkTargetTypeEnum = pgEnum("remark_target_type", [
 	"cable_change",
 	"room_change",
 	"priority_list",
+	"cable",
 ]);
 export const remarkStatusEnum = pgEnum("remark_status", ["open", "resolved"]);
 
@@ -61,6 +63,7 @@ export const users = pgTable(
 		login: text("login").notNull(),
 		passwordHash: text("password_hash").notNull(),
 		role: userRoleEnum("role").notNull().default("user"),
+		department: userDepartmentEnum("department").notNull().default("tai"),
 		status: userStatusEnum("status").notNull().default("active"),
 		reviewedByUserId: uuid("reviewed_by_user_id").references((): AnyPgColumn => users.id, {
 			onDelete: "set null",
@@ -113,10 +116,35 @@ export const importSnapshots = pgTable(
 	]
 );
 
+export const cables = pgTable(
+	"cables",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		externalKey: text("external_key").notNull(),
+		cableLabel: text("cable_label").notNull(),
+		cableJournal: text("cable_journal").notNull().default(""),
+		cableNumber: text("cable_number").notNull().default(""),
+		fromRoom: text("from_room").notNull().default(""),
+		toRoom: text("to_room").notNull().default(""),
+		progress: integer("progress").notNull().default(0),
+		progressUpdatedByUserId: uuid("progress_updated_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		progressUpdatedAt: timestamp("progress_updated_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		uniqueIndex("cables_external_key_unique").on(table.externalKey),
+		index("cables_label_idx").on(table.cableLabel),
+	]
+);
+
 export const importedCableRows = pgTable(
 	"imported_cable_rows",
 	{
 		id: uuid("id").defaultRandom().primaryKey(),
+		cableId: uuid("cable_id").references(() => cables.id, { onDelete: "set null" }),
 		snapshotId: uuid("snapshot_id")
 			.notNull()
 			.references(() => importSnapshots.id, { onDelete: "cascade" }),
@@ -406,13 +434,18 @@ export const priorityRoomLists = pgTable(
 	"priority_room_lists",
 	{
 		id: uuid("id").defaultRandom().primaryKey(),
-		snapshotId: uuid("snapshot_id")
-			.notNull()
-			.references(() => importSnapshots.id, { onDelete: "cascade" }),
+		snapshotId: uuid("snapshot_id").references(() => importSnapshots.id, { onDelete: "set null" }),
 		authorName: text("author_name").notNull(),
 		fileName: text("file_name").notNull(),
 		fileType: text("file_type").notNull(),
 		roomCount: integer("room_count").notNull().default(0),
+		sourceChecksum: text("source_checksum"),
+		senderDepartment: userDepartmentEnum("sender_department").notNull().default("tai"),
+		recipientDepartment: userDepartmentEnum("recipient_department"),
+		responsibleUserId: uuid("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+		acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+		completedAt: timestamp("completed_at", { withTimezone: true }),
+		verifiedAt: timestamp("verified_at", { withTimezone: true }),
 		status: priorityListKanbanStatusEnum("status").notNull().default("formed"),
 		statusUpdatedByUserId: uuid("status_updated_by_user_id").references(() => users.id, {
 			onDelete: "set null",
@@ -424,7 +457,84 @@ export const priorityRoomLists = pgTable(
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 	},
-	(table) => [index("priority_room_lists_snapshot_created_idx").on(table.snapshotId, table.createdAt)]
+	(table) => [
+		index("priority_room_lists_snapshot_created_idx").on(table.snapshotId, table.createdAt),
+		index("priority_room_lists_status_created_idx").on(table.status, table.createdAt),
+		uniqueIndex("priority_room_lists_source_checksum_unique").on(table.sourceChecksum),
+	]
+);
+
+export const cableListItems = pgTable(
+	"cable_list_items",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		listId: uuid("list_id")
+			.notNull()
+			.references(() => priorityRoomLists.id, { onDelete: "cascade" }),
+		cableId: uuid("cable_id")
+			.notNull()
+			.references(() => cables.id, { onDelete: "restrict" }),
+		sourceRowIndex: integer("source_row_index").notNull().default(0),
+		importedProgress: integer("imported_progress"),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("cable_list_items_list_idx").on(table.listId),
+		index("cable_list_items_cable_idx").on(table.cableId),
+		uniqueIndex("cable_list_items_list_cable_unique").on(table.listId, table.cableId),
+	]
+);
+
+export const taskComments = pgTable(
+	"task_comments",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		listId: uuid("list_id")
+			.notNull()
+			.references(() => priorityRoomLists.id, { onDelete: "cascade" }),
+		content: text("content").notNull(),
+		createdByUserId: uuid("created_by_user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [index("task_comments_list_created_idx").on(table.listId, table.createdAt)]
+);
+
+export const taskEvents = pgTable(
+	"task_events",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		listId: uuid("list_id")
+			.notNull()
+			.references(() => priorityRoomLists.id, { onDelete: "cascade" }),
+		eventType: text("event_type").notNull(),
+		message: text("message").notNull(),
+		actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [index("task_events_list_created_idx").on(table.listId, table.createdAt)]
+);
+
+export const notifications = pgTable(
+	"notifications",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		listId: uuid("list_id").references(() => priorityRoomLists.id, { onDelete: "cascade" }),
+		remarkId: uuid("remark_id"),
+		type: text("type").notNull(),
+		message: text("message").notNull(),
+		dedupeKey: text("dedupe_key").notNull(),
+		readAt: timestamp("read_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("notifications_user_created_idx").on(table.userId, table.createdAt),
+		uniqueIndex("notifications_dedupe_unique").on(table.dedupeKey),
+	]
 );
 
 export const remarks = pgTable(
@@ -434,6 +544,9 @@ export const remarks = pgTable(
 		targetType: remarkTargetTypeEnum("target_type").notNull(),
 		targetId: uuid("target_id").notNull(),
 		content: text("content").notNull(),
+		listId: uuid("list_id").references(() => priorityRoomLists.id, { onDelete: "set null" }),
+		assignedDepartment: userDepartmentEnum("assigned_department"),
+		assignedUserId: uuid("assigned_user_id").references(() => users.id, { onDelete: "set null" }),
 		status: remarkStatusEnum("status").notNull().default("open"),
 		createdByUserId: uuid("created_by_user_id")
 			.notNull()
@@ -575,6 +688,7 @@ export const cableChangeAuditLogs = pgTable(
 
 export type ImportSnapshot = typeof importSnapshots.$inferSelect;
 export type ImportedCableRow = typeof importedCableRows.$inferSelect;
+export type Cable = typeof cables.$inferSelect;
 export type GraphGroup = typeof graphGroups.$inferSelect;
 export type GraphGroupRoom = typeof graphGroupRooms.$inferSelect;
 export type CableProgress = typeof cableProgress.$inferSelect;
@@ -584,6 +698,10 @@ export type InstallationKksGroup = typeof installationKksGroups.$inferSelect;
 export type InstallationKksItem = typeof installationKksItems.$inferSelect;
 export type InstallationPendingChange = typeof installationPendingChanges.$inferSelect;
 export type PriorityRoomList = typeof priorityRoomLists.$inferSelect;
+export type CableListItem = typeof cableListItems.$inferSelect;
+export type TaskComment = typeof taskComments.$inferSelect;
+export type TaskEvent = typeof taskEvents.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
 export type PriorityRoomEntry = typeof priorityRoomEntries.$inferSelect;
 export type PriorityRoomKanbanState = typeof priorityRoomKanbanStates.$inferSelect;
 export type Remark = typeof remarks.$inferSelect;

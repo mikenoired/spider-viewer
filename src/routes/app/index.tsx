@@ -21,6 +21,7 @@ function AppHomePage() {
 			canEditProgress={canEditProgress(auth.role)}
 			canManageManualRooms={canManageManualRooms(auth.role)}
 			role={auth.role}
+			session={auth}
 		/>
 	);
 }

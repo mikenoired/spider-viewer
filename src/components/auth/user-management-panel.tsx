@@ -47,8 +47,10 @@ import {
 	assignableUserRoles,
 	createManagedUserFieldsSchema,
 	createManagedUserSchema,
+	departmentLabels,
 	roleLabels,
 	statusLabels,
+	userDepartments,
 } from "@/lib/auth/shared";
 import { cn } from "@/lib/utils";
 
@@ -138,6 +140,7 @@ function UserTable({
 					<TableRow>
 						<TableHead>Логин</TableHead>
 						<TableHead>Роль</TableHead>
+						<TableHead>Подразделение</TableHead>
 						<TableHead>Статус</TableHead>
 						<TableHead>Зарегистрирован</TableHead>
 						<TableHead>Рассмотрен</TableHead>
@@ -158,6 +161,7 @@ function UserTable({
 									{roleLabels[user.role]}
 								</Badge>
 							</TableCell>
+							<TableCell>{departmentLabels[user.department]}</TableCell>
 							<TableCell>
 								<Badge variant={getStatusBadgeVariant(user.status)}>{statusLabels[user.status]}</Badge>
 							</TableCell>
@@ -187,6 +191,7 @@ function CreateUserDialog({
 		password: "",
 		confirmPassword: "",
 		role: "user",
+		department: "tai",
 	};
 	const form = useForm({
 		defaultValues,
@@ -251,6 +256,40 @@ function CreateUserDialog({
 											onChange={(event) => field.handleChange(event.target.value)}
 											aria-invalid={errors.length > 0}
 										/>
+										<FieldError errors={errors} />
+									</Field>
+								);
+							}}
+						</form.Field>
+						<form.Field
+							name="department"
+							validators={{ onBlur: createManagedUserFieldsSchema.shape.department }}>
+							{(field) => {
+								const errors = toFieldErrors(field.state.meta.errors);
+
+								return (
+									<Field data-invalid={errors.length > 0 || undefined}>
+										<FieldLabel htmlFor={field.name}>Подразделение</FieldLabel>
+										<select
+											id={field.name}
+											name={field.name}
+											className={cn(
+												"h-8 w-full rounded-lg border border-input bg-background px-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+												errors.length > 0 &&
+													"border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40"
+											)}
+											value={field.state.value}
+											onBlur={field.handleBlur}
+											onChange={(event) =>
+												field.handleChange(event.target.value as CreateManagedUserInput["department"])
+											}
+											aria-invalid={errors.length > 0}>
+											{userDepartments.map((department) => (
+												<option key={department} value={department}>
+													{departmentLabels[department]}
+												</option>
+											))}
+										</select>
 										<FieldError errors={errors} />
 									</Field>
 								);

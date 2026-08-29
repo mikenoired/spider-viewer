@@ -13,7 +13,7 @@ import {
 	StarIcon,
 	TriangleAlertIcon,
 } from "lucide-react";
-import { Fragment, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -554,6 +554,7 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 	const [open, setOpen] = useState(false);
 	const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
 	const [pending, setPending] = useState(false);
+	const saveInFlightRef = useRef(false);
 	const [expandedRoomIds, setExpandedRoomIds] = useState<Set<string>>(() => new Set());
 	const { draftRooms, effectiveDate, setEffectiveDate, changedCables, isDirty, updateCableProgress, reset } =
 		useGroupProgressDraft(group, open);
@@ -597,8 +598,9 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 	}
 
 	async function handleSave() {
-		if (!canEdit || changedCables.length === 0) return;
+		if (!canEdit || changedCables.length === 0 || saveInFlightRef.current) return;
 
+		saveInFlightRef.current = true;
 		setPending(true);
 
 		try {
@@ -609,12 +611,15 @@ export const GroupProgressSheet = memo(function GroupProgressSheet({
 					cables: changedCables,
 				},
 			});
-			await router.invalidate();
-			toast.success("Прогресс по кабелям сохранён.");
+			reset();
 			setOpen(false);
+			toast.success("Прогресс по кабелям сохранён.");
+			// The write succeeded; a later refresh will reconcile the map if revalidation is unavailable.
+			void router.invalidate().catch(() => undefined);
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Не удалось сохранить изменения по кабелям.");
 		} finally {
+			saveInFlightRef.current = false;
 			setPending(false);
 		}
 	}

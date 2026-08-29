@@ -25,14 +25,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { canUploadSnapshot, canViewAudit } from "@/lib/auth/shared";
-import type { UserRole } from "@/lib/auth/shared";
+import type { AuthSession, UserRole } from "@/lib/auth/shared";
 import { downloadDailyHistoryDocx } from "@/lib/cable-map/functions";
 import { buildDailyHistoryReportFileName } from "@/lib/cable-map/report-utils";
 import type { DashboardData } from "@/lib/cable-map/shared";
 import { cn, downloadResponseFile } from "@/lib/utils";
 
+import { CableTaskImportCard } from "../cable-task-import-card";
 import { InstallationKanbanBoard } from "../installation-kanban-board";
-import { PriorityRoomListsCard } from "../priority-room-lists-card";
 import { boardColumns, boardWidth } from "./config";
 import { LevelBandView } from "./level-band-view";
 import { LeftZoneHeader, MapTitle, PathHeader, RightZoneHeader, SummaryCard } from "./map-header";
@@ -205,11 +205,13 @@ export function CableMapView({
 	canEditProgress,
 	canManageManualRooms,
 	role,
+	session,
 }: {
 	data: DashboardData;
 	canEditProgress: boolean;
 	canManageManualRooms: boolean;
 	role: UserRole;
+	session: AuthSession;
 }) {
 	const { setChromeHidden } = useAppShellChrome();
 	const workspaceRef = useRef<HTMLDivElement | null>(null);
@@ -982,23 +984,27 @@ export function CableMapView({
 
 	if (!data.snapshot) {
 		return (
-			<Card className="border-dashed">
-				<CardHeader>
-					<CardTitle>Активный граф пока не загружен</CardTitle>
-					<CardDescription>{getEmptySnapshotDescription(data.snapshotKind)}</CardDescription>
-				</CardHeader>
-				<CardContent className="flex flex-wrap items-center gap-3">
-					<Badge variant="secondary">Ожидание данных</Badge>
-					{canUploadSnapshot(role) ? (
-						<Link
-							to="/app/import"
-							className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition hover:bg-muted">
-							<FileUpIcon />
-							Перейти к загрузке
-						</Link>
-					) : null}
-				</CardContent>
-			</Card>
+			<div className="grid gap-4 px-4 pt-4">
+				<Card className="border-dashed">
+					<CardHeader>
+						<CardTitle>Активный граф пока не загружен</CardTitle>
+						<CardDescription>{getEmptySnapshotDescription(data.snapshotKind)}</CardDescription>
+					</CardHeader>
+					<CardContent className="flex flex-wrap items-center gap-3">
+						<Badge variant="secondary">Ожидание данных</Badge>
+						{canUploadSnapshot(role) ? (
+							<Link
+								to="/app/import"
+								className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition hover:bg-muted">
+								<FileUpIcon />
+								Перейти к загрузке
+							</Link>
+						) : null}
+					</CardContent>
+				</Card>
+				<CableTaskImportCard session={session} />
+				<InstallationKanbanBoard lists={data.priorityLists} session={session} />
+			</div>
 		);
 	}
 
@@ -1036,16 +1042,10 @@ export function CableMapView({
 				</Card>
 			</div>
 
-			{data.snapshotKind === "installation" ? (
-				<div className="grid gap-4 px-4">
-					<PriorityRoomListsCard
-						canUpload
-						priorityLists={data.priorityLists}
-						priorityRoomCount={data.priorityRoomCount}
-					/>
-					<InstallationKanbanBoard lists={data.priorityLists} canManage={role === "super-admin"} />
-				</div>
-			) : null}
+			<div className="grid gap-4 px-4">
+				<CableTaskImportCard session={session} />
+				<InstallationKanbanBoard lists={data.priorityLists} session={session} />
+			</div>
 
 			<div
 				className="px-4 pb-4"

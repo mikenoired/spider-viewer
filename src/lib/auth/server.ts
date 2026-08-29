@@ -69,6 +69,7 @@ function toManagedUserView(user: {
 	id: string;
 	login: string;
 	role: ManagedUserView["role"];
+	department: ManagedUserView["department"];
 	status: ManagedUserView["status"];
 	createdAt: Date;
 	reviewedAt: Date | null;
@@ -77,6 +78,7 @@ function toManagedUserView(user: {
 		id: user.id,
 		login: user.login,
 		role: user.role,
+		department: user.department,
 		status: user.status,
 		createdAt: user.createdAt.toISOString(),
 		reviewedAt: user.reviewedAt?.toISOString() ?? null,
@@ -123,6 +125,7 @@ async function createAndSignInBootstrapSuperAdmin(login: string, password: strin
 			login,
 			passwordHash,
 			role: "super-admin",
+			department: "tai",
 			status: "active",
 			reviewedByUserId: null,
 			reviewedAt: now,
@@ -133,6 +136,7 @@ async function createAndSignInBootstrapSuperAdmin(login: string, password: strin
 			id: users.id,
 			login: users.login,
 			role: users.role,
+			department: users.department,
 		});
 
 	if (!createdUser) throw new Error("Не удалось создать первого суперпользователя.");
@@ -141,6 +145,7 @@ async function createAndSignInBootstrapSuperAdmin(login: string, password: strin
 		id: createdUser.id,
 		login: createdUser.login,
 		role: createdUser.role,
+		department: createdUser.department,
 	} satisfies AuthSession;
 	const token = await createAuthToken(session);
 
@@ -178,6 +183,7 @@ export async function getCurrentSession() {
 				id: users.id,
 				login: users.login,
 				role: users.role,
+				department: users.department,
 				status: users.status,
 			})
 			.from(users)
@@ -193,6 +199,7 @@ export async function getCurrentSession() {
 			id: user.id,
 			login: user.login,
 			role: user.role,
+			department: user.department,
 		} satisfies AuthSession;
 	} catch {
 		deleteCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
@@ -211,6 +218,7 @@ export async function loginWithCredentials(input: LoginInput) {
 			login: users.login,
 			passwordHash: users.passwordHash,
 			role: users.role,
+			department: users.department,
 			status: users.status,
 		})
 		.from(users)
@@ -230,6 +238,7 @@ export async function loginWithCredentials(input: LoginInput) {
 		id: user.id,
 		login: user.login,
 		role: user.role,
+		department: user.department,
 	} satisfies AuthSession;
 
 	const token = await createAuthToken(session);
@@ -269,7 +278,7 @@ export async function registerWithCredentials(input: RegisterInput) {
 export async function createManagedUser(input: CreateManagedUserInput, creator: AuthSession) {
 	await ensureLegacyAuthUsersReconciled();
 
-	const { login, password, role } = createManagedUserSchema.parse(input);
+	const { login, password, role, department } = createManagedUserSchema.parse(input);
 	const normalizedLogin = normalizeLogin(login);
 	const db = getDb();
 	const now = new Date();
@@ -298,6 +307,7 @@ export async function createManagedUser(input: CreateManagedUserInput, creator: 
 			.set({
 				passwordHash,
 				role,
+				department,
 				status: "active",
 				reviewedByUserId: creator.id,
 				reviewedAt: now,
@@ -309,6 +319,7 @@ export async function createManagedUser(input: CreateManagedUserInput, creator: 
 			login: normalizedLogin,
 			passwordHash,
 			role,
+			department,
 			status: "active",
 			reviewedByUserId: creator.id,
 			reviewedAt: now,
@@ -372,6 +383,7 @@ export async function getManagedUsers() {
 			id: users.id,
 			login: users.login,
 			role: users.role,
+			department: users.department,
 			status: users.status,
 			createdAt: users.createdAt,
 			reviewedAt: users.reviewedAt,
