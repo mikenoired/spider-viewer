@@ -33,6 +33,15 @@ export const uploadInstallationWorkbook = createServerFn({ method: "POST" })
 		return importInstallationWorkbookFromFormData(data, session);
 	});
 
+export const uploadInstallationCableBase = createServerFn({ method: "POST" })
+	.inputValidator((input: FormData) => input)
+	.handler(async ({ data }) => {
+		const session = await requireInstallationEditor();
+		const { importInstallationCableBaseFromFormData } = await import("./import.server");
+
+		return importInstallationCableBaseFromFormData(data, session);
+	});
+
 export const uploadInstallationProgressWorkbooks = createServerFn({ method: "POST" })
 	.inputValidator((input: FormData) => input)
 	.handler(async ({ data }) => {

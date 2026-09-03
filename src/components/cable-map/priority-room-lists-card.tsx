@@ -26,6 +26,7 @@ export function PriorityRoomListsCard({
 	const [pending, setPending] = useState(false);
 	const [authorName, setAuthorName] = useState("");
 	const [file, setFile] = useState<File | null>(null);
+	const defaultAuthorName = "Без автора";
 
 	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
@@ -39,17 +40,12 @@ export function PriorityRoomListsCard({
 			return;
 		}
 
-		if (!authorName.trim()) {
-			toast.error("Укажите автора списка.");
-			return;
-		}
-
 		setPending(true);
 
 		try {
 			const formData = new FormData();
 			formData.set("file", file);
-			formData.set("author", authorName);
+			formData.set("author", authorName.trim() || defaultAuthorName);
 
 			const result = await uploadPriorityRoomList({
 				data: formData,
@@ -97,8 +93,9 @@ export function PriorityRoomListsCard({
 									id="priority-author"
 									value={authorName}
 									onChange={(event) => setAuthorName(event.target.value)}
-									placeholder="Например, Сидоров И.И."
+									placeholder={defaultAuthorName}
 								/>
+								<FieldDescription>Можно оставить пустым и загрузить только файл списка.</FieldDescription>
 							</Field>
 
 							<Field>
@@ -115,7 +112,7 @@ export function PriorityRoomListsCard({
 							</Field>
 						</FieldGroup>
 
-						<Button type="submit" disabled={pending || !file || !authorName.trim()}>
+						<Button type="submit" disabled={pending || !file}>
 							{pending ? (
 								<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
 							) : (
