@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import * as Xlsx from "xlsx";
 
 import type { AuthSession } from "@/lib/auth/shared";
@@ -37,6 +38,8 @@ type WorkbookUpload = Awaited<ReturnType<typeof ensureUploadFile>>;
 type DbClient = ReturnType<typeof getDb>;
 type DbTransaction = Parameters<Parameters<DbClient["transaction"]>[0]>[0];
 type SnapshotSummary = ReturnType<typeof createSnapshotSummary>;
+type ActiveSnapshotForBase = NonNullable<Awaited<ReturnType<typeof getActiveInstallationSnapshotForBase>>>;
+type ActiveItemForBase = Awaited<ReturnType<typeof getActiveInstallationItemsForBase>>[number];
 type InstallationImportWriteInput = {
 	primaryUpload: WorkbookUpload;
 	session: AuthSession;
@@ -505,6 +508,21 @@ function createSnapshotSummary(groups: AggregatedInstallationGroup[]) {
 	};
 }
 
+function createUpdatedBaseSummary(
+	summary: ActiveSnapshotForBase["summary"],
+	baseMatchedCount: number,
+	baseDoneCount: number
+) {
+	return {
+		groupCount: summary.groupCount ?? 0,
+		kksCount: summary.kksCount ?? 0,
+		cableCount: summary.cableCount ?? 0,
+		mechanismCount: summary.mechanismCount ?? 0,
+		baseMatchedCount,
+		baseDoneCount,
+	};
+}
+
 function createInstallationChecksum(primaryUpload: WorkbookUpload, baseUpload: WorkbookUpload | null) {
 	return createHash("sha256")
 		.update(primaryUpload.buffer)
@@ -605,6 +623,53 @@ async function replaceActiveInstallationData(tx: DbTransaction, input: Installat
 	return snapshot;
 }
 
+async function getActiveInstallationSnapshotForBase(db: DbClient) {
+	const [snapshot] = await db
+		.select({
+			id: installationSnapshots.id,
+			summary: installationSnapshots.summary,
+		})
+		.from(installationSnapshots)
+		.where(eq(installationSnapshots.isActive, true))
+		.orderBy(desc(installationSnapshots.createdAt))
+		.limit(1);
+
+	return snapshot ?? null;
+}
+
+async function getActiveInstallationItemsForBase(db: DbClient, snapshotId: string) {
+	return db
+		.select({
+			id: installationKksItems.id,
+			name: installationKksItems.name,
+			itemType: installationKksItems.itemType,
+			matchedInCableBase: installationKksItems.matchedInCableBase,
+			isDone: installationKksItems.isDone,
+		})
+		.from(installationKksItems)
+		.where(eq(installationKksItems.snapshotId, snapshotId));
+}
+
+function createCableBaseApplicationPlan(
+	items: ActiveItemForBase[],
+	statusByKks: Map<string, CableBaseEntry>
+) {
+	const matchedRows = items.filter(
+		(item) => item.itemType === "cable" && statusByKks.has(normalizeKksKey(item.name))
+	);
+	const doneRows = matchedRows.filter((item) => statusByKks.get(normalizeKksKey(item.name))?.isDone);
+	const matchedIds = new Set(matchedRows.map((item) => item.id));
+	const doneIds = new Set(doneRows.map((item) => item.id));
+
+	return {
+		matchedRows,
+		doneRows,
+		matchedEnabledRows: items.filter((item) => !item.matchedInCableBase && matchedIds.has(item.id)),
+		matchedDisabledRows: items.filter((item) => item.matchedInCableBase && !matchedIds.has(item.id)),
+		doneChangedRows: items.filter((item) => !item.isDone && doneIds.has(item.id)),
+	};
+}
+
 function createImportWriteInput(
 	primaryUpload: WorkbookUpload,
 	baseUpload: WorkbookUpload | null,
@@ -642,8 +707,101 @@ export async function importInstallationWorkbookFromFormData(formData: FormData,
 	};
 }
 
+export async function importInstallationCableBaseFromFormData(formData: FormData, session: AuthSession) {
+	const baseUpload = await ensureUploadFile(formData);
+	const baseWorkbook = readWorkbook(baseUpload);
+	const statusByKks = buildCableBaseIndex([baseWorkbook]);
+
+	if (statusByKks.size === 0) {
+		throw new Error("В базе кабелей не найдены колонки «Монтажная марка» и «Проложено».");
+	}
+
+	const db = getDb();
+	const snapshot = await getActiveInstallationSnapshotForBase(db);
+
+	if (!snapshot) {
+		throw new Error("Сначала импортируйте файл первоочередных карточек.");
+	}
+
+	const activeItems = await getActiveInstallationItemsForBase(db, snapshot.id);
+	const plan = createCableBaseApplicationPlan(activeItems, statusByKks);
+	const now = new Date();
+
+	await db.transaction(async (tx) => {
+		await tx
+			.update(installationSnapshots)
+			.set({
+				summary: createUpdatedBaseSummary(snapshot.summary, plan.matchedRows.length, plan.doneRows.length),
+				updatedAt: now,
+			})
+			.where(eq(installationSnapshots.id, snapshot.id));
+
+		for (const chunk of chunkValues(plan.matchedEnabledRows, 500)) {
+			if (chunk.length === 0) continue;
+
+			await tx
+				.update(installationKksItems)
+				.set({
+					matchedInCableBase: true,
+					updatedAt: now,
+				})
+				.where(
+					inArray(
+						installationKksItems.id,
+						chunk.map((row) => row.id)
+					)
+				);
+		}
+
+		for (const chunk of chunkValues(plan.matchedDisabledRows, 500)) {
+			if (chunk.length === 0) continue;
+
+			await tx
+				.update(installationKksItems)
+				.set({
+					matchedInCableBase: false,
+					updatedAt: now,
+				})
+				.where(
+					inArray(
+						installationKksItems.id,
+						chunk.map((row) => row.id)
+					)
+				);
+		}
+
+		for (const chunk of chunkValues(plan.doneChangedRows, 500)) {
+			if (chunk.length === 0) continue;
+
+			await tx
+				.update(installationKksItems)
+				.set({
+					isDone: true,
+					revision: sql`${installationKksItems.revision} + 1`,
+					updatedByUserId: session.id,
+					updatedAt: now,
+				})
+				.where(
+					inArray(
+						installationKksItems.id,
+						chunk.map((row) => row.id)
+					)
+				);
+		}
+	});
+
+	return {
+		fileName: baseUpload.file.name,
+		recognizedCableCount: statusByKks.size,
+		matchedCableCount: plan.matchedRows.length,
+		baseDoneCount: plan.doneRows.length,
+		changedCableCount: plan.doneChangedRows.length,
+	};
+}
+
 export const __installationImportTestUtils = {
 	buildCableBaseIndex,
+	createCableBaseApplicationPlan,
 	parseInstallationRows,
 	readWorkbook,
 };

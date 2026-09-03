@@ -13,20 +13,25 @@ import type { InstallationSnapshotView } from "@/lib/installation/shared";
 export function InstallationImportPanel({
 	canEdit,
 	importing,
+	importingBase,
 	importingProgress,
 	snapshot,
+	onBaseUpload,
 	onUpload,
 	onProgressUpload,
 }: {
 	canEdit: boolean;
 	importing: boolean;
+	importingBase: boolean;
 	importingProgress: boolean;
 	snapshot: InstallationSnapshotView | null;
+	onBaseUpload: (file: File) => Promise<void>;
 	onUpload: (file: File, baseFile: File | null) => Promise<void>;
 	onProgressUpload: (files: File[]) => Promise<void>;
 }) {
 	const [file, setFile] = useState<File | null>(null);
 	const [baseFile, setBaseFile] = useState<File | null>(null);
+	const [baseOnlyFile, setBaseOnlyFile] = useState<File | null>(null);
 	const [progressFiles, setProgressFiles] = useState<File[]>([]);
 
 	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -40,6 +45,19 @@ export function InstallationImportPanel({
 		await onUpload(file, baseFile);
 		setFile(null);
 		setBaseFile(null);
+		event.currentTarget.reset();
+	}
+
+	async function handleBaseSubmit(event: React.FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+
+		if (!baseOnlyFile) {
+			toast.error("Выберите базу кабелей для контроля.");
+			return;
+		}
+
+		await onBaseUpload(baseOnlyFile);
+		setBaseOnlyFile(null);
 		event.currentTarget.reset();
 	}
 
@@ -104,6 +122,35 @@ export function InstallationImportPanel({
 								<UploadIcon data-icon="inline-start" />
 							)}
 							Импортировать монтаж
+						</Button>
+					</form>
+					<form className="flex flex-col gap-4 border-t pt-4" onSubmit={handleBaseSubmit}>
+						<FieldGroup>
+							<Field>
+								<FieldLabel htmlFor="installation-base-only-file">База кабелей для контроля</FieldLabel>
+								<Input
+									id="installation-base-only-file"
+									type="file"
+									accept=".ods,.xlsx,.xls"
+									disabled={!canEdit || importingBase || !snapshot}
+									onChange={(event) => setBaseOnlyFile(event.target.files?.[0] ?? null)}
+								/>
+								<FieldDescription>
+									Отдельно применяет базу к уже загруженным карточкам монтажа. Кабели с заполненным столбцом
+									«Проложено» будут отмечены как готовые.
+								</FieldDescription>
+							</Field>
+						</FieldGroup>
+						<Button
+							type="submit"
+							variant="secondary"
+							disabled={!canEdit || !snapshot || !baseOnlyFile || importingBase}>
+							{importingBase ? (
+								<LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
+							) : (
+								<UploadIcon data-icon="inline-start" />
+							)}
+							Загрузить базу контроля
 						</Button>
 					</form>
 					<form className="flex flex-col gap-4 border-t pt-4" onSubmit={handleProgressSubmit}>

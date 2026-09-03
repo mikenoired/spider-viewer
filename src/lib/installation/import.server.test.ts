@@ -106,4 +106,59 @@ describe("installation workbook import", () => {
 			isDone: true,
 		});
 	});
+
+	it("plans a separate cable base upload for an active installation snapshot", () => {
+		const baseWorkbook = __installationImportTestUtils.readWorkbook(
+			createUpload(
+				createWorkbookBuffer(
+					[
+						["Монтажная марка", "Проложено"],
+						["1TQ12S02K334", "12"],
+						["1TQ12S02K335", ""],
+					],
+					"База"
+				)
+			)
+		);
+		const statusByKks = __installationImportTestUtils.buildCableBaseIndex([baseWorkbook]);
+		const plan = __installationImportTestUtils.createCableBaseApplicationPlan(
+			[
+				{
+					id: "ready-from-base",
+					name: "1ТQ12S02К334",
+					itemType: "cable",
+					matchedInCableBase: false,
+					isDone: false,
+				},
+				{
+					id: "matched-not-done",
+					name: "1ТQ12S02К335",
+					itemType: "cable",
+					matchedInCableBase: false,
+					isDone: false,
+				},
+				{
+					id: "manual-ready",
+					name: "1ТQ12S02К336",
+					itemType: "cable",
+					matchedInCableBase: true,
+					isDone: true,
+				},
+				{
+					id: "mechanism",
+					name: "1ТQ12S02",
+					itemType: "mechanism",
+					matchedInCableBase: false,
+					isDone: false,
+				},
+			],
+			statusByKks
+		);
+
+		expect(plan.matchedRows.map((row) => row.id)).toEqual(["ready-from-base", "matched-not-done"]);
+		expect(plan.doneRows.map((row) => row.id)).toEqual(["ready-from-base"]);
+		expect(plan.matchedEnabledRows.map((row) => row.id)).toEqual(["ready-from-base", "matched-not-done"]);
+		expect(plan.matchedDisabledRows.map((row) => row.id)).toEqual(["manual-ready"]);
+		expect(plan.doneChangedRows.map((row) => row.id)).toEqual(["ready-from-base"]);
+	});
 });
