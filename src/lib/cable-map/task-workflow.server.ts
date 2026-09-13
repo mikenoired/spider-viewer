@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import * as Xlsx from "xlsx";
 
 import type { AuthSession, UserDepartment } from "@/lib/auth/shared";
@@ -10,6 +10,7 @@ import {
 	cables,
 	notifications,
 	priorityRoomLists,
+	remarkCableItems,
 	remarks,
 	taskComments,
 	taskEvents,
@@ -21,7 +22,10 @@ import type {
 	CreateKanbanRemarkInput,
 	CreateTaskCommentInput,
 	PriorityListKanbanStatus,
+	RevertKanbanTaskEventInput,
+	SplitKanbanTaskInput,
 	TransitionKanbanTaskInput,
+	UpdateTaskItemCompletionInput,
 } from "./shared";
 
 const stageRecipient: Record<PriorityListKanbanStatus, UserDepartment> = {
@@ -224,11 +228,17 @@ async function addDepartmentNotifications(
 	if (values.length > 0) await db.insert(notifications).values(values).onConflictDoNothing();
 }
 
-async function addTaskEvent(listId: string, eventType: string, message: string, actorUserId: string) {
+async function addTaskEvent(
+	listId: string,
+	eventType: string,
+	message: string,
+	actorUserId: string,
+	payload: Record<string, unknown> = {}
+) {
 	const db = getDb();
 	const [event] = await db
 		.insert(taskEvents)
-		.values({ listId, eventType, message, actorUserId })
+		.values({ listId, eventType, message, actorUserId, payload })
 		.returning({ id: taskEvents.id });
 
 	return event;
@@ -237,6 +247,11 @@ async function addTaskEvent(listId: string, eventType: string, message: string, 
 export async function importCableTaskListFromFormData(formData: FormData, session: AuthSession) {
 	const { file, fileType, buffer } = await ensureUploadFile(formData);
 	const stage = String(formData.get("stage") ?? "formed") as PriorityListKanbanStatus;
+	const title = normalize(formData.get("title")) || file.name;
+	const priority = normalize(formData.get("priority")) || "normal";
+	const deadline = normalize(formData.get("deadline")) || null;
+	if (!["high", "normal", "low"].includes(priority)) throw new Error("Неизвестный приоритет списка.");
+	if (title.length > 240) throw new Error("Название списка не должно быть длиннее 240 символов.");
 
 	if (!getAllowedImportStages(session).includes(stage)) {
 		throw new Error("У вашей роли нет права добавить список в выбранный этап.");
@@ -267,12 +282,18 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 	const now = new Date();
 	const recipientDepartment = stageRecipient[stage];
 	const [list] = await db.transaction(async (tx) => {
+		const [{ count }] = await tx.select({ count: sql<number>`count(*)::int` }).from(priorityRoomLists);
+		const taskCode = String(count + 1);
 		const [created] = await tx
 			.insert(priorityRoomLists)
 			.values({
 				authorName: session.login,
 				fileName: file.name,
 				fileType,
+				title,
+				priority,
+				taskCode,
+				deadline,
 				roomCount: result.matched.length,
 				sourceChecksum: checksum,
 				senderDepartment: session.department,
@@ -314,6 +335,7 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 			eventType: "created",
 			message: `${session.login} создал список и передал его: ${stageTitles[stage]}.`,
 			actorUserId: session.id,
+			payload: { toStatus: stage },
 			createdAt: now,
 		});
 
@@ -354,9 +376,10 @@ function canTransition(
 function transitionTarget(input: TransitionKanbanTaskInput, current: PriorityListKanbanStatus) {
 	if (input.action === "accept") return { status: "in_progress" as const, department: "skm" as const };
 	if (input.action === "complete") return { status: "curator_review" as const, department: "tai" as const };
-	if (input.action === "confirm") return { status: "done" as const, department: "tai" as const };
+	if (input.action === "confirm")
+		return { status: "adjustment" as const, department: "commissioning" as const };
 	if (input.action === "return")
-		return { status: "adjustment" as const, department: input.recipientDepartment ?? "skm" };
+		return { status: "in_progress" as const, department: input.recipientDepartment ?? "skm" };
 	return {
 		status: input.status ?? current,
 		department: input.recipientDepartment ?? stageRecipient[input.status ?? current],
@@ -384,6 +407,14 @@ export async function transitionKanbanTask(input: TransitionKanbanTaskInput, ses
 	) {
 		throw new Error("Отметить выполненной может только назначенный исполнитель.");
 	}
+	if (input.action === "complete" && session.role !== "super-admin") {
+		const [pendingItem] = await db
+			.select({ id: cableListItems.id })
+			.from(cableListItems)
+			.where(and(eq(cableListItems.listId, list.id), eq(cableListItems.isCompleted, false)))
+			.limit(1);
+		if (pendingItem) throw new Error("Сначала отметьте выполненными все позиции списка.");
+	}
 
 	const target = transitionTarget(input, list.status);
 	if (target.status === list.status && input.action === "move") return { id: list.id, status: list.status };
@@ -409,7 +440,8 @@ export async function transitionKanbanTask(input: TransitionKanbanTaskInput, ses
 		list.id,
 		input.action,
 		`${session.login}: ${stageTitles[list.status]} → ${stageTitles[target.status]}.`,
-		session.id
+		session.id,
+		{ fromStatus: list.status, toStatus: target.status, action: input.action }
 	);
 	await addDepartmentNotifications(
 		target.department,
@@ -420,6 +452,221 @@ export async function transitionKanbanTask(input: TransitionKanbanTaskInput, ses
 		session.id
 	);
 	return updated;
+}
+
+export async function updateTaskItemCompletion(input: UpdateTaskItemCompletionInput, session: AuthSession) {
+	const db = getDb();
+	const [list] = await db
+		.select({ status: priorityRoomLists.status, responsibleUserId: priorityRoomLists.responsibleUserId })
+		.from(priorityRoomLists)
+		.where(eq(priorityRoomLists.id, input.listId))
+		.limit(1);
+	if (!list) throw new Error("Карточка Kanban не найдена.");
+	if (
+		session.role !== "super-admin" &&
+		(list.status !== "in_progress" || session.department !== "skm" || list.responsibleUserId !== session.id)
+	) {
+		throw new Error("Изменять позиции может только назначенный исполнитель СКМ.");
+	}
+	const now = new Date();
+	const [updated] = await db
+		.update(cableListItems)
+		.set({
+			isCompleted: input.isCompleted,
+			completedAt: input.isCompleted ? now : null,
+			completedByUserId: input.isCompleted ? session.id : null,
+		})
+		.where(and(eq(cableListItems.listId, input.listId), eq(cableListItems.cableId, input.cableId)))
+		.returning({ id: cableListItems.id });
+	if (!updated) throw new Error("Позиция не входит в этот список.");
+	await addTaskEvent(
+		input.listId,
+		"item_completion",
+		`${session.login} ${input.isCompleted ? "отметил выполненной" : "снял выполнение с"} позиции.`,
+		session.id,
+		{ cableId: input.cableId, isCompleted: input.isCompleted }
+	);
+	return updated;
+}
+
+export async function splitKanbanTask(input: SplitKanbanTaskInput, session: AuthSession) {
+	const db = getDb();
+	const [list] = await db
+		.select()
+		.from(priorityRoomLists)
+		.where(eq(priorityRoomLists.id, input.listId))
+		.limit(1);
+	if (!list) throw new Error("Карточка Kanban не найдена.");
+	if (
+		session.role !== "super-admin" &&
+		(list.status !== "curator_review" || !(session.department === "tai" || session.department === "curator"))
+	) {
+		throw new Error("Разделять список может только цех или куратор на этапе проверки.");
+	}
+	const items = await db.select().from(cableListItems).where(eq(cableListItems.listId, list.id));
+	const rejected = [...new Set(input.rejectedCableIds)];
+	if (!rejected.every((cableId) => items.some((item) => item.cableId === cableId))) {
+		throw new Error("В список разделения попала позиция из другой карточки.");
+	}
+	const accepted = items.filter((item) => !rejected.includes(item.cableId));
+	if (accepted.length === 0 || rejected.length === 0) {
+		throw new Error("Для разделения должны остаться и принятые, и возвращённые позиции.");
+	}
+	const now = new Date();
+	const [child] = await db.transaction(async (tx) => {
+		const [{ childCount }] = await tx
+			.select({ childCount: sql<number>`count(*)::int` })
+			.from(priorityRoomLists)
+			.where(eq(priorityRoomLists.parentListId, list.id));
+		const taskCode = `${list.taskCode || list.id.slice(0, 8)}.${childCount + 2}`;
+		const [created] = await tx
+			.insert(priorityRoomLists)
+			.values({
+				authorName: list.authorName,
+				fileName: list.fileName,
+				fileType: list.fileType,
+				title: list.title,
+				priority: list.priority,
+				taskCode,
+				parentListId: list.id,
+				deadline: list.deadline,
+				roomCount: accepted.length,
+				senderDepartment: list.senderDepartment,
+				recipientDepartment: "commissioning",
+				status: "adjustment",
+				statusUpdatedByUserId: session.id,
+				statusUpdatedAt: now,
+				importedByUserId: list.importedByUserId,
+				createdAt: now,
+				updatedAt: now,
+			})
+			.returning({ id: priorityRoomLists.id });
+		await tx.insert(cableListItems).values(
+			accepted.map((item) => ({
+				listId: created.id,
+				cableId: item.cableId,
+				sourceRowIndex: item.sourceRowIndex,
+				importedProgress: item.importedProgress,
+				isCompleted: item.isCompleted,
+				completedAt: item.completedAt,
+				completedByUserId: item.completedByUserId,
+				createdAt: now,
+			}))
+		);
+		await tx.delete(cableListItems).where(
+			and(
+				eq(cableListItems.listId, list.id),
+				inArray(
+					cableListItems.cableId,
+					accepted.map((item) => item.cableId)
+				)
+			)
+		);
+		await tx
+			.update(cableListItems)
+			.set({ isCompleted: false, completedAt: null, completedByUserId: null })
+			.where(and(eq(cableListItems.listId, list.id), inArray(cableListItems.cableId, rejected)));
+		await tx
+			.update(priorityRoomLists)
+			.set({
+				roomCount: rejected.length,
+				status: "in_progress",
+				recipientDepartment: "skm",
+				statusUpdatedByUserId: session.id,
+				statusUpdatedAt: now,
+				updatedAt: now,
+			})
+			.where(eq(priorityRoomLists.id, list.id));
+		await tx.insert(taskEvents).values([
+			{
+				listId: list.id,
+				eventType: "split",
+				message: `${session.login} вернул ${rejected.length} позиций на доработку и создал дочернюю часть.`,
+				actorUserId: session.id,
+				payload: { childListId: created.id, rejectedCableIds: rejected },
+				createdAt: now,
+			},
+			{
+				listId: created.id,
+				eventType: "split_created",
+				message: `${session.login} принял ${accepted.length} позиций из карточки ${list.taskCode || list.id.slice(0, 8)}.`,
+				actorUserId: session.id,
+				payload: { parentListId: list.id, acceptedCableIds: accepted.map((item) => item.cableId) },
+				createdAt: now,
+			},
+		]);
+		return [created];
+	});
+	if (input.remark) {
+		await createKanbanRemark(
+			{
+				listId: list.id,
+				cableIds: rejected,
+				content: input.remark,
+				assignedDepartment: "skm",
+			},
+			session
+		);
+	}
+	await addDepartmentNotifications(
+		"commissioning",
+		child.id,
+		"task_partially_accepted",
+		"Вам передана принятая часть списка.",
+		`task-split:${child.id}`,
+		session.id
+	);
+	return child;
+}
+
+export async function revertKanbanTaskEvent(input: RevertKanbanTaskEventInput, session: AuthSession) {
+	if (session.role !== "super-admin") throw new Error("Отменять действия может только администратор.");
+	const db = getDb();
+	const [event] = await db
+		.select()
+		.from(taskEvents)
+		.where(and(eq(taskEvents.id, input.eventId), eq(taskEvents.listId, input.listId)))
+		.limit(1);
+	if (!event || event.revertedAt) throw new Error("Действие недоступно для отмены.");
+	const payload = event.payload as {
+		fromStatus?: PriorityListKanbanStatus;
+		toStatus?: PriorityListKanbanStatus;
+	};
+	if (!payload.fromStatus || !payload.toStatus) throw new Error("Можно отменить только переход карточки.");
+	const [list] = await db
+		.select()
+		.from(priorityRoomLists)
+		.where(eq(priorityRoomLists.id, input.listId))
+		.limit(1);
+	if (!list || list.status !== payload.toStatus) {
+		throw new Error("Переход уже перекрыт последующим действием и не может быть отменён точечно.");
+	}
+	const now = new Date();
+	await db.transaction(async (tx) => {
+		await tx
+			.update(priorityRoomLists)
+			.set({
+				status: payload.fromStatus!,
+				recipientDepartment: stageRecipient[payload.fromStatus!],
+				statusUpdatedByUserId: session.id,
+				statusUpdatedAt: now,
+				updatedAt: now,
+			})
+			.where(eq(priorityRoomLists.id, input.listId));
+		await tx
+			.update(taskEvents)
+			.set({ revertedAt: now, revertedByUserId: session.id })
+			.where(eq(taskEvents.id, event.id));
+		await tx.insert(taskEvents).values({
+			listId: input.listId,
+			eventType: "revert",
+			message: `${session.login} отменил действие: ${event.message}`,
+			actorUserId: session.id,
+			payload: { revertedEventId: event.id, fromStatus: payload.toStatus, toStatus: payload.fromStatus },
+			createdAt: now,
+		});
+	});
+	return { id: input.listId, status: payload.fromStatus };
 }
 
 export async function createTaskComment(input: CreateTaskCommentInput, session: AuthSession) {
@@ -442,13 +689,21 @@ export async function createKanbanRemark(input: CreateKanbanRemarkInput, session
 		.limit(1);
 	if (!list) throw new Error("Карточка Kanban не найдена.");
 
-	if (input.cableId) {
-		const [item] = await db
-			.select({ id: cableListItems.id })
+	const selectedCableIds = input.applyToAll
+		? (
+				await db
+					.select({ cableId: cableListItems.cableId })
+					.from(cableListItems)
+					.where(eq(cableListItems.listId, input.listId))
+			).map((item) => item.cableId)
+		: [...new Set(input.cableIds ?? (input.cableId ? [input.cableId] : []))];
+	if (selectedCableIds.length > 0) {
+		const validItems = await db
+			.select({ cableId: cableListItems.cableId })
 			.from(cableListItems)
-			.where(and(eq(cableListItems.listId, input.listId), eq(cableListItems.cableId, input.cableId)))
-			.limit(1);
-		if (!item) throw new Error("Выбранный кабель не входит в этот список.");
+			.where(and(eq(cableListItems.listId, input.listId), inArray(cableListItems.cableId, selectedCableIds)));
+		if (validItems.length !== selectedCableIds.length)
+			throw new Error("Выбранная позиция не входит в этот список.");
 	}
 
 	if (input.assignedUserId) {
@@ -465,18 +720,37 @@ export async function createKanbanRemark(input: CreateKanbanRemarkInput, session
 	const [remark] = await db
 		.insert(remarks)
 		.values({
-			targetType: input.cableId ? "cable" : "priority_list",
-			targetId: input.cableId ?? input.listId,
+			targetType: selectedCableIds.length > 0 ? "cable" : "priority_list",
+			targetId: selectedCableIds[0] ?? input.listId,
 			listId: input.listId,
 			content: input.content,
+			stage: (
+				await db
+					.select({ status: priorityRoomLists.status })
+					.from(priorityRoomLists)
+					.where(eq(priorityRoomLists.id, input.listId))
+					.limit(1)
+			)[0]?.status,
 			assignedDepartment: input.assignedDepartment,
 			assignedUserId: input.assignedUserId,
 			createdByUserId: session.id,
 		})
 		.returning({ id: remarks.id });
 	if (!remark) throw new Error("Не удалось создать замечание.");
+	if (selectedCableIds.length > 0) {
+		await db
+			.insert(remarkCableItems)
+			.values(selectedCableIds.map((cableId) => ({ remarkId: remark.id, cableId })))
+			.onConflictDoNothing();
+	}
 
-	const event = await addTaskEvent(input.listId, "remark", `${session.login} создал замечание.`, session.id);
+	const event = await addTaskEvent(
+		input.listId,
+		"remark",
+		`${session.login} создал замечание${selectedCableIds.length ? ` для ${selectedCableIds.length} позиций` : ""}.`,
+		session.id,
+		{ remarkId: remark.id, cableIds: selectedCableIds }
+	);
 	if (input.assignedUserId) {
 		await db
 			.insert(notifications)
@@ -501,12 +775,80 @@ export async function createKanbanRemark(input: CreateKanbanRemarkInput, session
 	return remark;
 }
 
+export async function seedKanbanDemo(session: AuthSession) {
+	if (session.role !== "super-admin")
+		throw new Error("Демонстрационные списки может создавать только администратор.");
+	await ensureCanonicalCableBase();
+	const db = getDb();
+	const base = await db.select({ id: cables.id }).from(cables).orderBy(asc(cables.externalKey)).limit(60);
+	if (base.length < 60) throw new Error("Для демо требуется не менее 60 кабелей в генеральной базе.");
+	const demo = [
+		{ title: "Первый приоритет", priority: "high" },
+		{ title: "Второй приоритет", priority: "normal" },
+		{ title: "Третий приоритет", priority: "low" },
+	] as const;
+	const existing = await db
+		.select({ sourceChecksum: priorityRoomLists.sourceChecksum })
+		.from(priorityRoomLists)
+		.where(
+			inArray(
+				priorityRoomLists.sourceChecksum,
+				demo.map((_, index) => `kanban-demo:${index + 1}`)
+			)
+		);
+	if (existing.length > 0) return { created: 0, message: "Демонстрационные списки уже существуют." };
+	const now = new Date();
+	await db.transaction(async (tx) => {
+		const [{ count }] = await tx.select({ count: sql<number>`count(*)::int` }).from(priorityRoomLists);
+		for (const [index, item] of demo.entries()) {
+			const [list] = await tx
+				.insert(priorityRoomLists)
+				.values({
+					authorName: session.login,
+					fileName: "База контроля кабеля (демо)",
+					fileType: "xlsx",
+					title: item.title,
+					priority: item.priority,
+					taskCode: String(count + index + 1),
+					roomCount: 20,
+					sourceChecksum: `kanban-demo:${index + 1}`,
+					senderDepartment: "tai",
+					recipientDepartment: "skm",
+					status: "formed",
+					statusUpdatedByUserId: session.id,
+					statusUpdatedAt: now,
+					importedByUserId: session.id,
+					createdAt: now,
+					updatedAt: now,
+				})
+				.returning({ id: priorityRoomLists.id });
+			await tx.insert(cableListItems).values(
+				base.slice(index * 20, index * 20 + 20).map((cable, sourceRowIndex) => ({
+					listId: list.id,
+					cableId: cable.id,
+					sourceRowIndex: sourceRowIndex + 1,
+					createdAt: now,
+				}))
+			);
+			await tx.insert(taskEvents).values({
+				listId: list.id,
+				eventType: "created",
+				message: `${session.login} создал демонстрационный список «${item.title}».`,
+				actorUserId: session.id,
+				payload: { toStatus: "formed", demo: true },
+				createdAt: now,
+			});
+		}
+	});
+	return { created: 3, message: "Созданы три демонстрационных списка по 20 позиций." };
+}
+
 export async function getKanbanTaskData(listId: string) {
 	const db = getDb();
 	const [list] = await db.select().from(priorityRoomLists).where(eq(priorityRoomLists.id, listId)).limit(1);
 	if (!list) throw new Error("Карточка Kanban не найдена.");
 
-	const [items, comments, events, taskRemarks] = await Promise.all([
+	const [items, comments, events, taskRemarks, children] = await Promise.all([
 		db
 			.select({
 				id: cableListItems.id,
@@ -516,6 +858,8 @@ export async function getKanbanTaskData(listId: string) {
 				cableNumber: cables.cableNumber,
 				progress: cables.progress,
 				importedProgress: cableListItems.importedProgress,
+				isCompleted: cableListItems.isCompleted,
+				completedAt: cableListItems.completedAt,
 			})
 			.from(cableListItems)
 			.innerJoin(cables, eq(cables.id, cableListItems.cableId))
@@ -535,7 +879,10 @@ export async function getKanbanTaskData(listId: string) {
 		db
 			.select({
 				id: taskEvents.id,
+				eventType: taskEvents.eventType,
 				message: taskEvents.message,
+				payload: taskEvents.payload,
+				revertedAt: taskEvents.revertedAt,
 				createdAt: taskEvents.createdAt,
 				login: users.login,
 			})
@@ -544,18 +891,57 @@ export async function getKanbanTaskData(listId: string) {
 			.where(eq(taskEvents.listId, listId))
 			.orderBy(asc(taskEvents.createdAt)),
 		db.select().from(remarks).where(eq(remarks.listId, listId)).orderBy(desc(remarks.createdAt)),
+		db
+			.select({
+				id: priorityRoomLists.id,
+				taskCode: priorityRoomLists.taskCode,
+				title: priorityRoomLists.title,
+				status: priorityRoomLists.status,
+			})
+			.from(priorityRoomLists)
+			.where(eq(priorityRoomLists.parentListId, listId)),
 	]);
+	const parent = list.parentListId
+		? await db
+				.select({
+					id: priorityRoomLists.id,
+					taskCode: priorityRoomLists.taskCode,
+					title: priorityRoomLists.title,
+					status: priorityRoomLists.status,
+				})
+				.from(priorityRoomLists)
+				.where(eq(priorityRoomLists.id, list.parentListId))
+				.limit(1)
+		: [];
+	const remarkIds = taskRemarks.map((remark) => remark.id);
+	const linkedCables = remarkIds.length
+		? await db
+				.select({ remarkId: remarkCableItems.remarkId, cableId: remarkCableItems.cableId })
+				.from(remarkCableItems)
+				.where(inArray(remarkCableItems.remarkId, remarkIds))
+		: [];
+	const cablesByRemark = new Map<string, string[]>();
+	for (const linked of linkedCables)
+		cablesByRemark.set(linked.remarkId, [...(cablesByRemark.get(linked.remarkId) ?? []), linked.cableId]);
 
 	return {
 		list,
-		items,
+		items: items.map((item) => ({ ...item, completedAt: item.completedAt?.toISOString() ?? null })),
+		parent: parent[0] ?? null,
+		children,
 		comments: comments.map((comment) => ({ ...comment, createdAt: comment.createdAt.toISOString() })),
 		events: events.map((event) => ({
 			...event,
+			payload: JSON.stringify(event.payload),
 			login: event.login ?? "Система",
 			createdAt: event.createdAt.toISOString(),
+			revertedAt: event.revertedAt?.toISOString() ?? null,
 		})),
-		remarks: taskRemarks.map((remark) => ({ ...remark, createdAt: remark.createdAt.toISOString() })),
+		remarks: taskRemarks.map((remark) => ({
+			...remark,
+			cableIds: cablesByRemark.get(remark.id) ?? (remark.targetType === "cable" ? [remark.targetId] : []),
+			createdAt: remark.createdAt.toISOString(),
+		})),
 	};
 }
 

@@ -12,8 +12,8 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import type { AuthSession } from "@/lib/auth/shared";
 import { departmentLabels } from "@/lib/auth/shared";
-import { analyzeCableTaskList, uploadCableTaskList } from "@/lib/cable-map/functions";
-import type { PriorityListKanbanStatus } from "@/lib/cable-map/shared";
+import { analyzeCableTaskList, seedKanbanDemo, uploadCableTaskList } from "@/lib/cable-map/functions";
+import type { PriorityListKanbanStatus, TaskPriority } from "@/lib/cable-map/shared";
 
 const stageLabels: Record<PriorityListKanbanStatus, string> = {
 	formed: "Список сформирован",
@@ -30,6 +30,9 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 	const [file, setFile] = useState<File | null>(null);
 	const [analysis, setAnalysis] = useState<Analysis | null>(null);
 	const [stage, setStage] = useState<PriorityListKanbanStatus>("formed");
+	const [title, setTitle] = useState("");
+	const [priority, setPriority] = useState<TaskPriority>("normal");
+	const [deadline, setDeadline] = useState("");
 	const [analyzing, setAnalyzing] = useState(false);
 	const [importing, setImporting] = useState(false);
 
@@ -65,6 +68,9 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 			const formData = new FormData();
 			formData.set("file", file);
 			formData.set("stage", stage);
+			formData.set("title", title || file.name);
+			formData.set("priority", priority);
+			if (deadline) formData.set("deadline", deadline);
 			const result = await uploadCableTaskList({ data: formData });
 			await router.invalidate();
 			window.location.hash = `kanban-task-${result.id}`;
@@ -81,6 +87,18 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 			setImporting(false);
 		}
 	}
+	async function createDemo() {
+		setImporting(true);
+		try {
+			const result = await seedKanbanDemo();
+			await router.invalidate();
+			toast.success(result.message);
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Не удалось создать демонстрационные списки.");
+		} finally {
+			setImporting(false);
+		}
+	}
 
 	return (
 		<Card>
@@ -92,6 +110,38 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 			</CardHeader>
 			<CardContent className="grid gap-4">
 				<FieldGroup>
+					<Field>
+						<FieldLabel htmlFor="cable-task-title">Название карточки</FieldLabel>
+						<Input
+							id="cable-task-title"
+							value={title}
+							onChange={(event) => setTitle(event.target.value)}
+							placeholder="По умолчанию — имя файла"
+							disabled={analyzing || importing}
+						/>
+					</Field>
+					<Field>
+						<FieldLabel>Приоритет</FieldLabel>
+						<select
+							className="h-9 rounded-md border bg-background px-3"
+							value={priority}
+							onChange={(event) => setPriority(event.target.value as TaskPriority)}
+							disabled={analyzing || importing}>
+							<option value="high">Первый / высокий</option>
+							<option value="normal">Второй / обычный</option>
+							<option value="low">Третий / низкий</option>
+						</select>
+					</Field>
+					<Field>
+						<FieldLabel htmlFor="cable-task-deadline">Плановый срок (необязательно)</FieldLabel>
+						<Input
+							id="cable-task-deadline"
+							type="date"
+							value={deadline}
+							onChange={(event) => setDeadline(event.target.value)}
+							disabled={analyzing || importing}
+						/>
+					</Field>
 					<Field>
 						<FieldLabel htmlFor="cable-task-file">Список кабелей</FieldLabel>
 						<Input
@@ -170,6 +220,15 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 							disabled={importing || analysis.matchedCount === 0 || analysis.allowedStages.length === 0}>
 							{importing ? <LoaderCircleIcon className="animate-spin" /> : <UploadIcon />}
 							Подтвердить импорт
+						</Button>
+					) : null}
+					{session.role === "super-admin" ? (
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={importing || analyzing}
+							onClick={() => void createDemo()}>
+							Создать 3 демонстрационных списка
 						</Button>
 					) : null}
 				</div>

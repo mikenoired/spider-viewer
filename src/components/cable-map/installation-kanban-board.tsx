@@ -17,7 +17,10 @@ import {
 	getKanbanTaskData,
 	getMyNotifications,
 	getTaskRecipients,
+	revertKanbanTaskEvent,
+	splitKanbanTask,
 	transitionKanbanTask,
+	updateTaskItemCompletion,
 } from "@/lib/cable-map/functions";
 import type { PriorityListKanbanStatus, PriorityRoomListView } from "@/lib/cable-map/shared";
 
@@ -30,12 +33,14 @@ const columns: Array<{ status: PriorityListKanbanStatus; title: string; descript
 ];
 
 const departments: UserDepartment[] = ["tai", "skm", "commissioning", "curator"];
+type TaskAction = "move" | "accept" | "complete" | "confirm" | "return";
+type ActionItem = { action: TaskAction; label: string; status?: PriorityListKanbanStatus };
 
-function getActions(list: PriorityRoomListView, session: AuthSession) {
+function getActions(list: PriorityRoomListView, session: AuthSession): ActionItem[] {
 	if (session.role === "super-admin")
 		return columns
 			.filter((column) => column.status !== list.status)
-			.map((column) => ({ action: "move" as const, status: column.status, label: column.title }));
+			.map((column) => ({ action: "move", status: column.status, label: column.title }));
 	if (session.department === "skm" && list.status === "formed")
 		return [{ action: "accept" as const, label: "Взять в работу" }];
 	if (
@@ -50,7 +55,7 @@ function getActions(list: PriorityRoomListView, session: AuthSession) {
 			{ action: "return" as const, label: "Вернуть на доработку" },
 		];
 	if (session.department === "commissioning" && list.status === "adjustment")
-		return [{ action: "move" as const, status: "curator_review" as const, label: "Передать на проверку" }];
+		return [{ action: "move" as const, status: "done" as const, label: "Завершить наладку" }];
 	return [];
 }
 
@@ -64,19 +69,26 @@ function ListCard({
 	list: PriorityRoomListView;
 	session: AuthSession;
 	pending: boolean;
-	onTransition: (
-		list: PriorityRoomListView,
-		action: "move" | "accept" | "complete" | "confirm" | "return",
-		status?: PriorityListKanbanStatus
-	) => void;
+	onTransition: (list: PriorityRoomListView, action: TaskAction, status?: PriorityListKanbanStatus) => void;
 	onOpen: (list: PriorityRoomListView) => void;
 }) {
 	const actions = getActions(list, session);
 	return (
-		<div id={`kanban-task-${list.id}`} className="rounded-lg border bg-background p-3 shadow-sm">
+		<div
+			id={`kanban-task-${list.id}`}
+			className={`rounded-lg border bg-background p-3 shadow-sm ${
+				list.priority === "high"
+					? "border-red-400"
+					: list.priority === "low"
+						? "border-blue-300"
+						: "border-amber-300"
+			}`}>
 			<div className="flex items-start justify-between gap-2">
 				<div className="min-w-0">
-					<div className="truncate text-sm font-semibold">{list.fileName}</div>
+					<div className="truncate text-sm font-semibold">
+						{list.taskCode ? `${list.taskCode} · ` : ""}
+						{list.title}
+					</div>
 					<div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
 						<UserIcon className="size-3.5" />
 						<span className="truncate">Автор: {list.authorName}</span>
@@ -87,6 +99,13 @@ function ListCard({
 				</Badge>
 			</div>
 			<div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+				<span>
+					Приоритет: {list.priority === "high" ? "высокий" : list.priority === "low" ? "низкий" : "обычный"}
+				</span>
+				<span>
+					Прогресс: {list.completedItemCount} из {list.roomCount}
+				</span>
+				{list.parentListId ? <span>Часть исходной карточки</span> : null}
 				<span>Отправитель: {departmentLabels[list.senderDepartment]}</span>
 				<span>Получатель: {list.recipientDepartment ? departmentLabels[list.recipientDepartment] : "—"}</span>
 				<span>Ответственный: {list.responsibleLogin ?? "не назначен"}</span>
@@ -115,13 +134,24 @@ function ListCard({
 	);
 }
 
-function TaskDialog({ list, onClose }: { list: PriorityRoomListView | null; onClose: () => void }) {
+function TaskDialog({
+	list,
+	session,
+	onClose,
+}: {
+	list: PriorityRoomListView | null;
+	session: AuthSession;
+	onClose: () => void;
+}) {
 	const router = useRouter();
 	const [task, setTask] = useState<Awaited<ReturnType<typeof getKanbanTaskData>> | null>(null);
 	const [recipients, setRecipients] = useState<Awaited<ReturnType<typeof getTaskRecipients>>>([]);
 	const [comment, setComment] = useState("");
 	const [remark, setRemark] = useState("");
-	const [cableId, setCableId] = useState("");
+	const [selectedCableIds, setSelectedCableIds] = useState<string[]>([]);
+	const [applyToAll, setApplyToAll] = useState(false);
+	const [rejectedCableIds, setRejectedCableIds] = useState<string[]>([]);
+	const [splitRemark, setSplitRemark] = useState("");
 	const [department, setDepartment] = useState<UserDepartment>("skm");
 	const [assignedUserId, setAssignedUserId] = useState("");
 	const [pending, setPending] = useState(false);
@@ -163,7 +193,8 @@ function TaskDialog({ list, onClose }: { list: PriorityRoomListView | null; onCl
 			await createKanbanRemark({
 				data: {
 					listId: list.id,
-					cableId: cableId || undefined,
+					cableIds: selectedCableIds,
+					applyToAll,
 					content: remark,
 					assignedDepartment: department,
 					assignedUserId: assignedUserId || undefined,
@@ -173,6 +204,48 @@ function TaskDialog({ list, onClose }: { list: PriorityRoomListView | null; onCl
 			await refresh();
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Не удалось создать замечание.");
+		} finally {
+			setPending(false);
+		}
+	}
+	async function setItemCompleted(cableId: string, isCompleted: boolean) {
+		if (!list || pending) return;
+		setPending(true);
+		try {
+			await updateTaskItemCompletion({ data: { listId: list.id, cableId, isCompleted } });
+			await refresh();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Не удалось изменить позицию.");
+		} finally {
+			setPending(false);
+		}
+	}
+	async function splitList() {
+		if (!list || rejectedCableIds.length === 0 || pending) return;
+		setPending(true);
+		try {
+			await splitKanbanTask({
+				data: { listId: list.id, rejectedCableIds, remark: splitRemark || undefined },
+			});
+			toast.success("Список разделён: принятая часть передана в наладку.");
+			setRejectedCableIds([]);
+			setSplitRemark("");
+			await refresh();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Не удалось разделить список.");
+		} finally {
+			setPending(false);
+		}
+	}
+	async function revertEvent(eventId: string) {
+		if (!list || pending) return;
+		setPending(true);
+		try {
+			await revertKanbanTaskEvent({ data: { listId: list.id, eventId } });
+			toast.success("Действие отменено отдельной записью в журнале.");
+			await refresh();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Не удалось отменить действие.");
 		} finally {
 			setPending(false);
 		}
@@ -191,19 +264,31 @@ function TaskDialog({ list, onClose }: { list: PriorityRoomListView | null; onCl
 					<div className="grid gap-4">
 						<div className="grid gap-2 rounded-lg border p-3 text-sm sm:grid-cols-2">
 							<span>Статус: {columns.find((column) => column.status === task.list.status)?.title}</span>
+							<span>Карточка: {task.list.taskCode ?? "—"}</span>
 							<span>Автор: {task.list.authorName}</span>
+							<span>Исходный файл: {task.list.fileName}</span>
 							<span>Отправитель: {departmentLabels[task.list.senderDepartment]}</span>
 							<span>
 								Получатель:{" "}
 								{task.list.recipientDepartment ? departmentLabels[task.list.recipientDepartment] : "—"}
 							</span>
 						</div>
+						{task.parent || task.children.length > 0 ? (
+							<div className="rounded-lg border p-3 text-sm">
+								<b>Нитка карточки:</b>{" "}
+								{task.parent ? `исходная ${task.parent.taskCode ?? task.parent.id.slice(0, 8)} · ` : ""}
+								{task.children.length > 0
+									? `дочерние: ${task.children.map((child) => child.taskCode ?? child.id.slice(0, 8)).join(", ")}`
+									: "без дочерних частей"}
+							</div>
+						) : null}
 						<section className="grid gap-2">
 							<h3 className="font-medium">Кабели ({task.items.length})</h3>
 							<div className="max-h-56 overflow-auto rounded border">
 								<table className="w-full text-xs">
 									<thead>
 										<tr className="border-b text-left">
+											<th className="p-2">Готово</th>
 											<th className="p-2">Кабель</th>
 											<th className="p-2">Журнал / номер</th>
 											<th className="p-2">Прогресс</th>
@@ -212,6 +297,20 @@ function TaskDialog({ list, onClose }: { list: PriorityRoomListView | null; onCl
 									<tbody>
 										{task.items.map((item) => (
 											<tr key={item.id} className="border-b last:border-0">
+												<td className="p-2">
+													{session.department === "skm" && task.list.status === "in_progress" ? (
+														<input
+															type="checkbox"
+															checked={item.isCompleted}
+															disabled={pending}
+															onChange={(event) => void setItemCompleted(item.cableId, event.target.checked)}
+														/>
+													) : item.isCompleted ? (
+														"✓"
+													) : (
+														"—"
+													)}
+												</td>
 												<td className="p-2">{item.cableLabel}</td>
 												<td className="p-2">
 													{item.cableJournal} {item.cableNumber}
@@ -223,6 +322,50 @@ function TaskDialog({ list, onClose }: { list: PriorityRoomListView | null; onCl
 								</table>
 							</div>
 						</section>
+						{(session.department === "tai" ||
+							session.department === "curator" ||
+							session.role === "super-admin") &&
+						task.list.status === "curator_review" ? (
+							<section className="grid gap-2 rounded-lg border p-3">
+								<h3 className="font-medium">Частичная приёмка</h3>
+								<p className="text-sm text-muted-foreground">
+									Отметьте непринимаемые позиции: остальные будут переданы дочерней карточкой в наладку.
+								</p>
+								<div className="max-h-40 overflow-auto text-sm">
+									{task.items.map((item) => (
+										<label key={item.id} className="flex items-center gap-2 py-1">
+											<input
+												type="checkbox"
+												checked={rejectedCableIds.includes(item.cableId)}
+												onChange={(event) =>
+													setRejectedCableIds((current) =>
+														event.target.checked
+															? [...current, item.cableId]
+															: current.filter((id) => id !== item.cableId)
+													)
+												}
+											/>
+											{item.cableLabel}
+										</label>
+									))}
+								</div>
+								<textarea
+									className="min-h-16 rounded-md border bg-background p-2"
+									value={splitRemark}
+									onChange={(event) => setSplitRemark(event.target.value)}
+									placeholder="Замечание к возвращённым позициям (необязательно)"
+								/>
+								<Button
+									type="button"
+									className="w-fit"
+									disabled={
+										pending || rejectedCableIds.length === 0 || rejectedCableIds.length === task.items.length
+									}
+									onClick={() => void splitList()}>
+									Разделить список
+								</Button>
+							</section>
+						) : null}
 						<section className="grid gap-2">
 							<h3 className="font-medium">Комментарий</h3>
 							<textarea
@@ -254,17 +397,14 @@ function TaskDialog({ list, onClose }: { list: PriorityRoomListView | null; onCl
 								placeholder="Опишите проблему"
 							/>
 							<div className="grid gap-2 sm:grid-cols-3">
-								<select
-									className="h-9 rounded-md border bg-background px-2"
-									value={cableId}
-									onChange={(event) => setCableId(event.target.value)}>
-									<option value="">На весь список</option>
-									{task.items.map((item) => (
-										<option key={item.cableId} value={item.cableId}>
-											{item.cableLabel}
-										</option>
-									))}
-								</select>
+								<label className="flex items-center gap-2 text-sm">
+									<input
+										type="checkbox"
+										checked={applyToAll}
+										onChange={(event) => setApplyToAll(event.target.checked)}
+									/>
+									Применить ко всем
+								</label>
 								<select
 									className="h-9 rounded-md border bg-background px-2"
 									value={department}
@@ -289,6 +429,26 @@ function TaskDialog({ list, onClose }: { list: PriorityRoomListView | null; onCl
 										))}
 								</select>
 							</div>
+							<div className="max-h-32 overflow-auto rounded border p-2 text-sm">
+								<div className="mb-1 text-muted-foreground">Позиции замечания (можно несколько):</div>
+								{task.items.map((item) => (
+									<label key={item.cableId} className="mr-3 inline-flex items-center gap-1 py-1">
+										<input
+											type="checkbox"
+											disabled={applyToAll}
+											checked={selectedCableIds.includes(item.cableId)}
+											onChange={(event) =>
+												setSelectedCableIds((current) =>
+													event.target.checked
+														? [...current, item.cableId]
+														: current.filter((id) => id !== item.cableId)
+												)
+											}
+										/>
+										{item.cableLabel}
+									</label>
+								))}
+							</div>
 							<Button
 								type="button"
 								className="w-fit"
@@ -300,14 +460,35 @@ function TaskDialog({ list, onClose }: { list: PriorityRoomListView | null; onCl
 							{task.remarks.map((item) => (
 								<div key={item.id} className="rounded border p-2 text-sm">
 									{item.content}
+									{item.cableIds.length > 0 ? (
+										<div className="text-muted-foreground">Позиций: {item.cableIds.length}</div>
+									) : null}
 								</div>
 							))}
 						</section>
 						<section className="grid gap-2">
 							<h3 className="font-medium">История</h3>
 							{task.events.map((item) => (
-								<div key={item.id} className="text-sm text-muted-foreground">
-									{new Date(item.createdAt).toLocaleString("ru-RU")} — {item.message}
+								<div
+									key={item.id}
+									className="flex items-start justify-between gap-2 text-sm text-muted-foreground">
+									<span>
+										{new Date(item.createdAt).toLocaleString("ru-RU")} — {item.message}
+										{item.revertedAt ? " (отменено)" : ""}
+									</span>
+									{session.role === "super-admin" &&
+									!item.revertedAt &&
+									item.eventType !== "created" &&
+									item.eventType !== "revert" ? (
+										<Button
+											type="button"
+											size="sm"
+											variant="ghost"
+											disabled={pending}
+											onClick={() => void revertEvent(item.id)}>
+											Отменить
+										</Button>
+									) : null}
 								</div>
 							))}
 						</section>
@@ -442,7 +623,7 @@ export function InstallationKanbanBoard({
 					</div>
 				</CardContent>
 			</Card>
-			<TaskDialog list={selectedList} onClose={() => setSelectedList(null)} />
+			<TaskDialog list={selectedList} session={session} onClose={() => setSelectedList(null)} />
 		</>
 	);
 }

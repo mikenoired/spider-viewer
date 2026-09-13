@@ -18,6 +18,9 @@ import {
 	updatePriorityRoomKanbanStatusSchema,
 	updateRemarkStatusSchema,
 	transitionKanbanTaskSchema,
+	updateTaskItemCompletionSchema,
+	splitKanbanTaskSchema,
+	revertKanbanTaskEventSchema,
 } from "./shared";
 
 export const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
@@ -116,6 +119,36 @@ export const createKanbanRemark = createServerFn({ method: "POST" })
 		const { createKanbanRemark: create } = await import("./task-workflow.server");
 		return create(data, session);
 	});
+
+export const updateTaskItemCompletion = createServerFn({ method: "POST" })
+	.inputValidator(updateTaskItemCompletionSchema)
+	.handler(async ({ data }) => {
+		const session = await requireSession();
+		const { updateTaskItemCompletion: update } = await import("./task-workflow.server");
+		return update(data, session);
+	});
+
+export const splitKanbanTask = createServerFn({ method: "POST" })
+	.inputValidator(splitKanbanTaskSchema)
+	.handler(async ({ data }) => {
+		const session = await requireSession();
+		const { splitKanbanTask: split } = await import("./task-workflow.server");
+		return split(data, session);
+	});
+
+export const revertKanbanTaskEvent = createServerFn({ method: "POST" })
+	.inputValidator(revertKanbanTaskEventSchema)
+	.handler(async ({ data }) => {
+		const session = await requireRole(["super-admin"]);
+		const { revertKanbanTaskEvent: revert } = await import("./task-workflow.server");
+		return revert(data, session);
+	});
+
+export const seedKanbanDemo = createServerFn({ method: "POST" }).handler(async () => {
+	const session = await requireRole(["super-admin"]);
+	const { seedKanbanDemo: seed } = await import("./task-workflow.server");
+	return seed(session);
+});
 
 export const getMyNotifications = createServerFn({ method: "GET" }).handler(async () => {
 	const session = await requireSession();

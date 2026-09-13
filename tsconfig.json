@@ -1,5 +1,6 @@
 {
 	"include": ["**/*.ts", "**/*.tsx"],
+	"exclude": ["spider-viewer/**", "dist/**", "node_modules/**"],
 	"compilerOptions": {
 		"target": "ES2022",
 		"jsx": "react-jsx",
