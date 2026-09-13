@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AuthSession } from "@/lib/auth/shared";
+import { splitKanbanTaskSchema } from "@/lib/cable-map/shared";
 
 import { getAllowedImportStages } from "./task-workflow.server";
 
@@ -23,5 +24,20 @@ describe("Kanban import permissions", () => {
 		expect(getAllowedImportStages(session("tai"))).toEqual(["formed", "curator_review"]);
 		expect(getAllowedImportStages(session("commissioning"))).toEqual(["adjustment"]);
 		expect(getAllowedImportStages(session("skm"))).toEqual([]);
+	});
+
+	it("requires at least one rejected position for a partial acceptance", () => {
+		expect(() =>
+			splitKanbanTaskSchema.parse({
+				listId: "00000000-0000-4000-8000-000000000001",
+				rejectedCableIds: [],
+			})
+		).toThrow();
+		expect(
+			splitKanbanTaskSchema.parse({
+				listId: "00000000-0000-4000-8000-000000000001",
+				rejectedCableIds: ["00000000-0000-4000-8000-000000000002"],
+			})
+		).toMatchObject({ rejectedCableIds: ["00000000-0000-4000-8000-000000000002"] });
 	});
 });

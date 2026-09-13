@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
 	cableChangeAuditLogs,
+	cableListItems,
 	cables,
 	cableProgress,
 	graphGroupRooms,
@@ -224,6 +225,11 @@ async function getPriorityRoomLists(db: DbClient) {
 			authorName: priorityRoomLists.authorName,
 			fileName: priorityRoomLists.fileName,
 			fileType: priorityRoomLists.fileType,
+			title: priorityRoomLists.title,
+			priority: priorityRoomLists.priority,
+			taskCode: priorityRoomLists.taskCode,
+			parentListId: priorityRoomLists.parentListId,
+			deadline: priorityRoomLists.deadline,
 			roomCount: priorityRoomLists.roomCount,
 			senderDepartment: priorityRoomLists.senderDepartment,
 			recipientDepartment: priorityRoomLists.recipientDepartment,
@@ -276,10 +282,14 @@ async function getUserLoginsById(db: DbClient, userIds: string[]) {
 
 async function getPriorityListActivityCounts(db: DbClient, listIds: string[]) {
 	if (listIds.length === 0) {
-		return { commentsByListId: new Map<string, number>(), remarksByListId: new Map<string, number>() };
+		return {
+			commentsByListId: new Map<string, number>(),
+			remarksByListId: new Map<string, number>(),
+			completedItemsByListId: new Map<string, number>(),
+		};
 	}
 
-	const [commentRows, remarkRows] = await Promise.all([
+	const [commentRows, remarkRows, completedRows] = await Promise.all([
 		db
 			.select({ listId: taskComments.listId, count: sql<number>`count(*)` })
 			.from(taskComments)
@@ -290,6 +300,11 @@ async function getPriorityListActivityCounts(db: DbClient, listIds: string[]) {
 			.from(remarks)
 			.where(inArray(remarks.listId, listIds))
 			.groupBy(remarks.listId),
+		db
+			.select({ listId: cableListItems.listId, count: sql<number>`count(*)` })
+			.from(cableListItems)
+			.where(and(inArray(cableListItems.listId, listIds), eq(cableListItems.isCompleted, true)))
+			.groupBy(cableListItems.listId),
 	]);
 
 	return {
@@ -297,6 +312,7 @@ async function getPriorityListActivityCounts(db: DbClient, listIds: string[]) {
 		remarksByListId: new Map(
 			remarkRows.flatMap((row) => (row.listId ? [[row.listId, Number(row.count)] as const] : []))
 		),
+		completedItemsByListId: new Map(completedRows.map((row) => [row.listId, Number(row.count)])),
 	};
 }
 
@@ -667,6 +683,11 @@ async function buildPriorityListSummary(
 	return rows.map((row) => ({
 		id: row.id,
 		authorName: row.authorName,
+		title: row.title || row.fileName,
+		priority: row.priority as PriorityRoomListView["priority"],
+		taskCode: row.taskCode,
+		parentListId: row.parentListId,
+		deadline: row.deadline,
 		fileName: row.fileName,
 		fileType: row.fileType,
 		roomCount: row.roomCount,
@@ -685,6 +706,7 @@ async function buildPriorityListSummary(
 		verifiedAt: row.verifiedAt ? toIsoString(row.verifiedAt) : null,
 		commentCount: activityCounts.commentsByListId.get(row.id) ?? 0,
 		remarkCount: activityCounts.remarksByListId.get(row.id) ?? 0,
+		completedItemCount: activityCounts.completedItemsByListId.get(row.id) ?? 0,
 	}));
 }
 

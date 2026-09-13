@@ -51,6 +51,7 @@ import {
 	departmentLabels,
 	roleLabels,
 	statusLabels,
+	userDepartmentSchema,
 	userDepartments,
 } from "@/lib/auth/shared";
 import { cn } from "@/lib/utils";
@@ -196,14 +197,11 @@ function CreateUserDialog({
 	};
 	const form = useForm({
 		defaultValues,
-		validators: {
-			onSubmit: createManagedUserSchema,
-		},
 		onSubmit: async ({ value }) => {
 			setSubmitError(null);
 
 			try {
-				await createManagedUser({ data: value });
+				await createManagedUser({ data: createManagedUserSchema.parse(value) });
 				toast.success("Пользователь создан.");
 				form.reset();
 				onOpenChange(false);
@@ -262,9 +260,7 @@ function CreateUserDialog({
 								);
 							}}
 						</form.Field>
-						<form.Field
-							name="department"
-							validators={{ onBlur: createManagedUserFieldsSchema.shape.department }}>
+						<form.Field name="department" validators={{ onBlur: userDepartmentSchema }}>
 							{(field) => {
 								const errors = toFieldErrors(field.state.meta.errors);
 

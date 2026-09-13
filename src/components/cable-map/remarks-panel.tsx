@@ -13,6 +13,7 @@ import { createRemark, updateRemarkStatus } from "@/lib/cable-map/functions";
 import type { RemarkTargetType, RemarksData } from "@/lib/cable-map/shared";
 
 const targetLabels: Record<RemarkTargetType, string> = {
+	cable: "Кабель",
 	cable_change: "Последнее изменение кабеля",
 	room_change: "Выполненные работы по помещению",
 	priority_list: "Список или его статус",

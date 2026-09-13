@@ -438,6 +438,13 @@ export const priorityRoomLists = pgTable(
 		authorName: text("author_name").notNull(),
 		fileName: text("file_name").notNull(),
 		fileType: text("file_type").notNull(),
+		title: text("title").notNull().default(""),
+		priority: text("priority").notNull().default("normal"),
+		taskCode: text("task_code"),
+		parentListId: uuid("parent_list_id").references((): AnyPgColumn => priorityRoomLists.id, {
+			onDelete: "set null",
+		}),
+		deadline: date("deadline", { mode: "string" }),
 		roomCount: integer("room_count").notNull().default(0),
 		sourceChecksum: text("source_checksum"),
 		senderDepartment: userDepartmentEnum("sender_department").notNull().default("tai"),
@@ -476,6 +483,9 @@ export const cableListItems = pgTable(
 			.references(() => cables.id, { onDelete: "restrict" }),
 		sourceRowIndex: integer("source_row_index").notNull().default(0),
 		importedProgress: integer("imported_progress"),
+		isCompleted: boolean("is_completed").notNull().default(false),
+		completedAt: timestamp("completed_at", { withTimezone: true }),
+		completedByUserId: uuid("completed_by_user_id").references(() => users.id, { onDelete: "set null" }),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => [
@@ -510,7 +520,10 @@ export const taskEvents = pgTable(
 			.references(() => priorityRoomLists.id, { onDelete: "cascade" }),
 		eventType: text("event_type").notNull(),
 		message: text("message").notNull(),
+		payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
 		actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+		revertedAt: timestamp("reverted_at", { withTimezone: true }),
+		revertedByUserId: uuid("reverted_by_user_id").references(() => users.id, { onDelete: "set null" }),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => [index("task_events_list_created_idx").on(table.listId, table.createdAt)]
@@ -547,6 +560,7 @@ export const remarks = pgTable(
 		listId: uuid("list_id").references(() => priorityRoomLists.id, { onDelete: "set null" }),
 		assignedDepartment: userDepartmentEnum("assigned_department"),
 		assignedUserId: uuid("assigned_user_id").references(() => users.id, { onDelete: "set null" }),
+		stage: priorityListKanbanStatusEnum("stage"),
 		status: remarkStatusEnum("status").notNull().default("open"),
 		createdByUserId: uuid("created_by_user_id")
 			.notNull()
@@ -559,6 +573,24 @@ export const remarks = pgTable(
 	(table) => [
 		index("remarks_target_idx").on(table.targetType, table.targetId),
 		index("remarks_status_created_idx").on(table.status, table.createdAt),
+	]
+);
+
+export const remarkCableItems = pgTable(
+	"remark_cable_items",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		remarkId: uuid("remark_id")
+			.notNull()
+			.references(() => remarks.id, { onDelete: "cascade" }),
+		cableId: uuid("cable_id")
+			.notNull()
+			.references(() => cables.id, { onDelete: "restrict" }),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("remark_cable_items_cable_idx").on(table.cableId),
+		uniqueIndex("remark_cable_items_remark_cable_unique").on(table.remarkId, table.cableId),
 	]
 );
 
@@ -705,5 +737,6 @@ export type Notification = typeof notifications.$inferSelect;
 export type PriorityRoomEntry = typeof priorityRoomEntries.$inferSelect;
 export type PriorityRoomKanbanState = typeof priorityRoomKanbanStates.$inferSelect;
 export type Remark = typeof remarks.$inferSelect;
+export type RemarkCableItem = typeof remarkCableItems.$inferSelect;
 export type ChangeAuditLog = typeof changeAuditLogs.$inferSelect;
 export type CableChangeAuditLog = typeof cableChangeAuditLogs.$inferSelect;

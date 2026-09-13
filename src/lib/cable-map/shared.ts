@@ -113,6 +113,8 @@ export const priorityListKanbanStatuses = [
 	"done",
 ] as const;
 export const priorityListKanbanStatusSchema = z.enum(priorityListKanbanStatuses);
+export const taskPriorities = ["high", "normal", "low"] as const;
+export const taskPrioritySchema = z.enum(taskPriorities);
 export const updatePriorityRoomKanbanStatusSchema = z.object({
 	roomId: z.string().uuid(),
 	status: priorityRoomKanbanStatusSchema,
@@ -135,9 +137,25 @@ export const createTaskCommentSchema = z.object({
 export const createKanbanRemarkSchema = z.object({
 	listId: z.string().uuid(),
 	cableId: z.string().uuid().optional(),
+	cableIds: z.array(z.string().uuid()).max(2_000).optional(),
+	applyToAll: z.boolean().optional(),
 	content: z.string().trim().min(3, "Опишите замечание.").max(4_000, "Замечание слишком длинное."),
 	assignedDepartment: userDepartmentSchema.optional(),
 	assignedUserId: z.string().uuid().optional(),
+});
+export const updateTaskItemCompletionSchema = z.object({
+	listId: z.string().uuid(),
+	cableId: z.string().uuid(),
+	isCompleted: z.boolean(),
+});
+export const splitKanbanTaskSchema = z.object({
+	listId: z.string().uuid(),
+	rejectedCableIds: z.array(z.string().uuid()).min(1).max(2_000),
+	remark: z.string().trim().max(4_000).optional(),
+});
+export const revertKanbanTaskEventSchema = z.object({
+	listId: z.string().uuid(),
+	eventId: z.string().uuid(),
 });
 export const remarkTargetTypes = ["cable_change", "room_change", "priority_list", "cable"] as const;
 export const remarkTargetTypeSchema = z.enum(remarkTargetTypes);
@@ -163,10 +181,14 @@ export type ExportDailyHistoryInput = z.infer<typeof exportDailyHistorySchema>;
 export type PriorityRoomKanbanStatus = z.infer<typeof priorityRoomKanbanStatusSchema>;
 export type UpdatePriorityRoomKanbanStatusInput = z.infer<typeof updatePriorityRoomKanbanStatusSchema>;
 export type PriorityListKanbanStatus = z.infer<typeof priorityListKanbanStatusSchema>;
+export type TaskPriority = z.infer<typeof taskPrioritySchema>;
 export type UpdatePriorityListKanbanStatusInput = z.infer<typeof updatePriorityListKanbanStatusSchema>;
 export type TransitionKanbanTaskInput = z.infer<typeof transitionKanbanTaskSchema>;
 export type CreateTaskCommentInput = z.infer<typeof createTaskCommentSchema>;
 export type CreateKanbanRemarkInput = z.infer<typeof createKanbanRemarkSchema>;
+export type UpdateTaskItemCompletionInput = z.infer<typeof updateTaskItemCompletionSchema>;
+export type SplitKanbanTaskInput = z.infer<typeof splitKanbanTaskSchema>;
+export type RevertKanbanTaskEventInput = z.infer<typeof revertKanbanTaskEventSchema>;
 export type RemarkTargetType = z.infer<typeof remarkTargetTypeSchema>;
 export type RemarkStatus = z.infer<typeof remarkStatusSchema>;
 export type CreateRemarkInput = z.infer<typeof createRemarkSchema>;
@@ -262,6 +284,11 @@ export type SnapshotSummaryView = {
 
 export type PriorityRoomListView = {
 	id: string;
+	title: string;
+	priority: TaskPriority;
+	taskCode: string | null;
+	parentListId: string | null;
+	deadline: string | null;
 	authorName: string;
 	fileName: string;
 	fileType: string;
@@ -279,6 +306,7 @@ export type PriorityRoomListView = {
 	verifiedAt: string | null;
 	commentCount: number;
 	remarkCount: number;
+	completedItemCount: number;
 };
 
 export type RemarkView = {
