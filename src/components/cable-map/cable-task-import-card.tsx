@@ -35,6 +35,9 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 	const [deadline, setDeadline] = useState("");
 	const [analyzing, setAnalyzing] = useState(false);
 	const [importing, setImporting] = useState(false);
+	const hasProblemPositions = Boolean(
+		analysis && (analysis.missing.length > 0 || analysis.ambiguous.length > 0)
+	);
 
 	async function analyze() {
 		if (!file) {
@@ -77,7 +80,7 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 			toast.success(
 				result.reused
 					? "Этот файл уже был импортирован: открыта существующая карточка."
-					: `Создана карточка: ${result.matchedCount} кабелей, не найдено ${result.missingCount}.`
+					: `Создана карточка: ${result.matchedCount} кабелей, не найдено ${result.missingCount}, неоднозначно ${result.ambiguousCount}.`
 			);
 			setAnalysis(null);
 			setFile(null);
@@ -173,7 +176,9 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 						</div>
 						{analysis.missing.length > 0 || analysis.ambiguous.length > 0 ? (
 							<details className="rounded border bg-background p-2">
-								<summary className="cursor-pointer font-medium">Проблемные позиции</summary>
+								<summary className="cursor-pointer font-medium">
+									Проблемные позиции не попадут в карточку. Найденные можно импортировать.
+								</summary>
 								{analysis.missing.length > 0 ? (
 									<div className="mt-2">Не найдены: {analysis.missing.join(", ")}</div>
 								) : null}
@@ -219,7 +224,7 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 							onClick={() => void confirmImport()}
 							disabled={importing || analysis.matchedCount === 0 || analysis.allowedStages.length === 0}>
 							{importing ? <LoaderCircleIcon className="animate-spin" /> : <UploadIcon />}
-							Подтвердить импорт
+							{hasProblemPositions ? "Импортировать найденные" : "Подтвердить импорт"}
 						</Button>
 					) : null}
 					{session.role === "super-admin" ? (

@@ -176,6 +176,21 @@ async function analyzeParsedTaskCables(parsed: ParsedTaskCable[]) {
 	return { matched, missing, ambiguous, baseCount: baseCables.length };
 }
 
+export function createImportableTaskMatches(matched: Array<{ parsed: ParsedTaskCable; cableId: string }>) {
+	const matchesByCableId = new Map<string, { parsed: ParsedTaskCable; cableId: string }>();
+
+	for (const match of matched) {
+		if (!matchesByCableId.has(match.cableId)) {
+			matchesByCableId.set(match.cableId, match);
+		}
+	}
+
+	return {
+		matches: [...matchesByCableId.values()],
+		duplicateCount: matched.length - matchesByCableId.size,
+	};
+}
+
 export function getAllowedImportStages(session: AuthSession): PriorityListKanbanStatus[] {
 	if (session.role === "super-admin")
 		return ["formed", "in_progress", "curator_review", "adjustment", "done"];
@@ -188,13 +203,17 @@ export async function analyzeCableTaskListFromFormData(formData: FormData, sessi
 	const { file, buffer } = await ensureUploadFile(formData);
 	const parsed = parseTaskCableRows(file.name, buffer);
 	const result = await analyzeParsedTaskCables(parsed);
+	const importable = createImportableTaskMatches(result.matched);
 
 	return {
 		fileName: file.name,
 		totalCount: parsed.length,
-		matchedCount: result.matched.length,
+		matchedCount: importable.matches.length,
 		missing: result.missing.slice(0, 100),
-		ambiguous: result.ambiguous.slice(0, 100),
+		ambiguous: [
+			...result.ambiguous,
+			...Array.from({ length: importable.duplicateCount }, () => "Дубль найденного кабеля"),
+		].slice(0, 100),
 		baseCount: result.baseCount,
 		allowedStages: getAllowedImportStages(session),
 	};
@@ -259,7 +278,10 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 
 	const parsed = parseTaskCableRows(file.name, buffer);
 	const result = await analyzeParsedTaskCables(parsed);
-	if (result.matched.length === 0)
+	const importable = createImportableTaskMatches(result.matched);
+	const ambiguousCount = result.ambiguous.length + importable.duplicateCount;
+
+	if (importable.matches.length === 0)
 		throw new Error("Ни одна позиция списка не найдена в генеральной кабельной базе.");
 
 	const checksum = createHash("sha256").update(buffer).digest("hex");
@@ -274,8 +296,9 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 		return {
 			id: existing.id,
 			reused: true,
-			matchedCount: result.matched.length,
+			matchedCount: importable.matches.length,
 			missingCount: result.missing.length,
+			ambiguousCount,
 		};
 	}
 
@@ -294,7 +317,7 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 				priority,
 				taskCode,
 				deadline,
-				roomCount: result.matched.length,
+				roomCount: importable.matches.length,
 				sourceChecksum: checksum,
 				senderDepartment: session.department,
 				recipientDepartment,
@@ -308,7 +331,7 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 			.returning({ id: priorityRoomLists.id });
 
 		await tx.insert(cableListItems).values(
-			result.matched.map(({ parsed: item, cableId }) => ({
+			importable.matches.map(({ parsed: item, cableId }) => ({
 				listId: created.id,
 				cableId,
 				sourceRowIndex: item.rowIndex,
@@ -317,7 +340,7 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 			}))
 		);
 
-		for (const { parsed: item, cableId } of result.matched) {
+		for (const { parsed: item, cableId } of importable.matches) {
 			if (item.progress === null) continue;
 			await tx
 				.update(cables)
@@ -354,8 +377,9 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 	return {
 		id: list.id,
 		reused: false,
-		matchedCount: result.matched.length,
+		matchedCount: importable.matches.length,
 		missingCount: result.missing.length,
+		ambiguousCount,
 	};
 }
 

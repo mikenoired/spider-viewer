@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AuthSession } from "@/lib/auth/shared";
 import { splitKanbanTaskSchema } from "@/lib/cable-map/shared";
 
-import { getAllowedImportStages } from "./task-workflow.server";
+import { createImportableTaskMatches, getAllowedImportStages } from "./task-workflow.server";
 
 function session(department: AuthSession["department"], role: AuthSession["role"] = "user"): AuthSession {
 	return { id: "00000000-0000-4000-8000-000000000001", login: "tester", role, department };
@@ -39,5 +39,50 @@ describe("Kanban import permissions", () => {
 				rejectedCableIds: ["00000000-0000-4000-8000-000000000002"],
 			})
 		).toMatchObject({ rejectedCableIds: ["00000000-0000-4000-8000-000000000002"] });
+	});
+
+	it("keeps only one importable row per matched cable", () => {
+		const result = createImportableTaskMatches([
+			{
+				cableId: "cable-1",
+				parsed: {
+					rowIndex: 2,
+					cableLabel: "A",
+					cableJournal: "",
+					cableNumber: "",
+					fromRoom: "",
+					toRoom: "",
+					progress: null,
+				},
+			},
+			{
+				cableId: "cable-1",
+				parsed: {
+					rowIndex: 3,
+					cableLabel: "A duplicate",
+					cableJournal: "",
+					cableNumber: "",
+					fromRoom: "",
+					toRoom: "",
+					progress: 50,
+				},
+			},
+			{
+				cableId: "cable-2",
+				parsed: {
+					rowIndex: 4,
+					cableLabel: "B",
+					cableJournal: "",
+					cableNumber: "",
+					fromRoom: "",
+					toRoom: "",
+					progress: null,
+				},
+			},
+		]);
+
+		expect(result.duplicateCount).toBe(1);
+		expect(result.matches.map((match) => match.cableId)).toEqual(["cable-1", "cable-2"]);
+		expect(result.matches[0].parsed.rowIndex).toBe(2);
 	});
 });

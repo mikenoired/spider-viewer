@@ -590,8 +590,8 @@ export function InstallationKanbanBoard({
 						</div>
 					) : null}
 				</CardHeader>
-				<CardContent>
-					<div className="grid gap-3 2xl:grid-cols-5">
+				<CardContent className="overflow-x-auto">
+					<div className="grid min-w-[72rem] grid-cols-5 gap-3">
 						{columns.map((column) => (
 							<div key={column.status} className="flex min-h-72 flex-col rounded-lg border bg-muted/20">
 								<div className="border-b p-3">
