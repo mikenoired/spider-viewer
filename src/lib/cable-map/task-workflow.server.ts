@@ -17,7 +17,12 @@ import {
 	users,
 } from "@/lib/db/schema";
 
-import { ensureCanonicalCableBase, ensureUploadFile, getCableExternalKey } from "./import.server";
+import {
+	ensureCanonicalCableBase,
+	ensureUploadFile,
+	getCableExternalKey,
+	normalizeCableIdentityPart,
+} from "./import.server";
 import type {
 	CreateKanbanRemarkInput,
 	CreateTaskCommentInput,
@@ -54,6 +59,16 @@ type ParsedTaskCable = {
 	progress: number | null;
 };
 
+type TaskCableHeaderProfile = {
+	rowIndex: number;
+	cableIndex: number;
+	journalIndex: number | null;
+	numberIndex: number | null;
+	fromIndex: number | null;
+	toIndex: number | null;
+	progressIndex: number | null;
+};
+
 function normalize(value: unknown) {
 	return String(value ?? "")
 		.replace(/\s+/g, " ")
@@ -64,14 +79,109 @@ function normalizeHeader(value: unknown) {
 	return normalize(value).toLowerCase();
 }
 
-function findHeaderRow(rows: unknown[][]) {
-	return rows.findIndex((row) =>
-		row.some((cell) => /кабель|марка|журнал|номер/i.test(normalizeHeader(cell)))
+function isCableLabelHeader(header: string) {
+	if (!header) return false;
+	if (header.includes("журнал")) return false;
+	if (header.includes("сечение")) return false;
+	if (header.includes("тип каб")) return false;
+	if (header.includes("марка кабеля проект")) return false;
+	if (header.includes("класс безопасности")) return false;
+
+	return (
+		header === "кабель" ||
+		header.includes("маркировка кабеля") ||
+		header.includes("монтажная марка") ||
+		header.startsWith("кабель от") ||
+		header.startsWith("кабель до")
 	);
 }
 
-function findColumn(headers: string[], aliases: string[]) {
-	return headers.findIndex((header) => aliases.some((alias) => header === alias || header.includes(alias)));
+function getColumnIndex(headers: string[], predicate: (header: string) => boolean) {
+	const index = headers.findIndex(predicate);
+
+	return index >= 0 ? index : null;
+}
+
+function getPreferredColumnIndex(headers: string[], predicates: Array<(header: string) => boolean>) {
+	for (const predicate of predicates) {
+		const index = getColumnIndex(headers, predicate);
+
+		if (index !== null) return index;
+	}
+
+	return null;
+}
+
+function isJournalHeader(header: string) {
+	return header === "журнал" || header.includes("кабельный журнал") || header.includes("кабельного журнала");
+}
+
+function isNumberHeader(header: string) {
+	return (
+		header === "номер" ||
+		header.includes("№ нит") ||
+		header.includes("номер каб") ||
+		header.includes("номер нит") ||
+		header.includes("нитк")
+	);
+}
+
+function isFromHeader(header: string) {
+	return (
+		header === "откуда" || header.startsWith("откуда ") || header === "from" || header.startsWith("from ")
+	);
+}
+
+function isFromRoomHeader(header: string) {
+	return header.startsWith("откуда") && header.includes("помещ");
+}
+
+function isToHeader(header: string) {
+	return header === "куда" || header.startsWith("куда ") || header === "to" || header.startsWith("to ");
+}
+
+function isToRoomHeader(header: string) {
+	return header.startsWith("куда") && header.includes("помещ");
+}
+
+function isProgressHeader(header: string) {
+	return header.includes("прогресс") || header.includes("готов") || header.includes("выполн");
+}
+
+function getTaskCableHeaderProfile(row: unknown[], rowIndex: number): TaskCableHeaderProfile | null {
+	const headers = row.map(normalizeHeader);
+	const cableIndex = getColumnIndex(headers, isCableLabelHeader);
+
+	if (cableIndex === null) return null;
+
+	const profile = {
+		rowIndex,
+		cableIndex,
+		journalIndex: getColumnIndex(headers, isJournalHeader),
+		numberIndex: getColumnIndex(headers, isNumberHeader),
+		fromIndex: getPreferredColumnIndex(headers, [isFromRoomHeader, isFromHeader]),
+		toIndex: getPreferredColumnIndex(headers, [isToRoomHeader, isToHeader]),
+		progressIndex: getColumnIndex(headers, isProgressHeader),
+	} satisfies TaskCableHeaderProfile;
+
+	if (
+		profile.journalIndex === null &&
+		profile.numberIndex === null &&
+		profile.fromIndex === null &&
+		profile.toIndex === null
+	) {
+		return null;
+	}
+
+	return profile;
+}
+
+function findHeaderProfiles(rows: unknown[][]) {
+	return rows.flatMap((row, rowIndex) => {
+		const profile = getTaskCableHeaderProfile(row, rowIndex);
+
+		return profile ? [profile] : [];
+	});
 }
 
 function parseProgress(value: unknown) {
@@ -84,52 +194,69 @@ function parseProgress(value: unknown) {
 	return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? Math.round(parsed) : null;
 }
 
-function parseTaskCableRows(fileName: string, buffer: Buffer): ParsedTaskCable[] {
+function createParsedTaskCable(row: unknown[], rowIndex: number, profile: TaskCableHeaderProfile) {
+	const values = row.map(normalize);
+	const cableLabel = values[profile.cableIndex] ?? "";
+	const cableJournal = profile.journalIndex === null ? "" : (values[profile.journalIndex] ?? "");
+	const cableNumber = profile.numberIndex === null ? "" : (values[profile.numberIndex] ?? "");
+	const fromRoom = profile.fromIndex === null ? "" : (values[profile.fromIndex] ?? "");
+	const toRoom = profile.toIndex === null ? "" : (values[profile.toIndex] ?? "");
+
+	if (!cableLabel && !cableJournal && !cableNumber) return null;
+
+	return {
+		rowIndex,
+		cableLabel,
+		cableJournal,
+		cableNumber,
+		fromRoom,
+		toRoom,
+		progress: profile.progressIndex === null ? null : parseProgress(values[profile.progressIndex]),
+	} satisfies ParsedTaskCable;
+}
+
+function addParsedTaskCable(unique: Map<string, ParsedTaskCable>, item: ParsedTaskCable) {
+	const key = getCableExternalKey(item);
+	const existing = unique.get(key);
+
+	if (!existing || (existing.progress === null && item.progress !== null)) {
+		unique.set(key, item);
+	}
+}
+
+function parseTaskCableSheetRows(rows: unknown[][], unique: Map<string, ParsedTaskCable>) {
+	const profiles = findHeaderProfiles(rows);
+
+	for (const [index, profile] of profiles.entries()) {
+		const nextHeaderRowIndex = profiles[index + 1]?.rowIndex ?? rows.length;
+		const dataRows = rows.slice(profile.rowIndex + 1, nextHeaderRowIndex);
+
+		for (const [offset, row] of dataRows.entries()) {
+			const item = createParsedTaskCable(row, profile.rowIndex + offset + 2, profile);
+
+			if (item) addParsedTaskCable(unique, item);
+		}
+	}
+}
+
+export function parseTaskCableRows(fileName: string, buffer: Buffer): ParsedTaskCable[] {
 	const workbook = Xlsx.read(buffer, { type: "buffer", raw: false, cellDates: false });
-	const sheetName = workbook.SheetNames[0];
-	const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
-
-	if (!sheet) throw new Error(`В "${fileName}" не найден лист со списком кабелей.`);
-
-	const rows = Xlsx.utils.sheet_to_json<unknown[]>(sheet, {
-		header: 1,
-		raw: false,
-		defval: "",
-		blankrows: false,
-	});
-	const headerRowIndex = findHeaderRow(rows);
-	const headers = (headerRowIndex >= 0 ? rows[headerRowIndex] : []).map(normalizeHeader);
-	const dataRows = rows.slice(headerRowIndex >= 0 ? headerRowIndex + 1 : 0);
-	const cableIndex = findColumn(headers, ["кабель", "марка", "маркировка", "cable"]);
-	const journalIndex = findColumn(headers, ["журнал", "cable journal"]);
-	const numberIndex = findColumn(headers, ["номер", "нитка", "thread number"]);
-	const fromIndex = findColumn(headers, ["откуда", "from", "начало"]);
-	const toIndex = findColumn(headers, ["куда", "to", "конец"]);
-	const progressIndex = findColumn(headers, ["прогресс", "готов", "выполн", "progress", "status"]);
 	const unique = new Map<string, ParsedTaskCable>();
 
-	for (const [offset, row] of dataRows.entries()) {
-		const values = row.map(normalize);
-		const cableLabel = values[cableIndex >= 0 ? cableIndex : 0] ?? values.find(Boolean) ?? "";
-		const cableJournal = journalIndex >= 0 ? (values[journalIndex] ?? "") : "";
-		const cableNumber = numberIndex >= 0 ? (values[numberIndex] ?? "") : "";
-		const fromRoom = fromIndex >= 0 ? (values[fromIndex] ?? "") : "";
-		const toRoom = toIndex >= 0 ? (values[toIndex] ?? "") : "";
+	for (const sheetName of workbook.SheetNames) {
+		const sheet = workbook.Sheets[sheetName];
 
-		if (!cableLabel && !cableJournal && !cableNumber) continue;
+		if (!sheet) continue;
 
-		const item = {
-			rowIndex: offset + (headerRowIndex >= 0 ? headerRowIndex + 2 : 1),
-			cableLabel,
-			cableJournal,
-			cableNumber,
-			fromRoom,
-			toRoom,
-			progress: progressIndex >= 0 ? parseProgress(values[progressIndex]) : null,
-		};
-		const key = getCableExternalKey(item);
-
-		if (!unique.has(key)) unique.set(key, item);
+		parseTaskCableSheetRows(
+			Xlsx.utils.sheet_to_json<unknown[]>(sheet, {
+				header: 1,
+				raw: false,
+				defval: "",
+				blankrows: false,
+			}),
+			unique
+		);
 	}
 
 	if (unique.size === 0) throw new Error(`В "${fileName}" не найдены кабельные нитки.`);
@@ -151,7 +278,7 @@ async function analyzeParsedTaskCables(parsed: ParsedTaskCable[]) {
 	const cablesByLabel = new Map<string, typeof baseCables>();
 
 	for (const cable of baseCables) {
-		const label = normalizeHeader(cable.cableLabel);
+		const label = normalizeCableIdentityPart(cable.cableLabel);
 		cablesByLabel.set(label, [...(cablesByLabel.get(label) ?? []), cable]);
 	}
 
@@ -161,7 +288,7 @@ async function analyzeParsedTaskCables(parsed: ParsedTaskCable[]) {
 
 	for (const parsedCable of parsed) {
 		const exact = cablesByKey.get(getCableExternalKey(parsedCable));
-		const labelMatches = cablesByLabel.get(normalizeHeader(parsedCable.cableLabel)) ?? [];
+		const labelMatches = cablesByLabel.get(normalizeCableIdentityPart(parsedCable.cableLabel)) ?? [];
 		const match = exact ?? (labelMatches.length === 1 ? labelMatches[0] : null);
 
 		if (match) {
@@ -176,6 +303,21 @@ async function analyzeParsedTaskCables(parsed: ParsedTaskCable[]) {
 	return { matched, missing, ambiguous, baseCount: baseCables.length };
 }
 
+export function createImportableTaskMatches(matched: Array<{ parsed: ParsedTaskCable; cableId: string }>) {
+	const matchesByCableId = new Map<string, { parsed: ParsedTaskCable; cableId: string }>();
+
+	for (const match of matched) {
+		if (!matchesByCableId.has(match.cableId)) {
+			matchesByCableId.set(match.cableId, match);
+		}
+	}
+
+	return {
+		matches: [...matchesByCableId.values()],
+		duplicateCount: matched.length - matchesByCableId.size,
+	};
+}
+
 export function getAllowedImportStages(session: AuthSession): PriorityListKanbanStatus[] {
 	if (session.role === "super-admin")
 		return ["formed", "in_progress", "curator_review", "adjustment", "done"];
@@ -188,13 +330,17 @@ export async function analyzeCableTaskListFromFormData(formData: FormData, sessi
 	const { file, buffer } = await ensureUploadFile(formData);
 	const parsed = parseTaskCableRows(file.name, buffer);
 	const result = await analyzeParsedTaskCables(parsed);
+	const importable = createImportableTaskMatches(result.matched);
 
 	return {
 		fileName: file.name,
 		totalCount: parsed.length,
-		matchedCount: result.matched.length,
+		matchedCount: importable.matches.length,
 		missing: result.missing.slice(0, 100),
-		ambiguous: result.ambiguous.slice(0, 100),
+		ambiguous: [
+			...result.ambiguous,
+			...Array.from({ length: importable.duplicateCount }, () => "Дубль найденного кабеля"),
+		].slice(0, 100),
 		baseCount: result.baseCount,
 		allowedStages: getAllowedImportStages(session),
 	};
@@ -259,7 +405,10 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 
 	const parsed = parseTaskCableRows(file.name, buffer);
 	const result = await analyzeParsedTaskCables(parsed);
-	if (result.matched.length === 0)
+	const importable = createImportableTaskMatches(result.matched);
+	const ambiguousCount = result.ambiguous.length + importable.duplicateCount;
+
+	if (importable.matches.length === 0)
 		throw new Error("Ни одна позиция списка не найдена в генеральной кабельной базе.");
 
 	const checksum = createHash("sha256").update(buffer).digest("hex");
@@ -274,8 +423,9 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 		return {
 			id: existing.id,
 			reused: true,
-			matchedCount: result.matched.length,
+			matchedCount: importable.matches.length,
 			missingCount: result.missing.length,
+			ambiguousCount,
 		};
 	}
 
@@ -294,7 +444,7 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 				priority,
 				taskCode,
 				deadline,
-				roomCount: result.matched.length,
+				roomCount: importable.matches.length,
 				sourceChecksum: checksum,
 				senderDepartment: session.department,
 				recipientDepartment,
@@ -308,7 +458,7 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 			.returning({ id: priorityRoomLists.id });
 
 		await tx.insert(cableListItems).values(
-			result.matched.map(({ parsed: item, cableId }) => ({
+			importable.matches.map(({ parsed: item, cableId }) => ({
 				listId: created.id,
 				cableId,
 				sourceRowIndex: item.rowIndex,
@@ -317,7 +467,7 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 			}))
 		);
 
-		for (const { parsed: item, cableId } of result.matched) {
+		for (const { parsed: item, cableId } of importable.matches) {
 			if (item.progress === null) continue;
 			await tx
 				.update(cables)
@@ -354,8 +504,9 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 	return {
 		id: list.id,
 		reused: false,
-		matchedCount: result.matched.length,
+		matchedCount: importable.matches.length,
 		missingCount: result.missing.length,
+		ambiguousCount,
 	};
 }
 

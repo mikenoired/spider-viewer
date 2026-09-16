@@ -141,7 +141,7 @@ function normalizeCellValue(value: unknown) {
 	return String(value ?? "").trim();
 }
 
-function normalizeCableIdentityPart(value: string) {
+export function normalizeCableIdentityPart(value: string) {
 	return enToRuVisual(value).replace(/\s+/g, " ").trim().toUpperCase();
 }
 
