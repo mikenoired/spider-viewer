@@ -7,6 +7,7 @@ import {
 	ensureUploadFile,
 	getCableExternalKey,
 	hasExpectedWorkbookSignature,
+	normalizeCableIdentityPart,
 	parseWorkbookRows,
 } from "./import.server";
 
@@ -85,6 +86,11 @@ describe("workbook import validation", () => {
 				toRoom: "Б202",
 			})
 		).toBe("КВВГ 4Х2,5|А101|Б202");
+	});
+
+	it("normalizes visually equivalent latin characters in cable identities", () => {
+		expect(normalizeCableIdentityPart("AЭ 408/1")).toBe("АЭ 408/1");
+		expect(normalizeCableIdentityPart("1HV116k1301")).toBe("1НV116К1301");
 	});
 
 	it("accepts a valid workbook upload", async () => {
