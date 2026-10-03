@@ -33,20 +33,6 @@ export const getInstallationDashboardData = createServerFn({ method: "GET" }).ha
 	return getActiveDashboardData("installation");
 });
 
-export const convertNppToDocx = createServerFn({ method: "POST" })
-	.inputValidator((input: FormData) => input)
-	.handler(async ({ data }) => {
-		await requireSession();
-		const { convertNppFormData } = await import("@/lib/npp/server");
-		const { archive } = await convertNppFormData(data);
-		return new Response(new Uint8Array(archive), {
-			headers: {
-				"Content-Type": "application/zip",
-				"Content-Disposition": "attachment; filename=npp-docx-result.zip",
-			},
-		});
-	});
-
 export const uploadWorkbook = createServerFn({ method: "POST" })
 	.inputValidator((input: FormData) => input)
 	.handler(async ({ data }) => {
