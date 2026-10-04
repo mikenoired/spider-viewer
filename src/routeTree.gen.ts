@@ -18,7 +18,6 @@ import { Route as AppBackdatedRouteImport } from './routes/app/backdated'
 import { Route as AppHistoryRouteImport } from './routes/app/history'
 import { Route as AppImportRouteImport } from './routes/app/import'
 import { Route as AppInstallationRouteImport } from './routes/app/installation'
-import { Route as AppNppToDocxRouteImport } from './routes/app/npp-to-docx'
 import { Route as AppRemarksRouteImport } from './routes/app/remarks'
 import { Route as AppUsersRouteImport } from './routes/app/users'
 
@@ -67,11 +66,6 @@ const AppInstallationRoute = AppInstallationRouteImport.update({
   path: '/installation',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppNppToDocxRoute = AppNppToDocxRouteImport.update({
-  id: '/npp-to-docx',
-  path: '/npp-to-docx',
-  getParentRoute: () => AppRouteRoute,
-} as any)
 const AppRemarksRoute = AppRemarksRouteImport.update({
   id: '/remarks',
   path: '/remarks',
@@ -92,7 +86,6 @@ export interface FileRoutesByFullPath {
   '/app/history': typeof AppHistoryRoute
   '/app/import': typeof AppImportRoute
   '/app/installation': typeof AppInstallationRoute
-  '/app/npp-to-docx': typeof AppNppToDocxRoute
   '/app/remarks': typeof AppRemarksRoute
   '/app/users': typeof AppUsersRoute
   '/app/': typeof AppIndexRoute
@@ -105,7 +98,6 @@ export interface FileRoutesByTo {
   '/app/history': typeof AppHistoryRoute
   '/app/import': typeof AppImportRoute
   '/app/installation': typeof AppInstallationRoute
-  '/app/npp-to-docx': typeof AppNppToDocxRoute
   '/app/remarks': typeof AppRemarksRoute
   '/app/users': typeof AppUsersRoute
   '/app': typeof AppIndexRoute
@@ -120,7 +112,6 @@ export interface FileRoutesById {
   '/app/history': typeof AppHistoryRoute
   '/app/import': typeof AppImportRoute
   '/app/installation': typeof AppInstallationRoute
-  '/app/npp-to-docx': typeof AppNppToDocxRoute
   '/app/remarks': typeof AppRemarksRoute
   '/app/users': typeof AppUsersRoute
   '/app/': typeof AppIndexRoute
@@ -136,7 +127,6 @@ export interface FileRouteTypes {
     | '/app/history'
     | '/app/import'
     | '/app/installation'
-    | '/app/npp-to-docx'
     | '/app/remarks'
     | '/app/users'
     | '/app/'
@@ -149,7 +139,6 @@ export interface FileRouteTypes {
     | '/app/history'
     | '/app/import'
     | '/app/installation'
-    | '/app/npp-to-docx'
     | '/app/remarks'
     | '/app/users'
     | '/app'
@@ -163,7 +152,6 @@ export interface FileRouteTypes {
     | '/app/history'
     | '/app/import'
     | '/app/installation'
-    | '/app/npp-to-docx'
     | '/app/remarks'
     | '/app/users'
     | '/app/'
@@ -241,13 +229,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInstallationRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/app/npp-to-docx': {
-      id: '/app/npp-to-docx'
-      path: '/npp-to-docx'
-      fullPath: '/app/npp-to-docx'
-      preLoaderRoute: typeof AppNppToDocxRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
     '/app/remarks': {
       id: '/app/remarks'
       path: '/remarks'
@@ -270,7 +251,6 @@ interface AppRouteRouteChildren {
   AppHistoryRoute: typeof AppHistoryRoute
   AppImportRoute: typeof AppImportRoute
   AppInstallationRoute: typeof AppInstallationRoute
-  AppNppToDocxRoute: typeof AppNppToDocxRoute
   AppRemarksRoute: typeof AppRemarksRoute
   AppUsersRoute: typeof AppUsersRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -281,7 +261,6 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppHistoryRoute: AppHistoryRoute,
   AppImportRoute: AppImportRoute,
   AppInstallationRoute: AppInstallationRoute,
-  AppNppToDocxRoute: AppNppToDocxRoute,
   AppRemarksRoute: AppRemarksRoute,
   AppUsersRoute: AppUsersRoute,
   AppIndexRoute: AppIndexRoute,
