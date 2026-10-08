@@ -1,17 +1,16 @@
-// @vitest-environment jsdom
+import { afterEach, describe, expect, it, mock } from "bun:test";
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 
-const analyzeCableTaskList = vi.hoisted(() => vi.fn());
-vi.mock("@tanstack/react-router", () => ({ useRouter: () => ({ invalidate: vi.fn() }) }));
-vi.mock("@/lib/cable-map/functions", () => ({
+const analyzeCableTaskList = mock();
+mock.module("@tanstack/react-router", () => ({ useRouter: () => ({ invalidate: mock() }) }));
+mock.module("@/lib/cable-map/functions", () => ({
 	analyzeCableTaskList,
-	uploadCableTaskList: vi.fn(),
-	seedKanbanDemo: vi.fn(),
+	uploadCableTaskList: mock(),
+	seedKanbanDemo: mock(),
 }));
 
-import { CableTaskImportCard } from "./cable-task-import-card";
+const { CableTaskImportCard } = await import("./cable-task-import-card");
 
 afterEach(cleanup);
 

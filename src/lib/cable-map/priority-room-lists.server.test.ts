@@ -1,6 +1,6 @@
+import { describe, expect, it } from "bun:test";
 import { Buffer } from "node:buffer";
 
-import { describe, expect, it } from "vitest";
 import * as Xlsx from "xlsx";
 
 import {

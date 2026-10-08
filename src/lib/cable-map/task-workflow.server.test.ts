@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
+
 import * as Xlsx from "xlsx";
 
 import type { AuthSession } from "@/lib/auth/shared";

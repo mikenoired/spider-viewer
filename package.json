@@ -12,7 +12,7 @@
 		"start:railway": "NODE_ENV=production HOST=0.0.0.0 bun ./scripts/serve.mjs",
 		"preview": "vite preview",
 		"predeploy": "bun ./scripts/predeploy.mjs",
-		"test": "vitest run",
+		"test": "bun test --check",
 		"db:generate": "bunx --bun drizzle-kit generate",
 		"db:migrate": "bunx --bun drizzle-kit migrate",
 		"db:push": "bunx --bun drizzle-kit push",
@@ -66,22 +66,22 @@
 		"zod": "^4.6.5"
 	},
 	"devDependencies": {
+		"@happy-dom/global-registrator": "^20.14.5",
 		"@tailwindcss/typography": "^0.5.20",
 		"@tanstack/devtools-vite": "^0.8.5",
 		"@testing-library/dom": "^10.4.2",
 		"@testing-library/react": "^16.3.3",
+		"@types/bun": "^1.4.2",
 		"@types/node": "^26.6.4",
 		"@types/react": "^19.3.0",
 		"@types/react-dom": "^19.3.0",
 		"@vitejs/plugin-react": "^6.1.2",
 		"drizzle-kit": "^0.31.11",
-		"jsdom": "^30.1.2",
 		"oxfmt": "0.72.0",
 		"oxlint": "1.87.0",
 		"radix-ui": "^1.7.0",
 		"typescript": "^7.0.2",
 		"vite": "^8.3.4",
-		"vite-tsconfig-paths": "^6.1.1",
-		"vitest": "^4.1.11"
+		"vite-tsconfig-paths": "^6.1.1"
 	}
 }

@@ -1,3 +1,4 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -6,25 +7,23 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { SignJWT } from "jose";
 import postgres from "postgres";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { users } from "@/lib/db/schema";
-
-import { hashPassword, verifyPassword } from "./password";
 import type { AuthSession } from "./shared";
-import { AUTH_COOKIE_NAME } from "./shared";
 
-const cookies = vi.hoisted(() => new Map<string, string>());
-vi.mock("@tanstack/react-start/server", () => ({
+const cookies = new Map<string, string>();
+mock.module("@tanstack/react-start/server", () => ({
 	getCookie: (name: string) => cookies.get(name),
 	setCookie: (name: string, value: string) => cookies.set(name, value),
 	deleteCookie: (name: string) => cookies.delete(name),
 }));
 let db: ReturnType<typeof drizzle>;
-vi.mock("@/lib/db", () => ({ getDb: () => db }));
+mock.module("@/lib/db", () => ({ getDb: () => db }));
 
-import { requireRole } from "./guards";
-import {
+const { users } = await import("@/lib/db/schema");
+const { hashPassword, verifyPassword } = await import("./password");
+const { AUTH_COOKIE_NAME } = await import("./shared");
+const { requireRole } = await import("./guards");
+const {
 	changeOwnPassword,
 	createManagedUser,
 	deleteManagedUser,
@@ -36,10 +35,11 @@ import {
 	updateManagedUserPassword,
 	updateManagedUserRole,
 	approvePendingUser,
-} from "./server";
+} = await import("./server");
 
 // Use an explicitly supplied disposable PostgreSQL database, never the app DATABASE_URL.
 const testUrl = process.env.AUTH_TEST_DATABASE_URL;
+const originalJwtSecret = process.env.JWT_SECRET;
 describe.skipIf(!testUrl)("account management with PostgreSQL", () => {
 	let client: ReturnType<typeof postgres>;
 	const schemaName = `auth_test_${randomUUID().replaceAll("-", "")}`;
@@ -51,7 +51,7 @@ describe.skipIf(!testUrl)("account management with PostgreSQL", () => {
 	const passwordInput = { userId: worker.id, password: newPassword, confirmPassword: newPassword };
 
 	beforeAll(async () => {
-		vi.stubEnv("JWT_SECRET", "isolated-auth-integration-test-secret");
+		process.env.JWT_SECRET = "isolated-auth-integration-test-secret";
 		client = postgres(testUrl!, { max: 1, prepare: false });
 		await client.unsafe(`create schema ${schemaName}`);
 		await client.unsafe(`set search_path to ${schemaName}`);
@@ -82,7 +82,8 @@ describe.skipIf(!testUrl)("account management with PostgreSQL", () => {
 			await client.unsafe(`drop schema if exists ${schemaName} cascade`);
 			await client.end();
 		}
-		vi.unstubAllEnvs();
+		if (originalJwtSecret === undefined) delete process.env.JWT_SECRET;
+		else process.env.JWT_SECRET = originalJwtSecret;
 	});
 	async function signIn(login = worker.login, password = oldPassword) {
 		await loginWithCredentials({ login, password });

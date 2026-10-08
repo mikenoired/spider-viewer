@@ -1,20 +1,20 @@
-// @vitest-environment jsdom
+import { afterEach, describe, expect, it, mock } from "bun:test";
+
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ManagedUserView } from "@/lib/auth/shared";
 
-const api = vi.hoisted(() => ({
-	changeOwnPassword: vi.fn(),
-	deleteManagedUser: vi.fn(),
-	updateManagedUserLogin: vi.fn(),
-	updateManagedUserPassword: vi.fn(),
-	invalidate: vi.fn(),
-}));
-vi.mock("@tanstack/react-router", () => ({ useRouter: () => ({ invalidate: api.invalidate }) }));
-vi.mock("@/lib/auth/auth.functions", () => api);
-vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
-import { ChangePasswordDialog, ManagedUserActions } from "./account-actions";
+const api = {
+	changeOwnPassword: mock(),
+	deleteManagedUser: mock(),
+	updateManagedUserLogin: mock(),
+	updateManagedUserPassword: mock(),
+	invalidate: mock(),
+};
+mock.module("@tanstack/react-router", () => ({ useRouter: () => ({ invalidate: api.invalidate }) }));
+mock.module("@/lib/auth/auth.functions", () => api);
+mock.module("sonner", () => ({ toast: { success: mock() } }));
+const { ChangePasswordDialog, ManagedUserActions } = await import("./account-actions");
 
 const user: ManagedUserView = {
 	id: "00000000-0000-4000-8000-000000000001",
@@ -27,7 +27,7 @@ const user: ManagedUserView = {
 };
 afterEach(() => {
 	cleanup();
-	vi.clearAllMocks();
+	mock.clearAllMocks();
 });
 describe("account action forms", () => {
 	it("hides deletion for super-admins but permits editing their credentials", () => {
@@ -43,12 +43,12 @@ describe("account action forms", () => {
 		expect(api.deleteManagedUser).not.toHaveBeenCalled();
 		expect(screen.getByRole("dialog").textContent).toContain("История работ сохранится");
 		fireEvent.click(screen.getByRole("button", { name: "Удалить аккаунт" }));
-		await waitFor(() => expect(api.invalidate).toHaveBeenCalledOnce());
+		await waitFor(() => expect(api.invalidate).toHaveBeenCalledTimes(1));
 		expect(api.deleteManagedUser).toHaveBeenCalledWith({ data: { userId: user.id } });
 	});
 	it("validates matching passwords before sending self change and displays server errors", async () => {
 		api.changeOwnPassword.mockRejectedValue(new Error("Текущий пароль неверен."));
-		render(<ChangePasswordDialog open onOpenChange={vi.fn()} />);
+		render(<ChangePasswordDialog open onOpenChange={mock()} />);
 		fireEvent.change(screen.getByLabelText("Текущий пароль"), { target: { value: "OldPassword123" } });
 		fireEvent.change(screen.getByLabelText("Новый пароль"), { target: { value: "NewPassword456" } });
 		fireEvent.change(screen.getByLabelText("Повторите новый пароль"), { target: { value: "Mismatch123" } });
@@ -69,7 +69,7 @@ describe("account action forms", () => {
 		});
 	});
 	it("clears password values on reopening the form", () => {
-		const onOpenChange = vi.fn();
+		const onOpenChange = mock();
 		const view = render(<ChangePasswordDialog open onOpenChange={onOpenChange} />);
 		fireEvent.change(screen.getByLabelText("Новый пароль"), { target: { value: "SecretPassword123" } });
 		view.rerender(<ChangePasswordDialog open={false} onOpenChange={onOpenChange} />);

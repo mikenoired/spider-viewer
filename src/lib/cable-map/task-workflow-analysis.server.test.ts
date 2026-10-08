@@ -1,20 +1,22 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+
 import * as Xlsx from "xlsx";
 
 import type * as CableImport from "./import.server";
 
-const mocks = vi.hoisted(() => ({ from: vi.fn(), select: vi.fn(), ensureCanonicalCableBase: vi.fn() }));
-vi.mock("@/lib/db", () => ({ getDb: () => ({ select: mocks.select }) }));
-vi.mock("./import.server", async (importOriginal) => ({
-	...(await importOriginal<typeof CableImport>()),
+const mocks = { from: mock(), select: mock(), ensureCanonicalCableBase: mock() };
+mock.module("@/lib/db", () => ({ getDb: () => ({ select: mocks.select }) }));
+const importServer = await import("./import.server");
+mock.module("./import.server", () => ({
+	...(importServer as typeof CableImport),
 	ensureCanonicalCableBase: mocks.ensureCanonicalCableBase,
 }));
 
-import { getCableExternalKey } from "./import.server";
-import { analyzeCableTaskListFromFormData } from "./task-workflow.server";
+const { getCableExternalKey } = await import("./import.server");
+const { analyzeCableTaskListFromFormData } = await import("./task-workflow.server");
 
 beforeEach(() => {
-	vi.clearAllMocks();
+	mock.clearAllMocks();
 	mocks.select.mockReturnValue({ from: mocks.from });
 });
 
@@ -74,7 +76,7 @@ describe("task workbook analysis", () => {
 			],
 			skippedSheets: [{ sheetName: "Пуск", cablePositionCount: 2 }],
 		});
-		expect(mocks.ensureCanonicalCableBase).toHaveBeenCalledOnce();
+		expect(mocks.ensureCanonicalCableBase).toHaveBeenCalledTimes(1);
 		expect(mocks.select.mock.calls[0][0]).toHaveProperty("cableMarking");
 		expect(mocks.select.mock.calls[0][0]).toHaveProperty("fromRoom");
 	});

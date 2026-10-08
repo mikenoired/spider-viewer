@@ -35,10 +35,6 @@ const assets = [
 		path.join(coreRoot, "tesseract-core-simd-lstm.wasm.js"),
 		"tesseract-core/tesseract-core-simd-lstm.wasm.js",
 	],
-	[
-		path.join(coreRoot, "tesseract-core-relaxedsimd-lstm.wasm.js"),
-		"tesseract-core/tesseract-core-relaxedsimd-lstm.wasm.js",
-	],
 	[await languageModel("@tesseract.js-data/eng", "eng"), "tessdata/eng.traineddata.gz"],
 	[await languageModel("@tesseract.js-data/rus", "rus"), "tessdata/rus.traineddata.gz"],
 	[path.join(tesseractRoot, "LICENSE.md"), "licenses/tesseract.js.txt"],
