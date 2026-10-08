@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
+import { ChangePasswordDialog } from "@/components/auth/account-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -262,6 +263,7 @@ function MobileNavigationSheet({
 function SidebarUserMenu({ user, mobile = false }: { user: AuthSession; mobile?: boolean }) {
 	const [open, setOpen] = useState(false);
 	const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+	const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
 	function handleLogoutSelect() {
 		setOpen(false);
@@ -317,6 +319,13 @@ function SidebarUserMenu({ user, mobile = false }: { user: AuthSession; mobile?:
 					<DropdownMenuSeparator />
 					<DropdownMenuGroup>
 						<ThemeMenuItem />
+						<DropdownMenuItem
+							onSelect={() => {
+								setOpen(false);
+								window.requestAnimationFrame(() => setChangePasswordOpen(true));
+							}}>
+							Сменить пароль
+						</DropdownMenuItem>
 					</DropdownMenuGroup>
 					{canManageUsers(user.role) ? (
 						<>
@@ -343,6 +352,7 @@ function SidebarUserMenu({ user, mobile = false }: { user: AuthSession; mobile?:
 					</DropdownMenuGroup>
 				</DropdownMenuContent>
 			</DropdownMenu>
+			<ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
 			<LogoutConfirmDialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen} />
 		</>
 	);

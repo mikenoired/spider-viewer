@@ -1,7 +1,5 @@
 #!/usr/bin/env bun
 
-import { sql } from "drizzle-orm";
-
 import { hashPassword } from "../src/lib/auth/password";
 import { bootstrapSuperusersSchema, type BootstrapSuperuser, normalizeLogin } from "../src/lib/auth/shared";
 import { closeDbConnection, getDb } from "../src/lib/db";
@@ -43,6 +41,11 @@ async function seedSuperusers() {
 	validateConfiguredSuperusers(configuredSuperusers);
 
 	const db = getDb();
+	const [existing] = await db.select({ id: users.id }).from(users).limit(1);
+	if (existing) {
+		logger.info("Existing accounts preserved; bootstrap skipped");
+		return;
+	}
 	const now = new Date();
 	const records = await Promise.all(
 		configuredSuperusers.map(async ({ login, password }) => ({
@@ -57,27 +60,14 @@ async function seedSuperusers() {
 		}))
 	);
 
-	await db
-		.insert(users)
-		.values(records)
-		.onConflictDoUpdate({
-			target: users.login,
-			set: {
-				passwordHash: sql`excluded.password_hash`,
-				role: sql`excluded.role`,
-				status: sql`excluded.status`,
-				reviewedByUserId: null,
-				reviewedAt: sql`excluded.reviewed_at`,
-				updatedAt: now,
-			},
-		});
+	await db.insert(users).values(records).onConflictDoNothing({ target: users.login });
 
 	logger.info(
 		{
 			count: configuredSuperusers.length,
 			logins: configuredSuperusers.map(({ login }) => login),
 		},
-		"Configured superusers created or updated"
+		"Initial configured superusers created"
 	);
 }
 

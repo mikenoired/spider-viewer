@@ -1,7 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireRole } from "./guards";
+import { requireSession, requireRole } from "./guards";
 import {
+	changeOwnPasswordSchema,
+	updateManagedUserLoginSchema,
+	updateManagedUserPasswordSchema,
 	createManagedUserSchema,
 	loginSchema,
 	registerSchema,
@@ -86,3 +89,35 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 
 	return { success: true };
 });
+
+export const updateManagedUserLogin = createServerFn({ method: "POST" })
+	.inputValidator(updateManagedUserLoginSchema)
+	.handler(async ({ data }) => {
+		const actor = await requireRole(["super-admin"]);
+		const { updateManagedUserLogin } = await import("./server");
+		return updateManagedUserLogin(data, actor);
+	});
+
+export const updateManagedUserPassword = createServerFn({ method: "POST" })
+	.inputValidator(updateManagedUserPasswordSchema)
+	.handler(async ({ data }) => {
+		const actor = await requireRole(["super-admin"]);
+		const { updateManagedUserPassword } = await import("./server");
+		return updateManagedUserPassword(data, actor);
+	});
+
+export const changeOwnPassword = createServerFn({ method: "POST" })
+	.inputValidator(changeOwnPasswordSchema)
+	.handler(async ({ data }) => {
+		const actor = await requireSession();
+		const { changeOwnPassword } = await import("./server");
+		return changeOwnPassword(data, actor);
+	});
+
+export const deleteManagedUser = createServerFn({ method: "POST" })
+	.inputValidator(userModerationSchema)
+	.handler(async ({ data }) => {
+		const actor = await requireRole(["super-admin"]);
+		const { deleteManagedUser } = await import("./server");
+		return deleteManagedUser(data.userId, actor);
+	});

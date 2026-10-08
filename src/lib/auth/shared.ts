@@ -105,6 +105,37 @@ export const updateManagedUserDepartmentSchema = z.object({
 
 export type UpdateManagedUserDepartmentInput = z.infer<typeof updateManagedUserDepartmentSchema>;
 
+export const updateManagedUserLoginSchema = z.object({
+	userId: userModerationSchema.shape.userId,
+	login: loginValueSchema,
+});
+
+export const updateManagedUserPasswordSchema = z
+	.object({
+		userId: userModerationSchema.shape.userId,
+		password: registrationPasswordSchema,
+		confirmPassword: registerFieldsSchema.shape.confirmPassword,
+	})
+	.refine((value) => value.password === value.confirmPassword, {
+		path: ["confirmPassword"],
+		message: "Пароли не совпадают.",
+	});
+
+export const changeOwnPasswordSchema = z
+	.object({
+		currentPassword: loginPasswordSchema,
+		password: registrationPasswordSchema,
+		confirmPassword: registerFieldsSchema.shape.confirmPassword,
+	})
+	.refine((value) => value.password === value.confirmPassword, {
+		path: ["confirmPassword"],
+		message: "Пароли не совпадают.",
+	});
+
+export type UpdateManagedUserLoginInput = z.infer<typeof updateManagedUserLoginSchema>;
+export type UpdateManagedUserPasswordInput = z.infer<typeof updateManagedUserPasswordSchema>;
+export type ChangeOwnPasswordInput = z.infer<typeof changeOwnPasswordSchema>;
+
 export const bootstrapSuperuserSchema = z.object({
 	login: loginValueSchema,
 	password: registrationPasswordSchema,

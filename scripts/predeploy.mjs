@@ -445,6 +445,8 @@ const tableDefinitions = [
 ];
 
 const columnDefinitions = [
+	["users", "session_version integer not null default 0"],
+	["users", "deleted_at timestamp with time zone"],
 	["users", "reviewed_by_user_id uuid"],
 	["users", "reviewed_at timestamp with time zone"],
 	["users", "status user_status not null default 'active'"],

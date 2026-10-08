@@ -56,6 +56,8 @@ import {
 } from "@/lib/auth/shared";
 import { cn } from "@/lib/utils";
 
+import { ManagedUserActions } from "./account-actions";
+
 function formatDateTime(value: string | null) {
 	if (!value) return "Не рассмотрено";
 
@@ -169,7 +171,12 @@ function UserTable({
 							</TableCell>
 							<TableCell>{formatDateTime(user.createdAt)}</TableCell>
 							<TableCell>{formatDateTime(user.reviewedAt)}</TableCell>
-							<TableCell className="text-right">{actionSlot?.(user) ?? "—"}</TableCell>
+							<TableCell className="text-right">
+								<div className="flex flex-wrap items-center justify-end gap-2">
+									{actionSlot?.(user)}
+									<ManagedUserActions user={user} />
+								</div>
+							</TableCell>
 						</TableRow>
 					))}
 				</TableBody>

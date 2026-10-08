@@ -1,6 +1,6 @@
 import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
 import type { CookieSerializeOptions } from "cookie-es";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { jwtVerify, SignJWT } from "jose";
 
 import { getDb } from "@/lib/db";
@@ -9,6 +9,9 @@ import { users } from "@/lib/db/schema";
 import { hashPassword, verifyPassword } from "./password";
 import type {
 	AuthSession,
+	ChangeOwnPasswordInput,
+	UpdateManagedUserLoginInput,
+	UpdateManagedUserPasswordInput,
 	CreateManagedUserInput,
 	LoginInput,
 	ManagedUsersView,
@@ -19,6 +22,9 @@ import type {
 } from "./shared";
 import { AUTH_COOKIE_NAME, loginSchema, normalizeLogin, registerSchema } from "./shared";
 import {
+	changeOwnPasswordSchema,
+	updateManagedUserLoginSchema,
+	updateManagedUserPasswordSchema,
 	createManagedUserSchema,
 	updateManagedUserDepartmentSchema,
 	updateManagedUserRoleSchema,
@@ -53,8 +59,9 @@ function getAuthCookieOptions(): CookieSerializeOptions {
 	};
 }
 
-async function createAuthToken(session: AuthSession) {
+async function createAuthToken(session: AuthSession, sessionVersion = 0) {
 	return new SignJWT({
+		sessionVersion,
 		login: session.login,
 		role: session.role,
 	})
@@ -190,12 +197,19 @@ export async function getCurrentSession() {
 				role: users.role,
 				department: users.department,
 				status: users.status,
+				deletedAt: users.deletedAt,
+				sessionVersion: users.sessionVersion,
 			})
 			.from(users)
 			.where(eq(users.id, payload.sub))
 			.limit(1);
 
-		if (!user || user.status !== "active") {
+		if (
+			!user ||
+			user.status !== "active" ||
+			user.deletedAt ||
+			(payload.sessionVersion ?? 0) !== user.sessionVersion
+		) {
 			deleteCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
 			return null;
 		}
@@ -225,12 +239,14 @@ export async function loginWithCredentials(input: LoginInput) {
 			role: users.role,
 			department: users.department,
 			status: users.status,
+			deletedAt: users.deletedAt,
+			sessionVersion: users.sessionVersion,
 		})
 		.from(users)
 		.where(eq(users.login, normalizeLogin(login)))
 		.limit(1);
 
-	if (!user) throw new Error("Неверный логин или пароль.");
+	if (!user || user.deletedAt) throw new Error("Неверный логин или пароль.");
 
 	const passwordMatches = await verifyPassword(password, user.passwordHash);
 
@@ -246,7 +262,7 @@ export async function loginWithCredentials(input: LoginInput) {
 		department: user.department,
 	} satisfies AuthSession;
 
-	const token = await createAuthToken(session);
+	const token = await createAuthToken(session, user.sessionVersion);
 
 	setCookie(AUTH_COOKIE_NAME, token, getAuthCookieOptions());
 
@@ -291,10 +307,13 @@ export async function createManagedUser(input: CreateManagedUserInput, creator: 
 		.select({
 			id: users.id,
 			status: users.status,
+			deletedAt: users.deletedAt,
 		})
 		.from(users)
 		.where(eq(users.login, normalizedLogin))
 		.limit(1);
+
+	if (existingUser?.deletedAt) throw new Error("Логин удалённого аккаунта занят.");
 
 	if (existingUser?.status === "active") {
 		throw new Error("Пользователь с таким логином уже существует.");
@@ -318,7 +337,7 @@ export async function createManagedUser(input: CreateManagedUserInput, creator: 
 				reviewedAt: now,
 				updatedAt: now,
 			})
-			.where(eq(users.id, existingUser.id));
+			.where(and(eq(users.id, existingUser.id), isNull(users.deletedAt)));
 	} else {
 		await db.insert(users).values({
 			login: normalizedLogin,
@@ -349,12 +368,13 @@ export async function updateManagedUserRole(input: UpdateManagedUserRoleInput, r
 			id: users.id,
 			role: users.role,
 			status: users.status,
+			deletedAt: users.deletedAt,
 		})
 		.from(users)
 		.where(eq(users.id, userId))
 		.limit(1);
 
-	if (!user) throw new Error("Пользователь не найден.");
+	if (!user || user.deletedAt) throw new Error("Пользователь не найден.");
 	if (user.status !== "active") throw new Error("Роль можно менять только активному пользователю.");
 	if (user.role === role) return { success: true };
 
@@ -374,7 +394,7 @@ export async function updateManagedUserRole(input: UpdateManagedUserRoleInput, r
 			reviewedAt: now,
 			updatedAt: now,
 		})
-		.where(eq(users.id, user.id));
+		.where(and(eq(users.id, user.id), isNull(users.deletedAt)));
 
 	return { success: true };
 }
@@ -388,19 +408,19 @@ export async function updateManagedUserDepartment(
 	const { userId, department } = updateManagedUserDepartmentSchema.parse(input);
 	const db = getDb();
 	const [user] = await db
-		.select({ id: users.id, status: users.status, department: users.department })
+		.select({ id: users.id, status: users.status, deletedAt: users.deletedAt, department: users.department })
 		.from(users)
 		.where(eq(users.id, userId))
 		.limit(1);
 
-	if (!user) throw new Error("Пользователь не найден.");
+	if (!user || user.deletedAt) throw new Error("Пользователь не найден.");
 	if (user.status !== "active") throw new Error("Подразделение можно менять только активному пользователю.");
 	if (user.department === department) return { success: true };
 
 	await db
 		.update(users)
 		.set({ department, reviewedByUserId: reviewer.id, reviewedAt: new Date(), updatedAt: new Date() })
-		.where(eq(users.id, user.id));
+		.where(and(eq(users.id, user.id), isNull(users.deletedAt)));
 
 	return { success: true };
 }
@@ -416,10 +436,12 @@ export async function getManagedUsers() {
 			role: users.role,
 			department: users.department,
 			status: users.status,
+			deletedAt: users.deletedAt,
 			createdAt: users.createdAt,
 			reviewedAt: users.reviewedAt,
 		})
 		.from(users)
+		.where(isNull(users.deletedAt))
 		.orderBy(desc(users.createdAt), asc(users.login));
 
 	const items = rows.map(toManagedUserView);
@@ -452,12 +474,13 @@ export async function approvePendingUser(userId: string, reviewer: AuthSession) 
 			id: users.id,
 			role: users.role,
 			status: users.status,
+			deletedAt: users.deletedAt,
 		})
 		.from(users)
 		.where(eq(users.id, userId))
 		.limit(1);
 
-	if (!user) throw new Error("Пользователь не найден.");
+	if (!user || user.deletedAt) throw new Error("Пользователь не найден.");
 	if (user.role === "super-admin") throw new Error("Суперпользователь не подтверждается через эту форму.");
 	if (user.status === "active") throw new Error("Пользователь уже подтверждён.");
 	if (user.status === "rejected") throw new Error("Отклонённую заявку нужно подать заново.");
@@ -471,7 +494,7 @@ export async function approvePendingUser(userId: string, reviewer: AuthSession) 
 			reviewedAt: now,
 			updatedAt: now,
 		})
-		.where(eq(users.id, user.id));
+		.where(and(eq(users.id, user.id), isNull(users.deletedAt)));
 
 	return { success: true };
 }
@@ -486,12 +509,13 @@ export async function rejectPendingUser(userId: string, reviewer: AuthSession) {
 			id: users.id,
 			role: users.role,
 			status: users.status,
+			deletedAt: users.deletedAt,
 		})
 		.from(users)
 		.where(eq(users.id, userId))
 		.limit(1);
 
-	if (!user) throw new Error("Пользователь не найден.");
+	if (!user || user.deletedAt) throw new Error("Пользователь не найден.");
 	if (user.role === "super-admin")
 		throw new Error("Суперпользователь не может быть отклонён через эту форму.");
 	if (user.status === "active")
@@ -507,11 +531,119 @@ export async function rejectPendingUser(userId: string, reviewer: AuthSession) {
 			reviewedAt: now,
 			updatedAt: now,
 		})
-		.where(eq(users.id, user.id));
+		.where(and(eq(users.id, user.id), isNull(users.deletedAt)));
 
 	return { success: true };
 }
 
 export async function logout() {
 	deleteCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
+}
+
+function assertSuperAdmin(actor: AuthSession) {
+	if (actor.role !== "super-admin") throw new Error("Недостаточно прав для выполнения действия.");
+}
+
+async function getEditableUser(userId: string) {
+	const [user] = await getDb()
+		.select()
+		.from(users)
+		.where(and(eq(users.id, userId), isNull(users.deletedAt)))
+		.limit(1);
+	if (!user) throw new Error("Пользователь не найден.");
+	return user;
+}
+
+function finishCredentialChange(userId: string, actor: AuthSession) {
+	const requiresLogin = userId === actor.id;
+	if (requiresLogin) deleteCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
+	return { success: true, requiresLogin };
+}
+
+export async function updateManagedUserLogin(input: UpdateManagedUserLoginInput, actor: AuthSession) {
+	assertSuperAdmin(actor);
+	const { userId, login } = updateManagedUserLoginSchema.parse(input);
+	const normalizedLogin = normalizeLogin(login);
+	const user = await getEditableUser(userId);
+	if (user.login === normalizedLogin) return { success: true, requiresLogin: false };
+	const db = getDb();
+	const [existing] = await db
+		.select({ id: users.id })
+		.from(users)
+		.where(eq(users.login, normalizedLogin))
+		.limit(1);
+	if (existing) throw new Error("Пользователь с таким логином уже существует.");
+	try {
+		const changed = await db
+			.update(users)
+			.set({
+				login: normalizedLogin,
+				sessionVersion: sql`${users.sessionVersion} + 1`,
+				updatedAt: new Date(),
+			})
+			.where(and(eq(users.id, userId), isNull(users.deletedAt)))
+			.returning({ id: users.id });
+		if (!changed.length) throw new Error("Пользователь не найден.");
+	} catch (error) {
+		const cause = error instanceof Error && "cause" in error ? error.cause : error;
+		if (cause && typeof cause === "object" && "code" in cause && cause.code === "23505")
+			throw new Error("Пользователь с таким логином уже существует.");
+		throw error;
+	}
+	return finishCredentialChange(userId, actor);
+}
+
+export async function updateManagedUserPassword(input: UpdateManagedUserPasswordInput, actor: AuthSession) {
+	assertSuperAdmin(actor);
+	const { userId, password } = updateManagedUserPasswordSchema.parse(input);
+	await getEditableUser(userId);
+	const passwordHash = await hashPassword(password);
+	const changed = await getDb()
+		.update(users)
+		.set({ passwordHash, sessionVersion: sql`${users.sessionVersion} + 1`, updatedAt: new Date() })
+		.where(and(eq(users.id, userId), isNull(users.deletedAt)))
+		.returning({ id: users.id });
+	if (!changed.length) throw new Error("Пользователь не найден.");
+	return finishCredentialChange(userId, actor);
+}
+
+export async function changeOwnPassword(input: ChangeOwnPasswordInput, actor: AuthSession) {
+	const { currentPassword, password } = changeOwnPasswordSchema.parse(input);
+	const user = await getEditableUser(actor.id);
+	if (user.status !== "active") throw new Error("Требуется авторизация.");
+	if (!(await verifyPassword(currentPassword, user.passwordHash))) throw new Error("Текущий пароль неверен.");
+	const passwordHash = await hashPassword(password);
+	const changed = await getDb()
+		.update(users)
+		.set({ passwordHash, sessionVersion: sql`${users.sessionVersion} + 1`, updatedAt: new Date() })
+		.where(
+			and(
+				eq(users.id, actor.id),
+				eq(users.passwordHash, user.passwordHash),
+				eq(users.sessionVersion, user.sessionVersion),
+				eq(users.status, "active"),
+				isNull(users.deletedAt)
+			)
+		)
+		.returning({ id: users.id });
+	if (!changed.length) throw new Error("Данные аккаунта изменились. Войдите снова.");
+	return finishCredentialChange(actor.id, actor);
+}
+
+export async function deleteManagedUser(userId: string, actor: AuthSession) {
+	assertSuperAdmin(actor);
+	const user = await getEditableUser(userId);
+	if (user.role === "super-admin") throw new Error("Нельзя удалить суперпользователя.");
+	const changed = await getDb()
+		.update(users)
+		.set({
+			deletedAt: new Date(),
+			status: "rejected",
+			sessionVersion: sql`${users.sessionVersion} + 1`,
+			updatedAt: new Date(),
+		})
+		.where(and(eq(users.id, userId), ne(users.role, "super-admin"), isNull(users.deletedAt)))
+		.returning({ id: users.id });
+	if (!changed.length) throw new Error("Аккаунт удалён или стал суперпользователем. Обновите список.");
+	return { success: true };
 }

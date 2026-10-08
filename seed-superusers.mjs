@@ -128,6 +128,11 @@ async function seedSuperusers() {
 	});
 
 	try {
+		const [existing] = await sql`select id from users limit 1`;
+		if (existing) {
+			process.stdout.write("[seed-superusers] Existing accounts preserved; bootstrap skipped.\n");
+			return;
+		}
 		const now = new Date();
 		const records = await Promise.all(
 			configuredSuperusers.map(async ({ login, password }) => ({
@@ -159,13 +164,7 @@ async function seedSuperusers() {
 						${now},
 						${now}
 					)
-					on conflict (login) do update set
-						password_hash = excluded.password_hash,
-						role = excluded.role,
-						status = excluded.status,
-						reviewed_by_user_id = null,
-						reviewed_at = excluded.reviewed_at,
-						updated_at = excluded.updated_at
+					on conflict (login) do nothing
 				`;
 			}
 		});
@@ -176,7 +175,7 @@ async function seedSuperusers() {
 				script: "seed-superusers",
 				count: configuredSuperusers.length,
 				logins: configuredSuperusers.map(({ login }) => login),
-				message: "Configured superusers created or updated",
+				message: "Initial configured superusers created",
 			}) + "\n"
 		);
 	} finally {

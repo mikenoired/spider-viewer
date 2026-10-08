@@ -62,6 +62,8 @@ export const users = pgTable(
 		id: uuid("id").defaultRandom().primaryKey(),
 		login: text("login").notNull(),
 		passwordHash: text("password_hash").notNull(),
+		sessionVersion: integer("session_version").notNull().default(0),
+		deletedAt: timestamp("deleted_at", { withTimezone: true }),
 		role: userRoleEnum("role").notNull().default("user"),
 		department: userDepartmentEnum("department").notNull().default("tai"),
 		status: userStatusEnum("status").notNull().default("active"),
