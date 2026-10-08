@@ -24,12 +24,42 @@ import {
 } from "@/lib/cable-map/functions";
 import type { PriorityListKanbanStatus, PriorityRoomListView } from "@/lib/cable-map/shared";
 
-const columns: Array<{ status: PriorityListKanbanStatus; title: string; description: string }> = [
-	{ status: "formed", title: "Список сформирован", description: "ТАИ сформировал задачу" },
-	{ status: "in_progress", title: "Список в работе", description: "СКМ выполняет работы" },
-	{ status: "curator_review", title: "На проверку куратору", description: "Ожидает проверки ТАИ" },
-	{ status: "adjustment", title: "Список в наладке", description: "Доработка или наладка" },
-	{ status: "done", title: "Список выполнен", description: "Работы подтверждены" },
+const columns: Array<{
+	status: PriorityListKanbanStatus;
+	title: string;
+	description: string;
+	className: string;
+}> = [
+	{
+		status: "formed",
+		title: "Список сформирован",
+		description: "ТАИ сформировал задачу",
+		className: "border-slate-300 bg-slate-500/5 dark:border-slate-700 dark:bg-slate-400/10",
+	},
+	{
+		status: "in_progress",
+		title: "Список в работе",
+		description: "СКМ выполняет работы",
+		className: "border-sky-300 bg-sky-500/5 dark:border-sky-800 dark:bg-sky-400/10",
+	},
+	{
+		status: "curator_review",
+		title: "На проверку куратору",
+		description: "Ожидает проверки ТАИ",
+		className: "border-violet-300 bg-violet-500/5 dark:border-violet-800 dark:bg-violet-400/10",
+	},
+	{
+		status: "adjustment",
+		title: "Список в наладке",
+		description: "Доработка или наладка",
+		className: "border-amber-300 bg-amber-500/5 dark:border-amber-800 dark:bg-amber-400/10",
+	},
+	{
+		status: "done",
+		title: "Список выполнен",
+		description: "Работы подтверждены",
+		className: "border-emerald-300 bg-emerald-500/5 dark:border-emerald-800 dark:bg-emerald-400/10",
+	},
 ];
 
 const departments: UserDepartment[] = ["tai", "skm", "commissioning", "curator"];
@@ -593,7 +623,9 @@ export function InstallationKanbanBoard({
 				<CardContent className="overflow-x-auto">
 					<div className="grid min-w-[72rem] grid-cols-5 gap-3">
 						{columns.map((column) => (
-							<div key={column.status} className="flex min-h-72 flex-col rounded-lg border bg-muted/20">
+							<div
+								key={column.status}
+								className={`flex min-h-72 flex-col rounded-lg border ${column.className}`}>
 								<div className="border-b p-3">
 									<div className="flex items-start justify-between gap-2 text-sm font-semibold">
 										<span>{column.title}</span>
