@@ -122,7 +122,7 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 				<CardTitle>Сформировать задание</CardTitle>
 			</CardHeader>
 			<CardContent className="grid gap-4">
-				<FieldGroup>
+				<FieldGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 					<Field>
 						<FieldLabel htmlFor="cable-task-title">Название</FieldLabel>
 						<Input
