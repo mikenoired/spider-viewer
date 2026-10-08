@@ -118,11 +118,11 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 
 	return (
 		<Card>
-			<CardHeader>
+			<CardHeader className="border-b">
 				<CardTitle>Сформировать задание</CardTitle>
 			</CardHeader>
-			<CardContent className="grid gap-4">
-				<FieldGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+			<CardContent className="space-y-5">
+				<FieldGroup className="grid grid-cols-1 gap-4 lg:grid-cols-3">
 					<Field>
 						<FieldLabel htmlFor="cable-task-title">Название</FieldLabel>
 						<Input
@@ -197,7 +197,7 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 							</Popover>
 						</div>
 					</Field>
-					<Field>
+					<Field className="rounded-xl border bg-muted/30 p-4 lg:col-span-3">
 						<FieldLabel htmlFor="cable-task-file">Список кабелей (как в кабельном журнале)</FieldLabel>
 						<Input
 							id="cable-task-file"
@@ -303,7 +303,7 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 					</div>
 				) : null}
 
-				<div className="flex flex-wrap gap-2">
+				<div className="flex flex-wrap items-center gap-2 border-t pt-4">
 					<Button
 						type="button"
 						variant="outline"
@@ -325,6 +325,7 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 						<Button
 							type="button"
 							variant="secondary"
+							className="sm:ml-auto"
 							disabled={importing || analyzing}
 							onClick={() => void createDemo()}>
 							Создать 3 демонстрационных списка
