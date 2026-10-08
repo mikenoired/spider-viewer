@@ -32,14 +32,14 @@ const columns: Array<{
 }> = [
 	{
 		status: "formed",
-		title: "Список сформирован",
+		title: "Задачи заказчика",
 		description: "ТАИ сформировал задачу",
 		className: "border-slate-300 bg-slate-500/5 dark:border-slate-700 dark:bg-slate-400/10",
 	},
 	{
 		status: "in_progress",
-		title: "Список в работе",
-		description: "СКМ выполняет работы",
+		title: "В монтаже",
+		description: "ЭСКМ выполняет работы",
 		className: "border-sky-300 bg-sky-500/5 dark:border-sky-800 dark:bg-sky-400/10",
 	},
 	{
@@ -57,7 +57,7 @@ const columns: Array<{
 	{
 		status: "done",
 		title: "Список выполнен",
-		description: "Работы подтверждены",
+		description: "Можно писать акт",
 		className: "border-emerald-300 bg-emerald-500/5 dark:border-emerald-800 dark:bg-emerald-400/10",
 	},
 ];

@@ -20,11 +20,11 @@ import { analyzeCableTaskList, seedKanbanDemo, uploadCableTaskList } from "@/lib
 import type { PriorityListKanbanStatus, TaskPriority } from "@/lib/cable-map/shared";
 
 const stageLabels: Record<PriorityListKanbanStatus, string> = {
-	formed: "Список сформирован",
-	in_progress: "Список в работе",
+	formed: "Задачи заказчика",
+	in_progress: "В монтаже",
 	curator_review: "На проверку куратору",
 	adjustment: "Список в наладке",
-	done: "Список выполнен",
+	done: "Работы отписаны",
 };
 
 type Analysis = Awaited<ReturnType<typeof analyzeCableTaskList>>;
