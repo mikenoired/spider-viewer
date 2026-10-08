@@ -106,15 +106,12 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Импорт рабочего списка кабелей</CardTitle>
-				<CardDescription>
-					Шаг 1 — файл, шаг 2 — сопоставление с генеральной базой, шаг 3 — выбор этапа и создание задачи.
-				</CardDescription>
+				<CardTitle>Сформировать задание</CardTitle>
 			</CardHeader>
 			<CardContent className="grid gap-4">
 				<FieldGroup>
 					<Field>
-						<FieldLabel htmlFor="cable-task-title">Название карточки</FieldLabel>
+						<FieldLabel htmlFor="cable-task-title">Название</FieldLabel>
 						<Input
 							id="cable-task-title"
 							value={title}
@@ -146,7 +143,7 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 						/>
 					</Field>
 					<Field>
-						<FieldLabel htmlFor="cable-task-file">Список кабелей</FieldLabel>
+						<FieldLabel htmlFor="cable-task-file">Список кабелей (как в кабельном журнале)</FieldLabel>
 						<Input
 							id="cable-task-file"
 							type="file"
@@ -158,8 +155,8 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 							}}
 						/>
 						<FieldDescription>
-							Распознаются маркировка/кабель, журнал и номер нитки; столбец «Прогресс» обновит только
-							указанные значения.
+              Файл, который вы прикрепляете, будет добавлен как отдельное задание.<br />
+              Он должен содержать KKS или номер нитки.
 						</FieldDescription>
 					</Field>
 				</FieldGroup>
