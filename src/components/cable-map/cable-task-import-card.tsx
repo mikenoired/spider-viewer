@@ -1,15 +1,19 @@
 "use client";
 
 import { useRouter } from "@tanstack/react-router";
-import { FileSearchIcon, LoaderCircleIcon, UploadIcon } from "lucide-react";
+import { format, isValid, parse } from "date-fns";
+import { ru } from "date-fns/locale";
+import { CalendarIcon, FileSearchIcon, LoaderCircleIcon, UploadIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AuthSession } from "@/lib/auth/shared";
 import { departmentLabels } from "@/lib/auth/shared";
 import { analyzeCableTaskList, seedKanbanDemo, uploadCableTaskList } from "@/lib/cable-map/functions";
@@ -25,6 +29,11 @@ const stageLabels: Record<PriorityListKanbanStatus, string> = {
 
 type Analysis = Awaited<ReturnType<typeof analyzeCableTaskList>>;
 
+function parseDeadline(value: string, pattern: string) {
+	const date = parse(value, pattern, new Date());
+	return isValid(date) && format(date, pattern) === value ? date : undefined;
+}
+
 export function CableTaskImportCard({ session }: { session: AuthSession }) {
 	const router = useRouter();
 	const [file, setFile] = useState<File | null>(null);
@@ -33,11 +42,15 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 	const [title, setTitle] = useState("");
 	const [priority, setPriority] = useState<TaskPriority>("normal");
 	const [deadline, setDeadline] = useState("");
+	const [deadlineInput, setDeadlineInput] = useState("");
+	const [deadlinePickerOpen, setDeadlinePickerOpen] = useState(false);
 	const [analyzing, setAnalyzing] = useState(false);
 	const [importing, setImporting] = useState(false);
 	const hasProblemPositions = Boolean(
 		analysis && (analysis.missing.length > 0 || analysis.ambiguous.length > 0)
 	);
+	const deadlineDate = parseDeadline(deadline, "yyyy-MM-dd");
+	const enteredDeadline = deadlineInput ? parseDeadline(deadlineInput, "dd.MM.yyyy") : undefined;
 
 	async function analyze() {
 		if (!file) {
@@ -134,13 +147,55 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 					</Field>
 					<Field>
 						<FieldLabel htmlFor="cable-task-deadline">Плановый срок (необязательно)</FieldLabel>
-						<Input
-							id="cable-task-deadline"
-							type="date"
-							value={deadline}
-							onChange={(event) => setDeadline(event.target.value)}
-							disabled={analyzing || importing}
-						/>
+						<div className="relative">
+							<Input
+								id="cable-task-deadline"
+								value={deadlineInput}
+								placeholder="дд.мм.гггг"
+								inputMode="numeric"
+								className="pr-9"
+								aria-invalid={deadlineInput ? !enteredDeadline : undefined}
+								onChange={(event) => {
+									const value = event.target.value;
+									const date = parseDeadline(value, "dd.MM.yyyy");
+									setDeadlineInput(value);
+									setDeadline(date ? format(date, "yyyy-MM-dd") : "");
+								}}
+								onKeyDown={(event) => {
+									if (event.key === "ArrowDown") {
+										event.preventDefault();
+										setDeadlinePickerOpen(true);
+									}
+								}}
+								disabled={analyzing || importing}
+							/>
+							<Popover open={deadlinePickerOpen} onOpenChange={setDeadlinePickerOpen}>
+								<PopoverTrigger asChild>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-sm"
+										className="absolute top-0 right-0"
+										disabled={analyzing || importing}
+										aria-label="Выбрать плановый срок">
+										<CalendarIcon />
+									</Button>
+								</PopoverTrigger>
+								<PopoverContent align="end" className="w-auto overflow-hidden p-0">
+									<Calendar
+										mode="single"
+										locale={ru}
+										selected={deadlineDate}
+										onSelect={(date) => {
+											if (!date) return;
+											setDeadline(format(date, "yyyy-MM-dd"));
+											setDeadlineInput(format(date, "dd.MM.yyyy"));
+											setDeadlinePickerOpen(false);
+										}}
+									/>
+								</PopoverContent>
+							</Popover>
+						</div>
 					</Field>
 					<Field>
 						<FieldLabel htmlFor="cable-task-file">Список кабелей (как в кабельном журнале)</FieldLabel>
