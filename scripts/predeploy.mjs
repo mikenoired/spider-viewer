@@ -445,6 +445,7 @@ const tableDefinitions = [
 ];
 
 const columnDefinitions = [
+	["cables", "cable_marking text not null default ''"],
 	["users", "session_version integer not null default 0"],
 	["users", "deleted_at timestamp with time zone"],
 	["users", "reviewed_by_user_id uuid"],

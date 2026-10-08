@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 import * as Xlsx from "xlsx";
 
 import {
+	createCanonicalCableKeyResolver,
 	ensureUploadFile,
 	getCableExternalKey,
+	getCanonicalCableAttributes,
 	hasExpectedWorkbookSignature,
 	normalizeCableIdentityPart,
 	parseWorkbookRows,
@@ -91,6 +93,61 @@ describe("workbook import validation", () => {
 	it("normalizes visually equivalent latin characters in cable identities", () => {
 		expect(normalizeCableIdentityPart("AЭ 408/1")).toBe("АЭ 408/1");
 		expect(normalizeCableIdentityPart("1HV116k1301")).toBe("1НV116К1301");
+	});
+
+	it("normalizes lowercase B the same way as uppercase B", () => {
+		expect(normalizeCableIdentityPart("1bv13-200")).toBe(normalizeCableIdentityPart("1BV13-200"));
+		expect(normalizeCableIdentityPart("abcekmhoptxy")).toBe(normalizeCableIdentityPart("ABCEKMHOPTXY"));
+	});
+
+	it("reuses a stored key after normalization changes instead of creating a second cable", () => {
+		const cable = {
+			externalKey: "journal:JЬ-1|number:0042",
+			cableLabel: "1bv13-200",
+			cableJournal: "jb-1",
+			cableNumber: "0042",
+			fromRoom: "А101",
+			toRoom: "Б202",
+		};
+		const resolve = createCanonicalCableKeyResolver([cable]);
+		expect(resolve({ ...cable, cableJournal: "JB-1", cableLabel: "1BV13-200" })).toBe(cable.externalKey);
+	});
+
+	it("rejects ambiguous historical keys instead of choosing an arbitrary existing cable", () => {
+		const cable = {
+			cableLabel: "1bv13-200",
+			cableJournal: "jb-1",
+			cableNumber: "0042",
+			fromRoom: "А101",
+			toRoom: "Б202",
+		};
+		const resolve = createCanonicalCableKeyResolver([
+			{ ...cable, externalKey: "legacy-1" },
+			{ ...cable, externalKey: "legacy-2" },
+		]);
+		expect(() => resolve(cable)).toThrow(/проверить дубли/);
+	});
+
+	it("stores installation marking and physical rooms independently of descriptive label and equipment groups", () => {
+		const rawRow = Array.from({ length: 32 }, () => "");
+		rawRow[7] = "1BV13-200";
+		rawRow[13] = "АЭ607/1";
+		rawRow[24] = "АЭ052";
+		expect(
+			getCanonicalCableAttributes(
+				{ cableLabel: "1BV13-200 КВВГЭнг(А)-FRLS 4х1,5", fromRoom: "KKS-TO", toRoom: "KKS-FROM", rawRow },
+				"installation"
+			)
+		).toEqual({ cableMarking: "1BV13-200", fromRoom: "АЭ607/1", toRoom: "АЭ052" });
+	});
+
+	it("preserves demolition marking and room attributes", () => {
+		expect(
+			getCanonicalCableAttributes(
+				{ cableLabel: "1BV13-200", fromRoom: "АЭ607/1", toRoom: "АЭ052", rawRow: [] },
+				"demolition"
+			)
+		).toEqual({ cableMarking: "1BV13-200", fromRoom: "АЭ607/1", toRoom: "АЭ052" });
 	});
 
 	it("accepts a valid workbook upload", async () => {

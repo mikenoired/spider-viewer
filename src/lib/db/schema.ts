@@ -124,6 +124,7 @@ export const cables = pgTable(
 		id: uuid("id").defaultRandom().primaryKey(),
 		externalKey: text("external_key").notNull(),
 		cableLabel: text("cable_label").notNull(),
+		cableMarking: text("cable_marking").notNull().default(""),
 		cableJournal: text("cable_journal").notNull().default(""),
 		cableNumber: text("cable_number").notNull().default(""),
 		fromRoom: text("from_room").notNull().default(""),

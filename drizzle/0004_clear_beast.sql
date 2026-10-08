@@ -1,0 +1,1 @@
+ALTER TABLE "cables" ADD COLUMN "cable_marking" text DEFAULT '' NOT NULL;

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { AuthSession } from "@/lib/auth/shared";
@@ -155,8 +155,9 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 							}}
 						/>
 						<FieldDescription>
-              Файл, который вы прикрепляете, будет добавлен как отдельное задание.<br />
-              Он должен содержать KKS или номер нитки.
+							Файл, который вы прикрепляете, будет добавлен как отдельное задание.
+							<br />
+							Он должен содержать KKS или номер нитки.
 						</FieldDescription>
 					</Field>
 				</FieldGroup>
@@ -170,7 +171,48 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 							<Badge variant="outline">Не найдено: {analysis.missing.length}</Badge>
 							<Badge variant="outline">Неоднозначно: {analysis.ambiguous.length}</Badge>
 							<Badge variant="secondary">Генеральная база: {analysis.baseCount}</Badge>
+							{analysis.warnings.length > 0 ? (
+								<Badge variant="outline">Связи с расхождениями: {analysis.warnings.length}</Badge>
+							) : null}
 						</div>
+						{analysis.warnings.length > 0 ? (
+							<div className="rounded border border-amber-300 bg-amber-50 p-2 text-amber-900">
+								<p className="font-medium">
+									Проверьте найденные связи: данные файла отличаются от базы. Эти кабели попадут в задание.
+								</p>
+								<ul className="mt-2 list-disc pl-5">
+									{analysis.warnings.map((warning, index) => (
+										<li key={`${warning.cableId}-${index}`}>
+											{warning.sheetName ? `${warning.sheetName}, ` : ""}строка {warning.rowIndex}: связь с
+											кабелем {warning.cableLabel}, журнал {warning.cableJournal || "—"}, нитка{" "}
+											{warning.cableNumber || "—"}.{" "}
+											{warning.differences
+												.map(
+													(difference) =>
+														`${difference.field}: в файле «${difference.source}», в базе «${difference.matched}»`
+												)
+												.join("; ")}
+											.
+										</li>
+									))}
+								</ul>
+							</div>
+						) : null}
+						{analysis.skippedSheets.length > 0 ? (
+							<div className="rounded border border-amber-300 bg-amber-50 p-2 text-amber-900">
+								<p className="font-medium">
+									Пропущены листы без журнала, номера или направления. Их позиции не учтены в анализе и не
+									попадут в задание.
+								</p>
+								<ul className="mt-2 list-disc pl-5">
+									{analysis.skippedSheets.map((sheet) => (
+										<li key={sheet.sheetName}>
+											{sheet.sheetName}: заполненных позиций в колонках кабеля — {sheet.cablePositionCount}.
+										</li>
+									))}
+								</ul>
+							</div>
+						) : null}
 						{analysis.missing.length > 0 || analysis.ambiguous.length > 0 ? (
 							<details className="rounded border bg-background p-2">
 								<summary className="cursor-pointer font-medium">

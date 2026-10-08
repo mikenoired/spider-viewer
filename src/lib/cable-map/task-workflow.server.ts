@@ -51,6 +51,7 @@ const stageTitles: Record<PriorityListKanbanStatus, string> = {
 
 type ParsedTaskCable = {
 	rowIndex: number;
+	sheetName?: string;
 	cableLabel: string;
 	cableJournal: string;
 	cableNumber: string;
@@ -239,68 +240,181 @@ function parseTaskCableSheetRows(rows: unknown[][], unique: Map<string, ParsedTa
 	}
 }
 
-export function parseTaskCableRows(fileName: string, buffer: Buffer): ParsedTaskCable[] {
+export function parseTaskCableWorkbook(fileName: string, buffer: Buffer) {
 	const workbook = Xlsx.read(buffer, { type: "buffer", raw: false, cellDates: false });
 	const unique = new Map<string, ParsedTaskCable>();
+	const skippedSheets: Array<{ sheetName: string; cablePositionCount: number }> = [];
 
 	for (const sheetName of workbook.SheetNames) {
 		const sheet = workbook.Sheets[sheetName];
 
 		if (!sheet) continue;
 
-		parseTaskCableSheetRows(
-			Xlsx.utils.sheet_to_json<unknown[]>(sheet, {
-				header: 1,
-				raw: false,
-				defval: "",
-				blankrows: false,
-			}),
-			unique
-		);
+		const rows = Xlsx.utils.sheet_to_json<unknown[]>(sheet, {
+			header: 1,
+			raw: false,
+			defval: "",
+			blankrows: true,
+		});
+		if (findHeaderProfiles(rows).length === 0) {
+			const headerIndex = rows.findIndex((row) =>
+				row.some((cell) => isCableLabelHeader(normalizeHeader(cell)))
+			);
+			if (headerIndex >= 0) {
+				const columns = rows[headerIndex].flatMap((cell, index) =>
+					isCableLabelHeader(normalizeHeader(cell)) ? [index] : []
+				);
+				const cablePositionCount = rows
+					.slice(headerIndex + 1)
+					.reduce(
+						(count, row) =>
+							count +
+							columns.filter(
+								(index) => normalize(row[index]) && !isCableLabelHeader(normalizeHeader(row[index]))
+							).length,
+						0
+					);
+				skippedSheets.push({ sheetName, cablePositionCount });
+			}
+			continue;
+		}
+		const sheetCables = new Map<string, ParsedTaskCable>();
+		parseTaskCableSheetRows(rows, sheetCables);
+		for (const item of sheetCables.values()) addParsedTaskCable(unique, { ...item, sheetName });
 	}
 
-	if (unique.size === 0) throw new Error(`В "${fileName}" не найдены кабельные нитки.`);
+	if (unique.size === 0)
+		throw new Error(
+			`В "${fileName}" не найдены кабельные нитки.${skippedSheets.length ? ` Пропущены листы без журнала, номера или направления: ${skippedSheets.map((sheet) => sheet.sheetName).join(", ")}.` : ""}`
+		);
 
-	return [...unique.values()];
+	return { parsed: [...unique.values()], skippedSheets };
 }
 
-async function analyzeParsedTaskCables(parsed: ParsedTaskCable[]) {
-	await ensureCanonicalCableBase();
-	const db = getDb();
-	const baseCables = await db
-		.select({
-			id: cables.id,
-			externalKey: cables.externalKey,
-			cableLabel: cables.cableLabel,
-		})
-		.from(cables);
-	const cablesByKey = new Map(baseCables.map((cable) => [cable.externalKey, cable]));
-	const cablesByLabel = new Map<string, typeof baseCables>();
+export function parseTaskCableRows(fileName: string, buffer: Buffer): ParsedTaskCable[] {
+	return parseTaskCableWorkbook(fileName, buffer).parsed;
+}
+
+type TaskBaseCable = Pick<
+	typeof cables.$inferSelect,
+	| "id"
+	| "externalKey"
+	| "cableLabel"
+	| "cableMarking"
+	| "cableJournal"
+	| "cableNumber"
+	| "fromRoom"
+	| "toRoom"
+>;
+
+export function matchParsedTaskCables(parsed: ParsedTaskCable[], baseCables: TaskBaseCable[]) {
+	const cablesByKey = new Map<string, TaskBaseCable[]>();
+	const cablesByLabel = new Map<string, TaskBaseCable[]>();
 
 	for (const cable of baseCables) {
-		const label = normalizeCableIdentityPart(cable.cableLabel);
-		cablesByLabel.set(label, [...(cablesByLabel.get(label) ?? []), cable]);
+		for (const key of new Set([cable.externalKey, getCableExternalKey(cable)])) {
+			const items = cablesByKey.get(key) ?? [];
+			items.push(cable);
+			cablesByKey.set(key, items);
+		}
+		for (const label of new Set(
+			[cable.cableMarking, cable.cableLabel].map(normalizeCableIdentityPart).filter(Boolean)
+		)) {
+			const items = cablesByLabel.get(label) ?? [];
+			items.push(cable);
+			cablesByLabel.set(label, items);
+		}
 	}
 
 	const matched: Array<{ parsed: ParsedTaskCable; cableId: string }> = [];
 	const missing: string[] = [];
 	const ambiguous: string[] = [];
+	const warnings: Array<{
+		rowIndex: number;
+		sheetName?: string;
+		cableId: string;
+		cableLabel: string;
+		cableJournal: string;
+		cableNumber: string;
+		differences: Array<{ field: string; source: string; matched: string }>;
+	}> = [];
 
 	for (const parsedCable of parsed) {
-		const exact = cablesByKey.get(getCableExternalKey(parsedCable));
+		const exact = cablesByKey.get(getCableExternalKey(parsedCable)) ?? [];
 		const labelMatches = cablesByLabel.get(normalizeCableIdentityPart(parsedCable.cableLabel)) ?? [];
-		const match = exact ?? (labelMatches.length === 1 ? labelMatches[0] : null);
+		const candidates = exact.length ? exact : labelMatches;
+		const roomMatches = candidates.filter((cable) =>
+			(["fromRoom", "toRoom"] as const).every(
+				(field) =>
+					!parsedCable[field] ||
+					normalizeCableIdentityPart(parsedCable[field]) === normalizeCableIdentityPart(cable[field])
+			)
+		);
+		const narrowed = roomMatches.length ? roomMatches : candidates;
+		const match = narrowed.length === 1 ? narrowed[0] : null;
 
 		if (match) {
 			matched.push({ parsed: parsedCable, cableId: match.id });
-		} else if (labelMatches.length > 1) {
+			const fields = {
+				cableJournal: "Журнал",
+				cableNumber: "Номер нитки",
+				fromRoom: "Откуда",
+				toRoom: "Куда",
+			};
+			const differences = (Object.keys(fields) as Array<keyof typeof fields>).flatMap((field) =>
+				parsedCable[field] &&
+				match[field] &&
+				normalizeCableIdentityPart(parsedCable[field]) !== normalizeCableIdentityPart(match[field])
+					? [{ field: fields[field], source: parsedCable[field], matched: match[field] }]
+					: []
+			);
+			if (
+				parsedCable.cableLabel &&
+				![match.cableMarking, match.cableLabel].some(
+					(label) => normalizeCableIdentityPart(label) === normalizeCableIdentityPart(parsedCable.cableLabel)
+				)
+			) {
+				differences.push({
+					field: "Маркировка",
+					source: parsedCable.cableLabel,
+					matched: match.cableMarking || match.cableLabel,
+				});
+			}
+			if (differences.length)
+				warnings.push({
+					rowIndex: parsedCable.rowIndex,
+					sheetName: parsedCable.sheetName,
+					cableId: match.id,
+					cableLabel: match.cableLabel,
+					cableJournal: match.cableJournal,
+					cableNumber: match.cableNumber,
+					differences,
+				});
+		} else if (candidates.length > 1) {
 			ambiguous.push(parsedCable.cableLabel || parsedCable.cableJournal || parsedCable.cableNumber);
 		} else {
 			missing.push(parsedCable.cableLabel || parsedCable.cableJournal || parsedCable.cableNumber);
 		}
 	}
 
-	return { matched, missing, ambiguous, baseCount: baseCables.length };
+	return { matched, missing, ambiguous, warnings, baseCount: baseCables.length };
+}
+
+async function analyzeParsedTaskCables(parsed: ParsedTaskCable[]) {
+	await ensureCanonicalCableBase();
+	const baseCables = await getDb()
+		.select({
+			id: cables.id,
+			externalKey: cables.externalKey,
+			cableLabel: cables.cableLabel,
+			cableMarking: cables.cableMarking,
+			cableJournal: cables.cableJournal,
+			cableNumber: cables.cableNumber,
+			fromRoom: cables.fromRoom,
+			toRoom: cables.toRoom,
+		})
+		.from(cables);
+	return matchParsedTaskCables(parsed, baseCables);
 }
 
 export function createImportableTaskMatches(matched: Array<{ parsed: ParsedTaskCable; cableId: string }>) {
@@ -328,7 +442,7 @@ export function getAllowedImportStages(session: AuthSession): PriorityListKanban
 
 export async function analyzeCableTaskListFromFormData(formData: FormData, session: AuthSession) {
 	const { file, buffer } = await ensureUploadFile(formData);
-	const parsed = parseTaskCableRows(file.name, buffer);
+	const { parsed, skippedSheets } = parseTaskCableWorkbook(file.name, buffer);
 	const result = await analyzeParsedTaskCables(parsed);
 	const importable = createImportableTaskMatches(result.matched);
 
@@ -342,6 +456,8 @@ export async function analyzeCableTaskListFromFormData(formData: FormData, sessi
 			...Array.from({ length: importable.duplicateCount }, () => "Дубль найденного кабеля"),
 		].slice(0, 100),
 		baseCount: result.baseCount,
+		warnings: result.warnings,
+		skippedSheets,
 		allowedStages: getAllowedImportStages(session),
 	};
 }

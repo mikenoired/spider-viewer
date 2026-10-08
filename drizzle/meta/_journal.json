@@ -29,6 +29,13 @@
 			"when": 1791482056806,
 			"tag": "0003_dark_joshua_kane",
 			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "7",
+			"when": 1791484929068,
+			"tag": "0004_clear_beast",
+			"breakpoints": true
 		}
 	]
 }

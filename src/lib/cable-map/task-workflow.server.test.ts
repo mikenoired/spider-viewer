@@ -4,10 +4,13 @@ import * as Xlsx from "xlsx";
 import type { AuthSession } from "@/lib/auth/shared";
 import { splitKanbanTaskSchema } from "@/lib/cable-map/shared";
 
+import { getCableExternalKey } from "./import.server";
 import {
 	createImportableTaskMatches,
 	getAllowedImportStages,
+	matchParsedTaskCables,
 	parseTaskCableRows,
+	parseTaskCableWorkbook,
 } from "./task-workflow.server";
 
 function session(department: AuthSession["department"], role: AuthSession["role"] = "user"): AuthSession {
@@ -23,6 +26,190 @@ function createWorkbookBuffer(sheets: Array<{ name: string; rows: string[][] }>)
 
 	return Buffer.from(Xlsx.write(workbook, { type: "buffer", bookType: "xlsx" }));
 }
+
+function taskCable(overrides: Partial<Parameters<typeof matchParsedTaskCables>[0][number]> = {}) {
+	return {
+		rowIndex: 2,
+		cableLabel: "1BV13-200",
+		cableJournal: "А-218495",
+		cableNumber: "1.0001",
+		fromRoom: "АЭ607/1",
+		toRoom: "АЭ052",
+		progress: null,
+		...overrides,
+	};
+}
+
+function baseCable(overrides: Partial<Parameters<typeof matchParsedTaskCables>[1][number]> = {}) {
+	const row = { id: "cable-1", cableMarking: "1BV13-200", ...taskCable(), ...overrides };
+	return { ...row, externalKey: overrides.externalKey ?? getCableExternalKey(row) };
+}
+
+describe("task cable matching", () => {
+	it("retains a label match and describes conflicting identifiers and rooms", () => {
+		const result = matchParsedTaskCables(
+			[
+				taskCable({
+					sheetName: "ЭЦ",
+					cableJournal: "Другой журнал",
+					cableNumber: "9.9999",
+					fromRoom: "Другое помещение",
+				}),
+			],
+			[baseCable()]
+		);
+		expect(result.matched.map((match) => match.cableId)).toEqual(["cable-1"]);
+		expect(result.missing).toEqual([]);
+		expect(result.ambiguous).toEqual([]);
+		expect(result.warnings).toEqual([
+			{
+				rowIndex: 2,
+				sheetName: "ЭЦ",
+				cableId: "cable-1",
+				cableLabel: "1BV13-200",
+				cableJournal: "А-218495",
+				cableNumber: "1.0001",
+				differences: [
+					{ field: "Журнал", source: "Другой журнал", matched: "А-218495" },
+					{ field: "Номер нитки", source: "9.9999", matched: "1.0001" },
+					{ field: "Откуда", source: "Другое помещение", matched: "АЭ607/1" },
+				],
+			},
+		]);
+	});
+
+	it("prefers journal and number and warns about a changed marking", () => {
+		const result = matchParsedTaskCables(
+			[taskCable({ cableLabel: "Другая маркировка" })],
+			[
+				baseCable(),
+				baseCable({
+					id: "cable-2",
+					cableJournal: "Ж-2",
+					cableLabel: "Другая маркировка",
+					cableMarking: "Другая маркировка",
+				}),
+			]
+		);
+		expect(result.matched[0].cableId).toBe("cable-1");
+		expect(result.warnings[0].differences).toEqual([
+			{ field: "Маркировка", source: "Другая маркировка", matched: "1BV13-200" },
+		]);
+	});
+
+	it("disambiguates equal markings using rooms even when canonical keys use journals", () => {
+		const result = matchParsedTaskCables(
+			[taskCable({ cableJournal: "", cableNumber: "" })],
+			[baseCable(), baseCable({ id: "cable-2", cableNumber: "1.0002", toRoom: "АЭ999" })]
+		);
+		expect(result.matched.map((match) => match.cableId)).toEqual(["cable-1"]);
+		expect(result.warnings).toEqual([]);
+	});
+
+	it("keeps ambiguity when rooms cannot select one cable", () => {
+		const result = matchParsedTaskCables(
+			[taskCable({ cableJournal: "", cableNumber: "", fromRoom: "", toRoom: "" })],
+			[baseCable(), baseCable({ id: "cable-2", cableNumber: "1.0002" })]
+		);
+		expect(result.matched).toEqual([]);
+		expect(result.ambiguous).toEqual(["1BV13-200"]);
+	});
+
+	it("matches an installation marking separately from type and section", () => {
+		const result = matchParsedTaskCables(
+			[taskCable({ cableJournal: "", cableNumber: "" })],
+			[baseCable({ cableLabel: "1BV13-200 КВВГЭнг(А)-FRLS 4х1,5" })]
+		);
+		expect(result.matched[0].cableId).toBe("cable-1");
+		expect(result.warnings).toEqual([]);
+	});
+
+	it("matches case and visual alphabet variants without warnings", () => {
+		const result = matchParsedTaskCables(
+			[taskCable({ cableLabel: "1bv13-200", cableJournal: "a-218495", fromRoom: "aэ607/1" })],
+			[baseCable()]
+		);
+		expect(result.matched[0].cableId).toBe("cable-1");
+		expect(result.warnings).toEqual([]);
+	});
+
+	it("matches historical keys using the normalized stored identifiers", () => {
+		const result = matchParsedTaskCables(
+			[taskCable({ cableJournal: "jb-1", cableLabel: "" })],
+			[baseCable({ cableJournal: "jb-1", externalKey: "journal:JЬ-1|number:1.0001" })]
+		);
+		expect(result.matched[0].cableId).toBe("cable-1");
+	});
+
+	it("does not collapse normalized duplicate identities into an arbitrary match", () => {
+		const result = matchParsedTaskCables(
+			[taskCable()],
+			[baseCable(), baseCable({ id: "cable-2", externalKey: "legacy-key" })]
+		);
+		expect(result.matched).toEqual([]);
+		expect(result.ambiguous).toEqual(["1BV13-200"]);
+	});
+
+	it("reports a cable absent from the base", () => {
+		const result = matchParsedTaskCables([taskCable()], []);
+		expect(result.missing).toEqual(["1BV13-200"]);
+		expect(result.matched).toEqual([]);
+	});
+});
+
+describe("unsupported task sheets", () => {
+	it("reports both cable columns on a skipped sheet and ignores the title sheet", () => {
+		const result = parseTaskCableWorkbook(
+			"priority.xlsx",
+			createWorkbookBuffer([
+				{ name: "Титульник", rows: [["Перечень кабелей"]] },
+				{
+					name: "ЭЦ",
+					rows: [
+						["Кабель", "Журнал", "Номер"],
+						["1BV13-200", "А-218495", "1.0001"],
+					],
+				},
+				{
+					name: "Пуск",
+					rows: [
+						["KKS", "Кабель", "Кабель"],
+						["1TQ12S02", "1TQ12S02K334A", "1TQ12S02K334"],
+					],
+				},
+			])
+		);
+		expect(result.parsed).toHaveLength(1);
+		expect(result.skippedSheets).toEqual([{ sheetName: "Пуск", cablePositionCount: 2 }]);
+	});
+
+	it("explains why a workbook containing only an unsupported sheet cannot be imported", () => {
+		expect(() =>
+			parseTaskCableWorkbook(
+				"priority.xlsx",
+				createWorkbookBuffer([
+					{
+						name: "Пуск",
+						rows: [
+							["KKS", "Кабель"],
+							["KKS-1", "CABLE-1"],
+						],
+					},
+				])
+			)
+		).toThrow(/Пропущены листы.*Пуск/);
+	});
+
+	it("preserves the original sheet and row number after blank rows", () => {
+		const rows = parseTaskCableRows(
+			"priority.xlsx",
+			createWorkbookBuffer([
+				{ name: "ЭЦ", rows: [["Кабель", "Журнал", "Номер"], [], ["1BV13-200", "А-218495", "1.0001"]] },
+			])
+		);
+		expect(rows[0]).toMatchObject({ sheetName: "ЭЦ", rowIndex: 3 });
+	});
+});
 
 describe("Kanban import permissions", () => {
 	it("allows MASTER to select any of the five stages", () => {
