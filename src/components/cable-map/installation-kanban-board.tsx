@@ -66,6 +66,10 @@ const departments: UserDepartment[] = ["tai", "skm", "commissioning", "curator"]
 type TaskAction = "move" | "accept" | "complete" | "confirm" | "return";
 type ActionItem = { action: TaskAction; label: string; status?: PriorityListKanbanStatus };
 
+function getDisplayFileName(fileName?: string | null) {
+	return fileName?.replace(/\s*\(демо\)\s*$/iu, "") || "Карточка списка";
+}
+
 function getActions(list: PriorityRoomListView, session: AuthSession): ActionItem[] {
 	if (session.role === "super-admin")
 		return columns
@@ -283,9 +287,9 @@ function TaskDialog({
 
 	return (
 		<Dialog open={Boolean(list)} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+			<DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-none overflow-y-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] lg:max-w-5xl xl:max-w-6xl">
 				<DialogHeader>
-					<DialogTitle>{list?.fileName ?? "Карточка списка"}</DialogTitle>
+					<DialogTitle className="pr-8 break-words">{getDisplayFileName(list?.fileName)}</DialogTitle>
 					<DialogDescription>
 						Состояние задачи, кабели, комментарии, замечания и история сохраняются на сервере.
 					</DialogDescription>
@@ -296,7 +300,7 @@ function TaskDialog({
 							<span>Статус: {columns.find((column) => column.status === task.list.status)?.title}</span>
 							<span>Карточка: {task.list.taskCode ?? "—"}</span>
 							<span>Автор: {task.list.authorName}</span>
-							<span>Исходный файл: {task.list.fileName}</span>
+							<span>Исходный файл: {getDisplayFileName(task.list.fileName)}</span>
 							<span>Отправитель: {departmentLabels[task.list.senderDepartment]}</span>
 							<span>
 								Получатель:{" "}

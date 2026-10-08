@@ -1072,7 +1072,7 @@ export async function seedKanbanDemo(session: AuthSession) {
 				.insert(priorityRoomLists)
 				.values({
 					authorName: session.login,
-					fileName: "База контроля кабеля (демо)",
+					fileName: "База контроля кабеля",
 					fileType: "xlsx",
 					title: item.title,
 					priority: item.priority,
