@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM oven/bun:1.3.11 AS dependencies
+FROM oven/bun:1.4.2 AS dependencies
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ FROM dependencies AS build
 COPY . .
 RUN bun run build
 
-FROM oven/bun:1.3.11-slim AS runtime
+FROM oven/bun:1.4.2-slim AS runtime
 
 ENV HOST=0.0.0.0
 ENV NODE_ENV=production
