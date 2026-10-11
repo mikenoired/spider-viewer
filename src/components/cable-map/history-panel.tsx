@@ -296,7 +296,7 @@ export function HistoryPanel({
 								{formatRangeLabel(range)}
 							</Button>
 						</PopoverTrigger>
-						<PopoverContent align="end" className="w-[min(22rem,calc(100vw-2rem))]">
+						<PopoverContent align="end" className="w-[min(44rem,calc(100vw-2rem))]">
 							<PopoverHeader>
 								<PopoverTitle>Диапазон дат</PopoverTitle>
 							</PopoverHeader>
