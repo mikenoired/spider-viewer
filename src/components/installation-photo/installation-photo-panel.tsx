@@ -1,7 +1,7 @@
 "use client";
 
 import { CameraIcon, DownloadIcon, ImagesIcon } from "lucide-react";
-import { useRef, useState, type RefObject } from "react";
+import { type RefObject, useRef, useState } from "react";
 
 import { InstallationCameraDialog } from "@/components/installation-photo/installation-camera-dialog";
 import { PhotoRecognitionJob } from "@/components/installation-photo/photo-recognition-job";

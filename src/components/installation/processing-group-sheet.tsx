@@ -30,6 +30,7 @@ function buildResolvedChanges(group: InstallationProcessingGroupView | null, res
 		return [
 			{
 				pendingChangeId: change.id,
+				baseRevision: change.serverRevision,
 				resolvedDone,
 			},
 		];
@@ -47,7 +48,9 @@ export function ProcessingGroupSheet({
 	open: boolean;
 	pending: boolean;
 	onOpenChange: (open: boolean) => void;
-	onApply: (resolutions: Array<{ pendingChangeId: string; resolvedDone: boolean }>) => Promise<void>;
+	onApply: (
+		resolutions: Array<{ pendingChangeId: string; baseRevision: number; resolvedDone: boolean }>
+	) => Promise<void>;
 }) {
 	const isMobile = useMediaQuery("(max-width: 767px)");
 	const [resolutions, setResolutions] = useState<ResolutionState>(() => createInitialResolutions(group));

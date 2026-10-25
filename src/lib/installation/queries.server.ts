@@ -193,8 +193,9 @@ function buildPendingChange(row: InstallationPendingRow, itemById: Map<string, I
 		kksName: item?.name ?? "KKS",
 		baseDone: row.baseDone,
 		desiredDone: row.desiredDone,
-		serverDone: row.serverDone,
-		hasConflict: row.hasConflict,
+		serverDone: item?.isDone ?? row.serverDone,
+		serverRevision: item?.revision ?? 1,
+		hasConflict: (item?.isDone ?? row.serverDone) !== row.baseDone,
 		userLogin: row.userLogin,
 		createdAt: toIsoString(row.createdAt),
 	} satisfies InstallationPendingChangeView;

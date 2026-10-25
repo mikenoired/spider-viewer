@@ -2,16 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-function getInitialOnlineStatus() {
-	if (typeof navigator === "undefined") return true;
-
-	return navigator.onLine;
-}
-
 export function useNetworkStatus() {
-	const [isOnline, setOnline] = useState(getInitialOnlineStatus);
+	const [isOnline, setOnline] = useState(true);
 
 	useEffect(() => {
+		// Keep the server and hydration snapshot identical; Bun has navigator without onLine.
+		setOnline(navigator.onLine !== false);
 		function handleOnline() {
 			setOnline(true);
 		}

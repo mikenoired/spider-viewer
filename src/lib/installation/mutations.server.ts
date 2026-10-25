@@ -70,12 +70,15 @@ export async function saveInstallationKksState(input: SaveInstallationKksInput, 
 			updatedByUserId: session.id,
 			updatedAt: new Date(),
 		})
-		.where(eq(installationKksItems.id, input.kksItemId))
+		.where(
+			and(eq(installationKksItems.id, input.kksItemId), eq(installationKksItems.revision, input.baseRevision))
+		)
 		.returning({
 			id: installationKksItems.id,
 			revision: installationKksItems.revision,
 		});
 
+	if (!updatedItem) throw new Error("Данные KKS изменились. Обновите доску и повторите действие.");
 	return {
 		kksItemId: updatedItem.id,
 		revision: updatedItem.revision,
@@ -127,6 +130,8 @@ export async function submitInstallationOfflineChanges(
 	input: SubmitInstallationOfflineChangesInput,
 	session: AuthSession
 ) {
+	if (input.userId !== session.id)
+		throw new Error("Аккаунт изменился. Войдите под автором офлайн-изменений.");
 	const db = getDb();
 	const snapshot = await getActiveSnapshot(db, input.snapshotId);
 
@@ -141,13 +146,24 @@ export async function submitInstallationOfflineChanges(
 		throw new Error("Не все KKS найдены для обработки офлайн-изменений.");
 	}
 
+	const currentItemById = new Map(currentItems.map((item) => [item.id, item]));
+	if (input.changes.some((change) => currentItemById.get(change.kksItemId)?.groupId !== change.groupId)) {
+		throw new Error("KKS относится к другой группе.");
+	}
 	const currentDoneByItemId = new Map(currentItems.map((item) => [item.id, item.isDone]));
 	const rows = buildPendingChangeRows(input, session, currentDoneByItemId);
 
 	if (rows.length === 0) return { queuedCount: 0 };
 
-	await db.insert(installationPendingChanges).values(rows).onConflictDoNothing({
-		target: installationPendingChanges.clientMutationId,
+	await db.transaction(async (tx) => {
+		for (let start = 0; start < rows.length; start += 500) {
+			await tx
+				.insert(installationPendingChanges)
+				.values(rows.slice(start, start + 500))
+				.onConflictDoNothing({
+					target: installationPendingChanges.clientMutationId,
+				});
+		}
 	});
 
 	return {
@@ -155,18 +171,21 @@ export async function submitInstallationOfflineChanges(
 	};
 }
 
-async function getPendingChangesByIds(db: DbClient, ids: string[]) {
+async function getPendingChangesByIds(
+	db: DbClient | Parameters<Parameters<DbClient["transaction"]>[0]>[0],
+	ids: string[]
+) {
 	return db
 		.select({
 			id: installationPendingChanges.id,
 			groupId: installationPendingChanges.groupId,
 			kksItemId: installationPendingChanges.kksItemId,
-			hasConflict: installationPendingChanges.hasConflict,
+			snapshotId: installationPendingChanges.snapshotId,
 		})
 		.from(installationPendingChanges)
-		.where(
-			and(eq(installationPendingChanges.status, "pending"), inArray(installationPendingChanges.id, ids))
-		);
+		.where(and(eq(installationPendingChanges.status, "pending"), inArray(installationPendingChanges.id, ids)))
+		.orderBy(installationPendingChanges.id)
+		.for("update");
 }
 
 function validatePendingChanges(groupId: string, pendingChanges: PendingChangeRow[], requestedIds: string[]) {
@@ -188,26 +207,56 @@ export async function applyInstallationPendingGroup(
 	const finalDoneByPendingId = new Map(
 		input.changes.map((change) => [change.pendingChangeId, change.resolvedDone])
 	);
-	const pendingChanges = await getPendingChangesByIds(db, requestedIds);
-
-	validatePendingChanges(input.groupId, pendingChanges, requestedIds);
-
+	const requestedById = new Map(input.changes.map((change) => [change.pendingChangeId, change]));
 	await db.transaction(async (tx) => {
+		const pendingChanges = await getPendingChangesByIds(tx, requestedIds);
+		validatePendingChanges(input.groupId, pendingChanges, requestedIds);
+		const snapshotIds = [...new Set(pendingChanges.map((change) => change.snapshotId))];
+		const [snapshot] =
+			snapshotIds.length === 1
+				? await tx
+						.select({ id: installationSnapshots.id })
+						.from(installationSnapshots)
+						.where(
+							and(eq(installationSnapshots.id, snapshotIds[0]), eq(installationSnapshots.isActive, true))
+						)
+						.for("share")
+				: [];
+		if (!snapshot) throw new Error("Набор данных монтажа уже заменен.");
+		const appliedByItem = new Map<string, { revision: number; done: boolean }>();
 		for (const pendingChange of pendingChanges) {
-			await applyPendingChange(tx, pendingChange, finalDoneByPendingId, session);
+			const requested = requestedById.get(pendingChange.id)!;
+			const applied = appliedByItem.get(pendingChange.kksItemId);
+			if (
+				applied &&
+				(applied.revision !== requested.baseRevision || applied.done !== requested.resolvedDone)
+			) {
+				throw new Error("Для одного KKS выбраны разные итоговые состояния. Согласуйте изменения.");
+			}
+			await applyPendingChange(
+				tx,
+				pendingChange,
+				finalDoneByPendingId,
+				session,
+				requested.baseRevision,
+				Boolean(applied)
+			);
+			appliedByItem.set(pendingChange.kksItemId, {
+				revision: requested.baseRevision,
+				done: requested.resolvedDone,
+			});
 		}
 	});
-
-	return {
-		appliedCount: pendingChanges.length,
-	};
+	return { appliedCount: requestedIds.length };
 }
 
 async function applyPendingChange(
 	tx: Parameters<Parameters<DbClient["transaction"]>[0]>[0],
 	pendingChange: PendingChangeRow,
 	finalDoneByPendingId: Map<string, boolean>,
-	session: AuthSession
+	session: AuthSession,
+	baseRevision: number,
+	skipItemUpdate: boolean
 ) {
 	const finalDone = finalDoneByPendingId.get(pendingChange.id);
 
@@ -215,16 +264,24 @@ async function applyPendingChange(
 		throw new Error("Для изменения не выбран итоговый статус.");
 	}
 
-	await tx
-		.update(installationKksItems)
-		.set({
-			isDone: finalDone,
-			revision: sql`${installationKksItems.revision} + 1`,
-			updatedByUserId: session.id,
-			updatedAt: new Date(),
-		})
-		.where(eq(installationKksItems.id, pendingChange.kksItemId));
-
+	if (!skipItemUpdate) {
+		const [updated] = await tx
+			.update(installationKksItems)
+			.set({
+				isDone: finalDone,
+				revision: sql`${installationKksItems.revision} + 1`,
+				updatedByUserId: session.id,
+				updatedAt: new Date(),
+			})
+			.where(
+				and(
+					eq(installationKksItems.id, pendingChange.kksItemId),
+					eq(installationKksItems.revision, baseRevision)
+				)
+			)
+			.returning({ id: installationKksItems.id });
+		if (!updated) throw new Error("Данные KKS изменились. Обновите доску и повторно решите конфликт.");
+	}
 	await tx
 		.update(installationPendingChanges)
 		.set({

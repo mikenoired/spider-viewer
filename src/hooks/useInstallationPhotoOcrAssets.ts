@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
 	createCheckingInstallationPhotoOcrAssetState,
 	getInstallationPhotoOcrAssetState,
-	warmInstallationPhotoOcrAssets,
 	type InstallationPhotoAssetProgress,
 	type InstallationPhotoAssetState,
+	warmInstallationPhotoOcrAssets,
 } from "@/lib/installation-photo/assets";
 
 const setupDismissedStorageKey = "spider-viewer.installation-photo-ocr-setup-dismissed";

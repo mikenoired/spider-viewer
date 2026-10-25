@@ -1,15 +1,8 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 
 import type { AuthSession } from "@/lib/auth/shared";
 import { getDb } from "@/lib/db";
-import {
-	cableChangeAuditLogs,
-	changeAuditLogs,
-	importSnapshots,
-	priorityRoomLists,
-	remarks,
-	users,
-} from "@/lib/db/schema";
+import { cableChangeAuditLogs, changeAuditLogs, priorityRoomLists, remarks, users } from "@/lib/db/schema";
 
 import type { CreateRemarkInput, RemarksData, UpdateRemarkStatusInput } from "./shared";
 
@@ -64,14 +57,6 @@ export async function getRemarksData(): Promise<RemarksData> {
 				fileName: priorityRoomLists.fileName,
 			})
 			.from(priorityRoomLists)
-			.innerJoin(
-				importSnapshots,
-				and(
-					eq(importSnapshots.id, priorityRoomLists.snapshotId),
-					eq(importSnapshots.isActive, true),
-					eq(importSnapshots.snapshotKind, "installation")
-				)
-			)
 			.orderBy(desc(priorityRoomLists.createdAt)),
 		db.select().from(remarks).orderBy(desc(remarks.createdAt)).limit(100),
 	]);

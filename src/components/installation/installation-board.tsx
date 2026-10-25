@@ -65,11 +65,13 @@ function createPhotoChangeInputs(data: InstallationBoardData, candidates: Instal
 export function InstallationBoard({
 	initialData,
 	canEdit,
+	userId,
 }: {
 	initialData: InstallationBoardData;
 	canEdit: boolean;
+	userId: string;
 }) {
-	const board = useInstallationBoard(initialData, canEdit);
+	const board = useInstallationBoard(initialData, canEdit, userId);
 	const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 	const [processingGroupId, setProcessingGroupId] = useState<string | null>(null);
 	const selectedGroup = findGroupById(board.data, selectedGroupId);
@@ -102,6 +104,7 @@ export function InstallationBoard({
 			<InstallationStatusBar
 				isOnline={board.isOnline}
 				outboxCount={board.outboxCount}
+				staleOutboxCount={board.staleOutboxCount}
 				onRefresh={() => void handleRefresh()}
 			/>
 			{board.hasSnapshot ? (

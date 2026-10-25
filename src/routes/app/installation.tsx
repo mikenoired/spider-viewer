@@ -15,5 +15,12 @@ function InstallationPage() {
 
 	if (!auth) return null;
 
-	return <InstallationBoard initialData={data} canEdit={canEditInstallation(auth.role)} />;
+	return (
+		<InstallationBoard
+			key={auth.id}
+			userId={auth.id}
+			initialData={data}
+			canEdit={canEditInstallation(auth.role)}
+		/>
+	);
 }

@@ -45,6 +45,7 @@ export type InstallationPendingChangeView = {
 	baseDone: boolean;
 	desiredDone: boolean;
 	serverDone: boolean;
+	serverRevision: number;
 	hasConflict: boolean;
 	userLogin: string;
 	createdAt: string;
@@ -104,6 +105,7 @@ export const saveInstallationKksSchema = z.object({
 });
 
 export const submitInstallationOfflineChangesSchema = z.object({
+	userId: z.string().uuid(),
 	snapshotId: z.string().uuid(),
 	changes: z
 		.array(
@@ -124,6 +126,7 @@ export const applyInstallationPendingGroupSchema = z.object({
 		.array(
 			z.object({
 				pendingChangeId: z.string().uuid(),
+				baseRevision: z.number().int().positive(),
 				resolvedDone: z.boolean(),
 			})
 		)

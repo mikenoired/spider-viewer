@@ -6,9 +6,9 @@ import * as Xlsx from "xlsx";
 import type { AuthSession } from "@/lib/auth/shared";
 import { getDb } from "@/lib/db";
 import {
+	cables,
 	graphGroupRooms,
 	graphGroups,
-	cables,
 	type graphSideEnum,
 	type graphSubzoneEnum,
 	importedCableRows,
@@ -16,7 +16,7 @@ import {
 } from "@/lib/db/schema";
 import { enToRuVisual } from "@/lib/utils";
 
-import { supportedWorkbookExtensions, supportedWorkbookMimeTypes, type SnapshotKind } from "./shared";
+import { type SnapshotKind, supportedWorkbookExtensions, supportedWorkbookMimeTypes } from "./shared";
 
 type GraphSide = (typeof graphSideEnum.enumValues)[number];
 type GraphSubzone = (typeof graphSubzoneEnum.enumValues)[number] | null;
@@ -261,29 +261,33 @@ export async function ensureCanonicalCableBase() {
 	const now = new Date();
 
 	return db.transaction(async (tx) => {
-		const canonicalRows = await tx
-			.insert(cables)
-			.values(
-				[...recordsByKey.values()].map((row) => ({
-					externalKey: row.externalKey,
-					cableLabel: row.cableLabel,
-					cableJournal: row.cableJournal,
-					cableNumber: row.cableNumber,
-					...getCanonicalCableAttributes(row, row.snapshotKind),
-					createdAt: now,
-					updatedAt: now,
-				}))
-			)
-			.onConflictDoUpdate({
-				target: cables.externalKey,
-				set: {
-					externalKey: sql`excluded.external_key`,
-					cableMarking: sql`case when cables.cable_marking = '' then excluded.cable_marking else cables.cable_marking end`,
-					fromRoom: sql`case when cables.cable_marking = '' then excluded.from_room else cables.from_room end`,
-					toRoom: sql`case when cables.cable_marking = '' then excluded.to_room else cables.to_room end`,
-				},
-			})
-			.returning({ id: cables.id, externalKey: cables.externalKey });
+		const canonicalRows: Array<{ id: string; externalKey: string }> = [];
+		for (const batch of chunk([...recordsByKey.values()], 500)) {
+			const inserted = await tx
+				.insert(cables)
+				.values(
+					batch.map((row) => ({
+						externalKey: row.externalKey,
+						cableLabel: row.cableLabel,
+						cableJournal: row.cableJournal,
+						cableNumber: row.cableNumber,
+						...getCanonicalCableAttributes(row, row.snapshotKind),
+						createdAt: now,
+						updatedAt: now,
+					}))
+				)
+				.onConflictDoUpdate({
+					target: cables.externalKey,
+					set: {
+						externalKey: sql`excluded.external_key`,
+						cableMarking: sql`case when cables.cable_marking = '' then excluded.cable_marking else cables.cable_marking end`,
+						fromRoom: sql`case when cables.cable_marking = '' then excluded.from_room else cables.from_room end`,
+						toRoom: sql`case when cables.cable_marking = '' then excluded.to_room else cables.to_room end`,
+					},
+				})
+				.returning({ id: cables.id, externalKey: cables.externalKey });
+			canonicalRows.push(...inserted);
+		}
 		const canonicalIdByKey = new Map(canonicalRows.map((row) => [row.externalKey, row.id]));
 		const assignments = sourceRows.flatMap((row) => {
 			const cableId = canonicalIdByKey.get(resolveKey(row));
@@ -927,28 +931,32 @@ export async function importWorkbookFromFormData(
 			})
 			.returning();
 
-		const canonicalRows = await tx
-			.insert(cables)
-			.values(
-				canonicalCableRows.map((row) => ({
-					...row,
-					createdAt: now,
-					updatedAt: now,
-				}))
-			)
-			.onConflictDoUpdate({
-				target: cables.externalKey,
-				set: {
-					cableLabel: sql`excluded.cable_label`,
-					cableMarking: sql`excluded.cable_marking`,
-					cableJournal: sql`excluded.cable_journal`,
-					cableNumber: sql`excluded.cable_number`,
-					fromRoom: sql`excluded.from_room`,
-					toRoom: sql`excluded.to_room`,
-					updatedAt: now,
-				},
-			})
-			.returning({ id: cables.id, externalKey: cables.externalKey });
+		const canonicalRows: Array<{ id: string; externalKey: string }> = [];
+		for (const batch of chunk(canonicalCableRows, 500)) {
+			const inserted = await tx
+				.insert(cables)
+				.values(
+					batch.map((row) => ({
+						...row,
+						createdAt: now,
+						updatedAt: now,
+					}))
+				)
+				.onConflictDoUpdate({
+					target: cables.externalKey,
+					set: {
+						cableLabel: sql`excluded.cable_label`,
+						cableMarking: sql`excluded.cable_marking`,
+						cableJournal: sql`excluded.cable_journal`,
+						cableNumber: sql`excluded.cable_number`,
+						fromRoom: sql`excluded.from_room`,
+						toRoom: sql`excluded.to_room`,
+						updatedAt: now,
+					},
+				})
+				.returning({ id: cables.id, externalKey: cables.externalKey });
+			canonicalRows.push(...inserted);
+		}
 		const cableIdByKey = new Map(canonicalRows.map((row) => [row.externalKey, row.id]));
 
 		for (const chunk of chunkValues(

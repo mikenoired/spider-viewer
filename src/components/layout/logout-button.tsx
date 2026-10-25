@@ -79,6 +79,7 @@ function useLogoutAction(onSuccess?: () => void) {
 
 		try {
 			await logout();
+			navigator.serviceWorker?.controller?.postMessage({ type: "clear-session" });
 			onSuccess?.();
 			await router.invalidate();
 			await navigate({ to: "/login" });

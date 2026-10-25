@@ -4,31 +4,33 @@ import { requireRole, requireSession } from "@/lib/auth/guards";
 import { canEditProgress, canViewAudit } from "@/lib/auth/shared";
 
 import {
+	createKanbanRemarkSchema,
 	createManualRoomSchema,
+	createRemarkSchema,
+	createTaskCommentSchema,
 	dateRangeSchema,
 	deleteManualRoomSchema,
-	createRemarkSchema,
-	createKanbanRemarkSchema,
-	createTaskCommentSchema,
 	exportBackdatedSchema,
 	exportDailyHistorySchema,
 	exportHistorySchema,
+	revertKanbanTaskEventSchema,
 	saveCableProgressSchema,
+	splitKanbanTaskSchema,
+	transitionKanbanTaskSchema,
 	updatePriorityListKanbanStatusSchema,
 	updatePriorityRoomKanbanStatusSchema,
 	updateRemarkStatusSchema,
-	transitionKanbanTaskSchema,
 	updateTaskItemCompletionSchema,
-	splitKanbanTaskSchema,
-	revertKanbanTaskEventSchema,
 } from "./shared";
 
 export const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
+	await requireSession();
 	const { getActiveDashboardData } = await import("./queries.server");
 	return getActiveDashboardData("demolition");
 });
 
 export const getInstallationDashboardData = createServerFn({ method: "GET" }).handler(async () => {
+	await requireSession();
 	const { getActiveDashboardData } = await import("./queries.server");
 	return getActiveDashboardData("installation");
 });

@@ -2,6 +2,7 @@ import type { InstallationBoardData, InstallationOfflineChange } from "./shared"
 
 export type InstallationOfflineOutboxChange = InstallationOfflineChange & {
 	createdAt: string;
+	userId: string;
 };
 
 const installationOfflineDbName = "spider-viewer-installation";
@@ -55,51 +56,62 @@ function runStoreRequest<T>(
 				const transaction = db.transaction(storeName, mode);
 				const request = createRequest(transaction.objectStore(storeName));
 
-				transaction.oncomplete = () => db.close();
+				transaction.oncomplete = () => {
+					db.close();
+					resolve(request.result);
+				};
 				transaction.onerror = () => {
 					db.close();
 					reject(transaction.error ?? createOfflineError("Ошибка офлайн-хранилища."));
 				};
 				request.onerror = () => reject(request.error ?? createOfflineError("Ошибка офлайн-запроса."));
-				request.onsuccess = () => resolve(request.result);
+				transaction.onabort = () => {
+					db.close();
+					reject(transaction.error ?? createOfflineError("Офлайн-транзакция отменена."));
+				};
 			})
 	);
 }
 
-export async function getCachedInstallationBoard() {
+export async function getCachedInstallationBoard(userId: string) {
 	const result = await runStoreRequest<InstallationBoardData | undefined>(
 		"readonly",
 		boardStoreName,
-		(store) => store.get(activeBoardKey)
+		(store) => store.get(`${activeBoardKey}:${userId}`)
 	);
 
 	return result ?? null;
 }
 
-export async function saveCachedInstallationBoard(data: InstallationBoardData) {
-	await runStoreRequest<IDBValidKey>("readwrite", boardStoreName, (store) => store.put(data, activeBoardKey));
+export async function saveCachedInstallationBoard(data: InstallationBoardData, userId: string) {
+	await runStoreRequest<IDBValidKey>("readwrite", boardStoreName, (store) =>
+		store.put(data, `${activeBoardKey}:${userId}`)
+	);
 }
 
-export async function getInstallationOutboxChanges() {
+export async function getInstallationOutboxChanges(userId: string, snapshotId?: string) {
 	const changes = await runStoreRequest<InstallationOfflineOutboxChange[]>(
 		"readonly",
 		outboxStoreName,
 		(store) => store.getAll()
 	);
 
-	return changes.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+	return changes
+		.filter((change) => change.userId === userId && (!snapshotId || change.snapshotId === snapshotId))
+		.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 }
 
-export async function queueInstallationOutboxChange(change: InstallationOfflineChange) {
+export async function queueInstallationOutboxChange(change: InstallationOfflineChange, userId: string) {
 	await runStoreRequest<IDBValidKey>("readwrite", outboxStoreName, (store) =>
 		store.put({
 			...change,
+			userId,
 			createdAt: new Date().toISOString(),
 		} satisfies InstallationOfflineOutboxChange)
 	);
 }
 
-export async function queueInstallationOutboxChanges(changes: InstallationOfflineChange[]) {
+export async function queueInstallationOutboxChanges(changes: InstallationOfflineChange[], userId: string) {
 	if (changes.length === 0) return;
 
 	const db = await openInstallationDb();
@@ -112,6 +124,7 @@ export async function queueInstallationOutboxChanges(changes: InstallationOfflin
 		for (const change of changes) {
 			store.put({
 				...change,
+				userId,
 				createdAt,
 			} satisfies InstallationOfflineOutboxChange);
 		}

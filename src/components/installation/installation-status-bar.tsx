@@ -8,10 +8,12 @@ import { Button } from "@/components/ui/button";
 export function InstallationStatusBar({
 	isOnline,
 	outboxCount,
+	staleOutboxCount,
 	onRefresh,
 }: {
 	isOnline: boolean;
 	outboxCount: number;
+	staleOutboxCount: number;
 	onRefresh: () => void;
 }) {
 	return (
@@ -22,6 +24,11 @@ export function InstallationStatusBar({
 					{isOnline ? "Онлайн" : "Оффлайн"}
 				</Badge>
 				{outboxCount > 0 ? <Badge variant="outline">Офлайн-изменений: {outboxCount}</Badge> : null}
+				{staleOutboxCount > 0 ? (
+					<span className="text-sm text-muted-foreground">
+						Изменений из прежних наборов: {staleOutboxCount}. Сохранены локально.
+					</span>
+				) : null}
 			</div>
 			<Button type="button" variant="outline" onClick={onRefresh}>
 				<RefreshCcwIcon data-icon="inline-start" />

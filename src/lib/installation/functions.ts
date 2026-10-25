@@ -20,6 +20,7 @@ async function requireInstallationEditor() {
 }
 
 export const getInstallationBoardData = createServerFn({ method: "GET" }).handler(async () => {
+	await requireSession();
 	const { getActiveInstallationBoardData } = await import("./queries.server");
 	return getActiveInstallationBoardData();
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { Progress } from "@/components/ui/progress";
-import { shouldShowInstallationProgress, type InstallationGroupView } from "@/lib/installation/shared";
+import { type InstallationGroupView, shouldShowInstallationProgress } from "@/lib/installation/shared";
 import { cn } from "@/lib/utils";
 
 export function KksGroupCard({

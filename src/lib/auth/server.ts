@@ -10,23 +10,26 @@ import { hashPassword, verifyPassword } from "./password";
 import type {
 	AuthSession,
 	ChangeOwnPasswordInput,
-	UpdateManagedUserLoginInput,
-	UpdateManagedUserPasswordInput,
 	CreateManagedUserInput,
 	LoginInput,
 	ManagedUsersView,
 	ManagedUserView,
 	RegisterInput,
 	UpdateManagedUserDepartmentInput,
+	UpdateManagedUserLoginInput,
+	UpdateManagedUserPasswordInput,
 	UpdateManagedUserRoleInput,
 } from "./shared";
-import { AUTH_COOKIE_NAME, loginSchema, normalizeLogin, registerSchema } from "./shared";
 import {
+	AUTH_COOKIE_NAME,
 	changeOwnPasswordSchema,
+	createManagedUserSchema,
+	loginSchema,
+	normalizeLogin,
+	registerSchema,
+	updateManagedUserDepartmentSchema,
 	updateManagedUserLoginSchema,
 	updateManagedUserPasswordSchema,
-	createManagedUserSchema,
-	updateManagedUserDepartmentSchema,
 	updateManagedUserRoleSchema,
 } from "./shared";
 

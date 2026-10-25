@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { createRemark, updateRemarkStatus } from "@/lib/cable-map/functions";
-import type { RemarkTargetType, RemarksData } from "@/lib/cable-map/shared";
+import type { RemarksData, RemarkTargetType } from "@/lib/cable-map/shared";
 
 const targetLabels: Record<RemarkTargetType, string> = {
 	cable: "Кабель",

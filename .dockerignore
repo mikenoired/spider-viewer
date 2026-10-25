@@ -15,3 +15,5 @@ ops
 todos.json
 __unconfig*
 *.local
+
+.private

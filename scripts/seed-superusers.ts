@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { hashPassword } from "../src/lib/auth/password";
-import { bootstrapSuperusersSchema, type BootstrapSuperuser, normalizeLogin } from "../src/lib/auth/shared";
+import { type BootstrapSuperuser, bootstrapSuperusersSchema, normalizeLogin } from "../src/lib/auth/shared";
 import { closeDbConnection, getDb } from "../src/lib/db";
 import { users } from "../src/lib/db/schema";
 import { createLogger } from "../src/lib/logger";

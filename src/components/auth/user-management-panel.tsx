@@ -41,8 +41,8 @@ import {
 import type {
 	AuthSession,
 	CreateManagedUserInput,
-	ManagedUserView,
 	ManagedUsersView,
+	ManagedUserView,
 } from "@/lib/auth/shared";
 import {
 	assignableUserRoles,
@@ -51,8 +51,8 @@ import {
 	departmentLabels,
 	roleLabels,
 	statusLabels,
-	userDepartmentSchema,
 	userDepartments,
+	userDepartmentSchema,
 } from "@/lib/auth/shared";
 import { cn } from "@/lib/utils";
 

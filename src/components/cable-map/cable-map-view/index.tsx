@@ -8,8 +8,8 @@ import {
 	LoaderCircleIcon,
 	MapIcon,
 	Maximize2Icon,
-	MinusIcon,
 	Minimize2Icon,
+	MinusIcon,
 	PercentIcon,
 	PlusIcon,
 	RefreshCcwIcon,
@@ -124,8 +124,7 @@ function FloatingContrastPanel({ className, children }: { className?: string; ch
 
 function normalizeWheelDelta(
 	event:
-		| Pick<WheelEvent, "deltaMode" | "deltaY">
-		| Pick<React.WheelEvent<HTMLDivElement>, "deltaMode" | "deltaY">,
+		Pick<WheelEvent, "deltaMode" | "deltaY"> | Pick<React.WheelEvent<HTMLDivElement>, "deltaMode" | "deltaY">,
 	viewportHeight: number
 ) {
 	if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {

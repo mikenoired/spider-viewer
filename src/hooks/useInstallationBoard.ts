@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -13,10 +13,9 @@ import {
 	createInstallationClientMutationId,
 	getCachedInstallationBoard,
 	getInstallationOutboxChanges,
-	queueInstallationOutboxChange,
+	type InstallationOfflineOutboxChange,
 	queueInstallationOutboxChanges,
 	removeInstallationOutboxChanges,
-	type InstallationOfflineOutboxChange,
 	saveCachedInstallationBoard,
 } from "@/lib/installation/offline";
 import {
@@ -26,7 +25,6 @@ import {
 	type InstallationGroupView,
 	type InstallationKksChangeInput,
 	type InstallationKksView,
-	type InstallationOfflineChange,
 	type InstallationVisibleColumnId,
 } from "@/lib/installation/shared";
 
@@ -36,6 +34,7 @@ const installationRefreshIntervalMs = 15_000;
 
 type PendingResolution = {
 	pendingChangeId: string;
+	baseRevision: number;
 	resolvedDone: boolean;
 };
 
@@ -125,193 +124,161 @@ function applyOfflineChanges(data: InstallationBoardData, changes: InstallationO
 	);
 }
 
-export function useInstallationBoard(initialData: InstallationBoardData, canEdit: boolean) {
+export function isInstallationNetworkError(error: unknown) {
+	return (
+		error instanceof Error &&
+		(error.name === "NetworkError" ||
+			(error instanceof TypeError && /fetch|network|load failed/i.test(error.message)))
+	);
+}
+
+export function useInstallationBoard(initialData: InstallationBoardData, canEdit: boolean, userId: string) {
 	const isOnline = useNetworkStatus();
 	const [data, setData] = useState(initialData);
 	const [pending, setPending] = useState(false);
 	const [outboxCount, setOutboxCount] = useState(0);
-
-	const hasSnapshot = Boolean(data.snapshot);
+	const [staleOutboxCount, setStaleOutboxCount] = useState(0);
+	const flushing = useRef(false);
+	const refreshGeneration = useRef(0);
+	const snapshotId = data.snapshot?.id ?? null;
 
 	const refresh = useCallback(async () => {
+		const generation = ++refreshGeneration.current;
 		const nextData = await getInstallationBoardData();
-		const outboxChanges = await getInstallationOutboxChanges();
-		const dataWithOfflineChanges = applyOfflineChanges(nextData, outboxChanges);
-
-		setData(dataWithOfflineChanges);
-		setOutboxCount(outboxChanges.length);
-		await saveCachedInstallationBoard(nextData);
-	}, []);
+		const allChanges = await getInstallationOutboxChanges(userId);
+		const currentChanges = allChanges.filter((change) => change.snapshotId === nextData.snapshot?.id);
+		if (generation !== refreshGeneration.current) return;
+		setData(applyOfflineChanges(nextData, currentChanges));
+		setOutboxCount(currentChanges.length);
+		setStaleOutboxCount(allChanges.length - currentChanges.length);
+		await saveCachedInstallationBoard(nextData, userId);
+	}, [userId]);
 
 	useEffect(() => {
-		async function hydrateFromCache() {
-			const [cachedData, outboxChanges] = await Promise.all([
-				getCachedInstallationBoard(),
-				getInstallationOutboxChanges(),
-			]);
-
-			if (cachedData && !initialData.snapshot) {
-				setData(applyOfflineChanges(cachedData, outboxChanges));
+		let active = true;
+		void (async () => {
+			try {
+				const [cached, changes] = await Promise.all([
+					getCachedInstallationBoard(userId),
+					getInstallationOutboxChanges(userId),
+				]);
+				if (!active) return;
+				const board = initialData.snapshot ? initialData : (cached ?? initialData);
+				const current = changes.filter((change) => change.snapshotId === board.snapshot?.id);
+				setData(applyOfflineChanges(board, current));
+				setOutboxCount(current.length);
+				setStaleOutboxCount(changes.length - current.length);
+				if (initialData.snapshot) await saveCachedInstallationBoard(initialData, userId);
+			} catch (error) {
+				toast.error(error instanceof Error ? error.message : "Не удалось открыть офлайн-хранилище.");
 			}
+		})();
+		return () => {
+			active = false;
+		};
+	}, [initialData, userId]);
 
-			setOutboxCount(outboxChanges.length);
+	const flushOfflineChanges = useCallback(async () => {
+		if (!canEdit || !snapshotId || flushing.current) return;
+		flushing.current = true;
+		try {
+			const outbox = await getInstallationOutboxChanges(userId, snapshotId);
+			if (!outbox.length) return;
+			await submitInstallationOfflineChanges({
+				data: { userId, snapshotId, changes: getLatestOfflineChanges(outbox) },
+			});
+			await removeInstallationOutboxChanges(outbox.map((change) => change.clientMutationId));
+			await refresh();
+			toast.info("Офлайн-изменения перенесены в колонку «В обработке».");
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Не удалось синхронизировать офлайн-изменения.");
+		} finally {
+			flushing.current = false;
 		}
-
-		void hydrateFromCache();
-	}, [initialData.snapshot]);
+	}, [canEdit, snapshotId, userId, refresh]);
 
 	useEffect(() => {
-		if (initialData.snapshot) {
-			void saveCachedInstallationBoard(initialData);
-		}
-	}, [initialData]);
+		if (isOnline && navigator.onLine !== false) void flushOfflineChanges();
+	}, [isOnline, flushOfflineChanges]);
 
 	useEffect(() => {
 		if (!isOnline) return;
+		const timer = window.setInterval(() => {
+			if (document.visibilityState === "hidden") return;
+			void flushOfflineChanges()
+				.then(refresh)
+				.catch(() => undefined);
+		}, installationRefreshIntervalMs);
+		return () => window.clearInterval(timer);
+	}, [isOnline, refresh, flushOfflineChanges]);
 
-		const intervalId = window.setInterval(() => void refresh(), installationRefreshIntervalMs);
-
-		return () => window.clearInterval(intervalId);
-	}, [isOnline, refresh]);
-
-	useEffect(() => {
-		if (!isOnline || !canEdit) return;
-
-		void flushOfflineChanges();
-	}, [canEdit, isOnline]);
-
-	const snapshotId = data.snapshot?.id ?? null;
+	const persistChanges = useCallback(
+		async (changes: InstallationKksChangeInput[]) => {
+			if (!snapshotId) return;
+			await queueInstallationOutboxChanges(
+				changes.map((change) => ({
+					clientMutationId: createInstallationClientMutationId(change.item.id),
+					snapshotId,
+					groupId: change.groupId,
+					kksItemId: change.item.id,
+					baseDone: change.item.isDone,
+					desiredDone: change.isDone,
+				})),
+				userId
+			);
+			setOutboxCount((count) => count + changes.length);
+			toast.info("Изменения сохранены локально и будут синхронизированы позже.");
+		},
+		[snapshotId, userId]
+	);
 
 	const toggleKks = useCallback(
 		async (groupId: string, item: InstallationKksView, isDone: boolean) => {
 			if (!snapshotId || !canEdit) return;
-
 			setData((current) => updateBoardItem(current, groupId, item.id, isDone));
-
 			if (!isOnline) {
-				await queueOfflineChange(snapshotId, groupId, item, isDone);
+				await persistChanges([{ groupId, item, isDone }]);
 				return;
 			}
-
-			await saveOnlineChange(snapshotId, groupId, item, isDone);
+			try {
+				await saveInstallationKks({
+					data: { snapshotId, groupId, kksItemId: item.id, isDone, baseRevision: item.revision },
+				});
+			} catch (error) {
+				if (isInstallationNetworkError(error)) {
+					await persistChanges([{ groupId, item, isDone }]);
+					return;
+				}
+				toast.error(error instanceof Error ? error.message : "Не удалось сохранить состояние KKS.");
+			}
+			// A failure to refresh after a successful write must not enqueue that write again.
+			await refresh().catch(() => undefined);
 		},
-		[canEdit, isOnline, snapshotId]
+		[snapshotId, canEdit, isOnline, persistChanges, refresh]
 	);
 
 	const queueKksChanges = useCallback(
 		async (changes: InstallationKksChangeInput[]) => {
 			if (!snapshotId || !canEdit) return;
-
-			const latestChanges = getLatestKksChangeInputs(changes);
-
-			if (latestChanges.length === 0) return;
-
-			setData((current) => updateBoardItems(current, latestChanges));
-			await queueOfflineChanges(snapshotId, latestChanges);
-
-			if (isOnline) {
-				await flushOfflineChanges();
-			}
+			const latest = getLatestKksChangeInputs(changes);
+			if (!latest.length) return;
+			await persistChanges(latest);
+			setData((current) => updateBoardItems(current, latest));
+			if (isOnline) await flushOfflineChanges();
 		},
-		[canEdit, isOnline, snapshotId]
+		[snapshotId, canEdit, persistChanges, isOnline, flushOfflineChanges]
 	);
-
-	async function queueOfflineChange(
-		currentSnapshotId: string,
-		groupId: string,
-		item: InstallationKksView,
-		isDone: boolean
-	) {
-		const change: InstallationOfflineChange = {
-			clientMutationId: createInstallationClientMutationId(item.id),
-			snapshotId: currentSnapshotId,
-			groupId,
-			kksItemId: item.id,
-			baseDone: item.isDone,
-			desiredDone: isDone,
-		};
-
-		await queueInstallationOutboxChange(change);
-		setOutboxCount((current) => current + 1);
-		toast.info("Изменение сохранено офлайн и будет синхронизировано позже.");
-	}
-
-	async function queueOfflineChanges(currentSnapshotId: string, changes: InstallationKksChangeInput[]) {
-		const offlineChanges = changes.map(
-			(change) =>
-				({
-					clientMutationId: createInstallationClientMutationId(change.item.id),
-					snapshotId: currentSnapshotId,
-					groupId: change.groupId,
-					kksItemId: change.item.id,
-					baseDone: change.item.isDone,
-					desiredDone: change.isDone,
-				}) satisfies InstallationOfflineChange
-		);
-
-		await queueInstallationOutboxChanges(offlineChanges);
-		setOutboxCount((current) => current + offlineChanges.length);
-		toast.info(`Офлайн-изменений добавлено: ${offlineChanges.length}.`);
-	}
-
-	async function saveOnlineChange(
-		currentSnapshotId: string,
-		groupId: string,
-		item: InstallationKksView,
-		isDone: boolean
-	) {
-		try {
-			await saveInstallationKks({
-				data: {
-					snapshotId: currentSnapshotId,
-					groupId,
-					kksItemId: item.id,
-					isDone,
-					baseRevision: item.revision,
-				},
-			});
-			await refresh();
-		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Не удалось сохранить состояние KKS.");
-			await refresh();
-		}
-	}
-
-	async function flushOfflineChanges() {
-		const outboxChanges = await getInstallationOutboxChanges();
-		const latestChanges = getLatestOfflineChanges(outboxChanges);
-
-		if (!snapshotId || latestChanges.length === 0) return;
-
-		try {
-			await submitInstallationOfflineChanges({
-				data: {
-					snapshotId,
-					changes: latestChanges,
-				},
-			});
-			await removeInstallationOutboxChanges(outboxChanges.map((change) => change.clientMutationId));
-			setOutboxCount(0);
-			await refresh();
-			toast.info("Офлайн-изменения перенесены в колонку «В обработке».");
-		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Не удалось синхронизировать офлайн-изменения.");
-		}
-	}
 
 	const applyProcessingGroup = useCallback(
 		async (groupId: string, resolutions: PendingResolution[]) => {
 			setPending(true);
-
 			try {
-				await applyInstallationPendingGroup({
-					data: {
-						groupId,
-						changes: resolutions,
-					},
-				});
+				await applyInstallationPendingGroup({ data: { groupId, changes: resolutions } });
 				await refresh();
 				toast.success("Группа KKS утверждена в доске.");
+			} catch (error) {
+				await refresh().catch(() => undefined);
+				throw error;
 			} finally {
 				setPending(false);
 			}
@@ -319,28 +286,16 @@ export function useInstallationBoard(initialData: InstallationBoardData, canEdit
 		[refresh]
 	);
 
-	return useMemo(
-		() => ({
-			data,
-			hasSnapshot,
-			isOnline,
-			outboxCount,
-			pending,
-			refresh,
-			toggleKks,
-			queueKksChanges,
-			applyProcessingGroup,
-		}),
-		[
-			applyProcessingGroup,
-			data,
-			hasSnapshot,
-			isOnline,
-			outboxCount,
-			pending,
-			queueKksChanges,
-			refresh,
-			toggleKks,
-		]
-	);
+	return {
+		data,
+		hasSnapshot: Boolean(data.snapshot),
+		isOnline,
+		outboxCount,
+		staleOutboxCount,
+		pending,
+		refresh,
+		toggleKks,
+		queueKksChanges,
+		applyProcessingGroup,
+	};
 }

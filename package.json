@@ -2,7 +2,7 @@
 	"name": "spider-viewer",
 	"private": true,
 	"type": "module",
-	"packageManager": "bun@1.4.0",
+	"packageManager": "bun@1.4.4",
 	"scripts": {
 		"prepare:ocr-assets": "node ./scripts/prepare-ocr-assets.mjs",
 		"dev": "bun run prepare:ocr-assets && vite dev --port 3000",
@@ -22,10 +22,11 @@
 		"lint": "oxlint .",
 		"typecheck": "bun x tsc -p tsconfig.json --noEmit",
 		"lint:fix": "oxlint . --fix",
-		"format": "oxfmt .",
-		"format:check": "oxfmt --check .",
+		"format": "bun fmt",
+		"format:check": "bun fmt --check",
 		"lint:format": "bun run format",
-		"lint:check": "bun run lint && bun run format:check"
+		"lint:check": "bun run lint && bun run format:check",
+		"test:integration": "bun test --timeout 120000 ./test/integration/"
 	},
 	"dependencies": {
 		"@tailwindcss/vite": "^4.3.3",
@@ -77,11 +78,14 @@
 		"@types/react-dom": "^19.3.0",
 		"@vitejs/plugin-react": "^6.1.2",
 		"drizzle-kit": "^0.31.11",
-		"oxfmt": "0.72.0",
+		"fake-indexeddb": "^6.2.6",
 		"oxlint": "1.87.0",
 		"radix-ui": "^1.7.0",
 		"typescript": "^7.0.2",
 		"vite": "^8.3.4",
 		"vite-tsconfig-paths": "^6.1.1"
+	},
+	"engines": {
+		"bun": ">=1.4.4"
 	}
 }

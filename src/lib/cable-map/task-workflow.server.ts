@@ -573,27 +573,31 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 			})
 			.returning({ id: priorityRoomLists.id });
 
-		await tx.insert(cableListItems).values(
-			importable.matches.map(({ parsed: item, cableId }) => ({
-				listId: created.id,
-				cableId,
-				sourceRowIndex: item.rowIndex,
-				importedProgress: item.progress,
-				createdAt: now,
-			}))
-		);
+		for (let start = 0; start < importable.matches.length; start += 500) {
+			await tx.insert(cableListItems).values(
+				importable.matches.slice(start, start + 500).map(({ parsed: item, cableId }) => ({
+					listId: created.id,
+					cableId,
+					sourceRowIndex: item.rowIndex,
+					importedProgress: item.progress,
+					createdAt: now,
+				}))
+			);
+		}
 
-		for (const { parsed: item, cableId } of importable.matches) {
-			if (item.progress === null) continue;
-			await tx
-				.update(cables)
-				.set({
-					progress: item.progress,
-					progressUpdatedByUserId: session.id,
-					progressUpdatedAt: now,
-					updatedAt: now,
-				})
-				.where(eq(cables.id, cableId));
+		const progressUpdates = importable.matches.filter((match) => match.parsed.progress !== null);
+		for (let start = 0; start < progressUpdates.length; start += 500) {
+			const batch = progressUpdates.slice(start, start + 500);
+			await tx.execute(sql`
+				update cables as cable set progress = patch.progress,
+					progress_updated_by_user_id = ${session.id}::uuid,
+					progress_updated_at = ${now.toISOString()}::timestamptz, updated_at = ${now.toISOString()}::timestamptz
+				from (values ${sql.join(
+					batch.map(({ parsed: item, cableId }) => sql`(${cableId}::uuid, ${item.progress}::integer)`),
+					sql`, `
+				)}) as patch(id, progress)
+				where cable.id = patch.id
+			`);
 		}
 
 		await tx.insert(taskEvents).values({
@@ -637,7 +641,13 @@ function canTransition(
 	if (input.action === "confirm" || input.action === "return") {
 		return (session.department === "tai" || session.department === "curator") && current === "curator_review";
 	}
-	return session.department === "commissioning" && current === "adjustment";
+	return (
+		input.action === "move" &&
+		input.status === "done" &&
+		session.department === "commissioning" &&
+		current === "adjustment" &&
+		(!input.recipientDepartment || input.recipientDepartment === stageRecipient.done)
+	);
 }
 
 function transitionTarget(input: TransitionKanbanTaskInput, current: PriorityListKanbanStatus) {
@@ -696,20 +706,25 @@ export async function transitionKanbanTask(input: TransitionKanbanTaskInput, ses
 		...(input.action === "complete" ? { completedAt: now } : {}),
 		...(input.action === "confirm" ? { verifiedAt: now } : {}),
 	};
-	const [updated] = await db
-		.update(priorityRoomLists)
-		.set(updateValues)
-		.where(eq(priorityRoomLists.id, list.id))
-		.returning({ id: priorityRoomLists.id, status: priorityRoomLists.status });
-	if (!updated) throw new Error("Не удалось изменить статус карточки.");
-
-	const event = await addTaskEvent(
-		list.id,
-		input.action,
-		`${session.login}: ${stageTitles[list.status]} → ${stageTitles[target.status]}.`,
-		session.id,
-		{ fromStatus: list.status, toStatus: target.status, action: input.action }
-	);
+	const { updated, event } = await db.transaction(async (tx) => {
+		const [updated] = await tx
+			.update(priorityRoomLists)
+			.set(updateValues)
+			.where(and(eq(priorityRoomLists.id, list.id), eq(priorityRoomLists.status, list.status)))
+			.returning({ id: priorityRoomLists.id, status: priorityRoomLists.status });
+		if (!updated) throw new Error("Карточка уже изменена. Обновите доску и повторите действие.");
+		const [event] = await tx
+			.insert(taskEvents)
+			.values({
+				listId: list.id,
+				eventType: input.action,
+				message: `${session.login}: ${stageTitles[list.status]} → ${stageTitles[target.status]}.`,
+				actorUserId: session.id,
+				payload: { fromStatus: list.status, toStatus: target.status, action: input.action },
+			})
+			.returning({ id: taskEvents.id });
+		return { updated, event };
+	});
 	await addDepartmentNotifications(
 		target.department,
 		list.id,

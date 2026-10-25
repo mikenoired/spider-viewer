@@ -1,2 +1,26 @@
 [test]
 preload = ["./test/setup.ts"]
+
+[fmt]
+useTabs = true
+tabWidth = 2
+printWidth = 110
+singleQuote = false
+jsxSingleQuote = false
+quoteProps = "consistent"
+trailingComma = "es5"
+semi = true
+arrowParens = "always"
+bracketSameLine = true
+bracketSpacing = true
+sortImports = true
+sortPackageJson = false
+endOfLine = "lf"
+ignorePatterns = [
+	"**/src/routeTree.gen.ts",
+	"**/src/styles.css",
+	"**/dist",
+	"**/build",
+	"**/coverage",
+	"**/public/vision",
+]

@@ -34,6 +34,7 @@ type TesseractLoggerMessage = {
 };
 
 type TesseractWorker = {
+	terminate: () => Promise<unknown>;
 	setParameters: (params: Record<string, string>) => Promise<unknown>;
 	recognize: (
 		image: HTMLCanvasElement,
@@ -129,7 +130,10 @@ function handleTesseractProgress(message: TesseractLoggerMessage) {
 }
 
 async function getOcrWorker() {
-	workerPromise ??= createOcrWorker();
+	workerPromise ??= createOcrWorker().catch((error: unknown) => {
+		workerPromise = null;
+		throw error;
+	});
 
 	return workerPromise;
 }
@@ -147,14 +151,19 @@ async function createOcrWorker() {
 		errorHandler: () => undefined,
 	});
 
-	await worker.setParameters({
-		preserve_interword_spaces: "1",
-		tessedit_char_whitelist: ocrCharacterWhitelist,
-		tessedit_pageseg_mode: sparseTextPageSegmentationMode,
-		user_defined_dpi: "300",
-	});
+	try {
+		await worker.setParameters({
+			preserve_interword_spaces: "1",
+			tessedit_char_whitelist: ocrCharacterWhitelist,
+			tessedit_pageseg_mode: sparseTextPageSegmentationMode,
+			user_defined_dpi: "300",
+		});
 
-	return worker;
+		return worker;
+	} catch (error) {
+		await worker.terminate().catch(() => undefined);
+		throw error;
+	}
 }
 
 async function getTesseractApi() {

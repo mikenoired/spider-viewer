@@ -6,7 +6,7 @@ export const installationPhotoOcrAssetUrls = [
 	"/vision/tessdata/rus.traineddata.gz",
 ] as const;
 
-const installationPhotoOcrCacheName = "spider-viewer-v1";
+const installationPhotoOcrCacheName = "spider-viewer-v2";
 
 export type InstallationPhotoAssetProgress = {
 	loaded: number;

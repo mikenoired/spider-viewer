@@ -2,6 +2,10 @@
 
 Средство для просмотра активности выполнения прокладки кабелей в РОАЭС
 
+Работа с coding-агентом организована через [AGENTS.md](AGENTS.md) и протокол [Swiss Clock](docs/swiss-clock.md). Контекст приложения: [цели](docs/project.md), [предметная область](docs/domain.md), [архитектура](docs/architecture.md), [проверки](docs/verification.md). Результаты задач сохраняются в [tasks/](tasks/README.md).
+
+Требуется **Bun >=1.4.4**. Форматирование выполняется только встроенным `bun fmt`: `bun run format`, проверка — `bun run format:check`. Настройки — в `bunfig.toml`.
+
 ## Режим разработки
 
 ```bash
@@ -61,3 +65,5 @@ SHUTDOWN_TIMEOUT_MS=30000
 ```
 
 Перед запуском контейнера Railway выполняет `bun ./scripts/predeploy.mjs`: он синхронизирует схему, затем создаются или обновляются 3 суперпользователя из `AUTH_SUPERUSERS_JSON`. Локально для версии схемы также доступна миграция `bun run db:migrate`. Healthcheck смотрит на `/healthz`, чтобы деплой не зависел от прогрева базы или Redis.
+
+Регрессии workflow проверяются на отдельной одноразовой PostgreSQL: сначала `DATABASE_URL=postgresql://…/spider_test bun run db:push --force`, затем `APP_TEST_DATABASE_URL=postgresql://…/spider_test bun run test:integration`. Эти тесты очищают содержимое явно указанной тестовой БД; рабочую базу для них не используйте. CI предоставляет отдельный PostgreSQL service.

@@ -71,6 +71,20 @@ export function useAppShellChrome() {
 }
 
 export function AppShell({ children, user }: { children: React.ReactNode; user: AuthSession }) {
+	useEffect(() => {
+		if (!("serviceWorker" in navigator)) return;
+		let active = true;
+		const announce = () =>
+			navigator.serviceWorker.controller?.postMessage({ type: "set-session", userId: user.id });
+		navigator.serviceWorker.addEventListener("controllerchange", announce);
+		void navigator.serviceWorker.ready.then((registration) => {
+			if (active) registration.active?.postMessage({ type: "set-session", userId: user.id });
+		});
+		return () => {
+			active = false;
+			navigator.serviceWorker.removeEventListener("controllerchange", announce);
+		};
+	}, [user.id]);
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
 	});

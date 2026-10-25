@@ -9,7 +9,7 @@ import {
 	TextRun,
 	WidthType,
 } from "docx";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { AuthSession } from "@/lib/auth/shared";
 import { getDb } from "@/lib/db";
@@ -19,8 +19,8 @@ import {
 	cables,
 	graphGroupRooms,
 	graphGroups,
-	importSnapshots,
 	importedCableRows,
+	importSnapshots,
 } from "@/lib/db/schema";
 import { createLogger } from "@/lib/logger";
 import { getRedis } from "@/lib/redis";
@@ -72,7 +72,7 @@ function createRangeLabel(range?: DateRangeInput) {
 }
 
 async function pushAuditEntriesToRedis(entries: HistoryEntryView[]) {
-	if (entries.length === 0) return;
+	if (entries.length === 0 || !process.env.REDIS_URL) return;
 
 	try {
 		await Promise.race([
@@ -161,15 +161,24 @@ export async function saveCableProgressChanges(input: SaveCableProgressInput, se
 		throw new Error("Не все кабели найдены для сохранения прогресса.");
 	}
 
+	// Match the dashboard's canonical-first progress, including after snapshot re-imports.
 	const persistedProgressRows = cableIds.length
 		? await db
 				.select({
-					cableRowId: cableProgress.cableRowId,
-					progress: cableProgress.progress,
+					cableRowId: importedCableRows.id,
+					progress: sql<number>`coalesce(${cables.progress}, ${cableProgress.progress}, 0)`,
 				})
-				.from(cableProgress)
+				.from(importedCableRows)
+				.leftJoin(cables, eq(cables.id, importedCableRows.cableId))
+				.leftJoin(
+					cableProgress,
+					and(
+						eq(cableProgress.snapshotId, importedCableRows.snapshotId),
+						eq(cableProgress.cableRowId, importedCableRows.id)
+					)
+				)
 				.where(
-					and(eq(cableProgress.snapshotId, group.snapshotId), inArray(cableProgress.cableRowId, cableIds))
+					and(eq(importedCableRows.snapshotId, group.snapshotId), inArray(importedCableRows.id, cableIds))
 				)
 		: [];
 
