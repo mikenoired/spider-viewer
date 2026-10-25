@@ -14,7 +14,7 @@
 | `src/lib/db/`, `drizzle/`                                           | PostgreSQL/Drizzle, схема и SQL-миграции                                                     |
 | `src/lib/redis.ts`, `logger.ts`                                     | Redis и серверное логирование                                                                |
 | `public/sw.js`, `manifest.webmanifest`                              | Офлайн-перехват GET и приложение; assets OCR в `public/vision/` подготавливает скрипт        |
-| `scripts/`, `ops/`, Dockerfile, Railway config                      | Сборка, запуск, health/readiness, подготовка, эксплуатация                                   |
+| `scripts/`, Dockerfile, Railway config                              | Сборка, запуск, health/readiness, подготовка, эксплуатация                                   |
 | `test/`, `*.test.*`                                                 | Bun-тесты; happy-dom preload, часть auth-тестов требует отдельную PostgreSQL                 |
 | `.agent/`, `docs/`, `tasks/`, `evals/`, `checks/`                   | Инструкции Swiss Clock и свидетельства; не runtime приложения                                |
 
