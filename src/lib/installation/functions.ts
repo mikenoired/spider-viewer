@@ -34,6 +34,14 @@ export const uploadInstallationWorkbook = createServerFn({ method: "POST" })
 		return importInstallationWorkbookFromFormData(data, session);
 	});
 
+export const uploadInstallationPhoto = createServerFn({ method: "POST" })
+	.inputValidator((input: FormData) => input)
+	.handler(async ({ data }) => {
+		const session = await requireInstallationEditor();
+		const { archiveInstallationPhoto } = await import("@/lib/installation-photo/uploads.server");
+		return archiveInstallationPhoto(data, session);
+	});
+
 export const uploadInstallationCableBase = createServerFn({ method: "POST" })
 	.inputValidator((input: FormData) => input)
 	.handler(async ({ data }) => {

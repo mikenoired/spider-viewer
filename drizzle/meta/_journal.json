@@ -36,6 +36,13 @@
 			"when": 1791484929068,
 			"tag": "0004_clear_beast",
 			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "7",
+			"when": 1794242228921,
+			"tag": "0005_freezing_thena",
+			"breakpoints": true
 		}
 	]
 }

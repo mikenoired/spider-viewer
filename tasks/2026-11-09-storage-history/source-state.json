@@ -1,0 +1,6 @@
+{
+	"base": "d8a0248d13776166f7d9904390000d22e5a3cf9f",
+	"source_sha256": "ae71652aa1f470cf7cd7920297f4fcc0a7912c1faec70f5ab92cd893547153da",
+	"definition": "Sorted git tracked and nonignored untracked implementation/test/config paths: src/, scripts/, test/, drizzle/, .github/, Dockerfile*, package.json, bun.lock, bunfig.toml, tsconfig.json, vite.config.ts, railway.json, .env.example. Hash concatenates path + NUL + SHA256(file bytes). Excludes docs/task records and ignored files.",
+	"files": 182
+}

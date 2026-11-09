@@ -4,6 +4,7 @@ import * as Xlsx from "xlsx";
 import type { AuthSession } from "@/lib/auth/shared";
 import { getDb } from "@/lib/db";
 import { installationKksItems, installationSnapshots } from "@/lib/db/schema";
+import { archiveUpload } from "@/lib/uploads.server";
 import { enToRuVisual } from "@/lib/utils";
 
 import { ensureUploadFile } from "../cable-map/import.server";
@@ -207,6 +208,7 @@ export async function importInstallationProgressFromFormData(formData: FormData,
 	const matchedRows = getMatchedItems(activeItems, completedCableTokens);
 	const changedRows = matchedRows.filter((row) => !row.isDone);
 
+	for (const file of uploadFiles) await archiveUpload(file, session.id, "installation-progress");
 	if (matchedRows.length === 0) {
 		return {
 			fileCount: uploadFiles.length,

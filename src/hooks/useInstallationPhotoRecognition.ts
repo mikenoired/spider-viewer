@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { recognizeInstallationPhoto } from "@/lib/installation-photo/ocr";
 import {
 	getInstallationPhotoJobs,
+	queuePhotoUpload,
 	removeInstallationPhotoJob,
 	saveInstallationPhotoJob,
 } from "@/lib/installation-photo/offline";
@@ -14,6 +15,7 @@ import type {
 	InstallationPhotoJob,
 	InstallationPhotoKnownItem,
 } from "@/lib/installation-photo/shared";
+import { syncPhotoUploads } from "@/lib/installation-photo/uploads";
 
 function createPhotoJob(snapshotId: string, file: File) {
 	const now = new Date().toISOString();
@@ -57,11 +59,44 @@ function setJobInList(jobs: InstallationPhotoJob[], job: InstallationPhotoJob) {
 
 export function useInstallationPhotoRecognition(
 	snapshotId: string | null,
-	knownItems: InstallationPhotoKnownItem[]
+	knownItems: InstallationPhotoKnownItem[],
+	userId: string
 ) {
 	const [jobs, setJobs] = useState<InstallationPhotoJob[]>([]);
 	const [activeJobId, setActiveJobId] = useState<string | null>(null);
 	const knownItemCount = knownItems.length;
+	const syncingUploads = useRef(false);
+	const uploadErrorShown = useRef(false);
+
+	const syncUploads = useCallback(async () => {
+		if (!navigator.onLine || syncingUploads.current) return;
+		syncingUploads.current = true;
+		try {
+			await syncPhotoUploads(userId);
+			uploadErrorShown.current = false;
+		} catch {
+			if (!uploadErrorShown.current)
+				toast.error(
+					"Фото сохранено на устройстве. Не удалось отправить оригинал в архив; повторим при восстановлении связи."
+				);
+			uploadErrorShown.current = true;
+		} finally {
+			syncingUploads.current = false;
+		}
+	}, [userId]);
+
+	useEffect(() => {
+		void syncUploads();
+		const retry = () => {
+			void syncUploads();
+		};
+		window.addEventListener("online", retry);
+		const interval = window.setInterval(retry, 30_000);
+		return () => {
+			window.removeEventListener("online", retry);
+			window.clearInterval(interval);
+		};
+	}, [syncUploads]);
 
 	useEffect(() => {
 		if (!snapshotId) {
@@ -88,7 +123,7 @@ export function useInstallationPhotoRecognition(
 				await recognizeFile(snapshotId, file, knownItems);
 			}
 		},
-		[knownItemCount, knownItems, snapshotId]
+		[knownItemCount, knownItems, snapshotId, userId, syncUploads]
 	);
 
 	async function recognizeFile(
@@ -96,12 +131,24 @@ export function useInstallationPhotoRecognition(
 		file: File,
 		currentKnownItems: InstallationPhotoKnownItem[]
 	) {
+		if (!file.type.startsWith("image/") || file.size === 0 || file.size > 25 * 1024 * 1024) {
+			toast.error("Выберите изображение размером до 25 МБ.");
+			return;
+		}
 		const job = createPhotoJob(currentSnapshotId, file);
 
 		setActiveJobId(job.id);
-		await upsertJob(job);
 
 		try {
+			await upsertJob(job);
+			await queuePhotoUpload({
+				id: job.id,
+				userId,
+				snapshotId: currentSnapshotId,
+				fileName: job.fileName,
+				image: file,
+			});
+			void syncUploads();
 			const result = await recognizeInstallationPhoto(file, currentKnownItems, (progress) =>
 				updateJobProgress(job, progress)
 			);

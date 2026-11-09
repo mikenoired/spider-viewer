@@ -16,6 +16,7 @@ import {
 	taskEvents,
 	users,
 } from "@/lib/db/schema";
+import { archiveUpload } from "@/lib/uploads.server";
 
 import {
 	ensureCanonicalCableBase,
@@ -535,6 +536,7 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 		.where(eq(priorityRoomLists.sourceChecksum, checksum))
 		.limit(1);
 
+	await archiveUpload(file, session.id, "kanban-list");
 	if (existing) {
 		return {
 			id: existing.id,

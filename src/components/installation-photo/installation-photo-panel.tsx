@@ -19,6 +19,7 @@ import type { InstallationPhotoCandidate, InstallationPhotoKnownItem } from "@/l
 
 export function InstallationPhotoPanel({
 	snapshotId,
+	userId,
 	knownItems,
 	canEdit,
 	assetState,
@@ -29,6 +30,7 @@ export function InstallationPhotoPanel({
 	onApplyCandidates,
 }: {
 	snapshotId: string | null;
+	userId: string;
 	knownItems: InstallationPhotoKnownItem[];
 	canEdit: boolean;
 	assetState: InstallationPhotoAssetState;
@@ -40,7 +42,7 @@ export function InstallationPhotoPanel({
 }) {
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const [cameraOpen, setCameraOpen] = useState(false);
-	const photoRecognition = useInstallationPhotoRecognition(snapshotId, knownItems);
+	const photoRecognition = useInstallationPhotoRecognition(snapshotId, knownItems, userId);
 	const canRecognize =
 		canEdit && ocrReady && Boolean(snapshotId) && knownItems.length > 0 && !photoRecognition.activeJobId;
 

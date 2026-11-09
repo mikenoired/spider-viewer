@@ -12,7 +12,9 @@ FROM dependencies AS build
 COPY . .
 RUN bun run build
 
-FROM oven/bun:1.4.4-slim AS runtime
+FROM postgres:18-bookworm AS runtime
+
+COPY --from=dependencies /usr/local/bin/bun /usr/local/bin/bun
 
 ENV HOST=0.0.0.0
 ENV NODE_ENV=production
@@ -33,4 +35,5 @@ COPY --from=build /app/public ./public
 
 EXPOSE 3000
 
+ENTRYPOINT []
 CMD ["bun", "./scripts/serve.mjs"]

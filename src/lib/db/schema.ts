@@ -80,6 +80,20 @@ export const users = pgTable(
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
+export const uploadedFiles = pgTable("uploaded_files", {
+	id: uuid("id").defaultRandom().primaryKey(),
+	objectKey: text("object_key").notNull(),
+	fileName: text("file_name").notNull(),
+	contentType: text("content_type").notNull(),
+	checksum: text("checksum").notNull(),
+	sizeBytes: integer("size_bytes").notNull(),
+	purpose: text("purpose").notNull(),
+	uploadedByUserId: uuid("uploaded_by_user_id")
+		.notNull()
+		.references(() => users.id, { onDelete: "restrict" }),
+	createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const importSnapshots = pgTable(
 	"import_snapshots",
 	{

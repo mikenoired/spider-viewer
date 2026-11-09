@@ -7,6 +7,7 @@ import type { AuthSession } from "@/lib/auth/shared";
 import { ensureUploadFile } from "@/lib/cable-map/import.server";
 import { getDb } from "@/lib/db";
 import { installationKksGroups, installationKksItems, installationSnapshots } from "@/lib/db/schema";
+import { archiveUpload } from "@/lib/uploads.server";
 import { enToRuVisual } from "@/lib/utils";
 
 import type { InstallationKksItemType } from "./shared";
@@ -696,6 +697,8 @@ export async function importInstallationWorkbookFromFormData(formData: FormData,
 	const primaryUpload = await ensureUploadFile(formData);
 	const baseUpload = await getOptionalUpload(formData, "baseFile");
 	const input = createImportWriteInput(primaryUpload, baseUpload, session);
+	await archiveUpload(primaryUpload.file, session.id, "installation");
+	if (baseUpload) await archiveUpload(baseUpload.file, session.id, "installation-base");
 	const db = getDb();
 	const snapshot = await db.transaction((tx) => replaceActiveInstallationData(tx, input));
 
@@ -725,6 +728,7 @@ export async function importInstallationCableBaseFromFormData(formData: FormData
 
 	const activeItems = await getActiveInstallationItemsForBase(db, snapshot.id);
 	const plan = createCableBaseApplicationPlan(activeItems, statusByKks);
+	await archiveUpload(baseUpload.file, session.id, "installation-base");
 	const now = new Date();
 
 	await db.transaction(async (tx) => {

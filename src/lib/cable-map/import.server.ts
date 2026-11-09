@@ -14,6 +14,7 @@ import {
 	importedCableRows,
 	importSnapshots,
 } from "@/lib/db/schema";
+import { archiveUpload } from "@/lib/uploads.server";
 import { enToRuVisual } from "@/lib/utils";
 
 import { type SnapshotKind, supportedWorkbookExtensions, supportedWorkbookMimeTypes } from "./shared";
@@ -880,6 +881,7 @@ export async function importWorkbookFromFormData(
 	const { file, fileType, buffer } = await ensureUploadFile(formData);
 	const snapshotKind = options.snapshotKind ?? "demolition";
 	const parsedRows = parseRowsForSnapshotKind(file.name, buffer, snapshotKind);
+	await archiveUpload(file, session.id, `cable-map:${snapshotKind}`);
 	const db = getDb();
 	const resolveKey = createCanonicalCableKeyResolver(await db.select().from(cables));
 	const canonicalCableRows = [

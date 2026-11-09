@@ -120,6 +120,7 @@ export function InstallationBoard({
 							/>
 						) : null}
 						<InstallationPhotoPanel
+							userId={userId}
 							snapshotId={board.data.snapshot?.id ?? null}
 							knownItems={photoKnownItems}
 							canEdit={canEdit}

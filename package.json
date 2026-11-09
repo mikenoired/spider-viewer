@@ -26,7 +26,11 @@
 		"format:check": "bun fmt --check",
 		"lint:format": "bun run format",
 		"lint:check": "bun run lint && bun run format:check",
-		"test:integration": "bun test --timeout 120000 ./test/integration/"
+		"test:integration": "bun test --timeout 120000 ./test/integration/",
+		"db:backup": "bun ./scripts/backup-db.ts",
+		"db:clear-history": "bun ./scripts/clear-history.ts",
+		"db:clear-audit-cache": "bun ./scripts/clear-audit-cache.ts",
+		"db:download-backup": "bun ./scripts/download-backup.ts"
 	},
 	"dependencies": {
 		"@tailwindcss/vite": "^4.3.3",

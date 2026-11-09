@@ -1,0 +1,7 @@
+FROM oven/bun:1.4.4 AS bun
+FROM postgres:18-bookworm
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
+WORKDIR /app
+COPY scripts/backup-db.ts scripts/storage.ts ./scripts/
+ENTRYPOINT []
+CMD ["bun", "./scripts/backup-db.ts"]

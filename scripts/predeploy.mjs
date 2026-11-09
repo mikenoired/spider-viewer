@@ -444,6 +444,21 @@ const tableDefinitions = [
 	],
 ];
 
+tableDefinitions.push([
+	"uploaded_files",
+	`create table if not exists uploaded_files (
+	id uuid primary key default gen_random_uuid(),
+	object_key text not null,
+	file_name text not null,
+	content_type text not null,
+	checksum text not null,
+	size_bytes integer not null,
+	purpose text not null,
+	uploaded_by_user_id uuid not null references users(id) on delete restrict,
+	created_at timestamp with time zone not null default now()
+)`,
+]);
+
 const columnDefinitions = [
 	["cables", "cable_marking text not null default ''"],
 	["users", "session_version integer not null default 0"],

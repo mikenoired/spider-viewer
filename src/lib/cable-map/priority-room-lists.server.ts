@@ -4,6 +4,7 @@ import * as Xlsx from "xlsx";
 import type { AuthSession } from "@/lib/auth/shared";
 import { getDb } from "@/lib/db";
 import { importSnapshots, priorityRoomEntries, priorityRoomLists } from "@/lib/db/schema";
+import { archiveUpload } from "@/lib/uploads.server";
 import { enToRuVisual } from "@/lib/utils";
 
 import {
@@ -188,6 +189,7 @@ async function ensurePriorityRoomListUpload(formData: FormData) {
 export async function importPriorityRoomListFromFormData(formData: FormData, session: AuthSession) {
 	const { file, fileType, authorName, buffer } = await ensurePriorityRoomListUpload(formData);
 	const rooms = parsePriorityRoomRows(file.name, buffer);
+	await archiveUpload(file, session.id, "priority-rooms");
 	const db = getDb();
 	const now = new Date();
 
