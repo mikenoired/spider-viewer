@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	graphSideLabelsBySnapshotKind,
@@ -106,23 +104,16 @@ export function SummaryCard({
 	title,
 	value,
 	description,
-	icon,
 }: {
 	title: string;
 	value: string;
 	description: string;
-	icon: ReactNode;
 }) {
 	return (
-		<Card>
-			<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-				<div className="flex flex-col gap-1">
-					<CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-					<CardDescription className="text-2xl font-semibold text-foreground">{value}</CardDescription>
-				</div>
-				<div className="rounded-lg border bg-muted/30 p-2 text-muted-foreground">{icon}</div>
-			</CardHeader>
-			<CardContent className="pt-0 text-sm text-muted-foreground">{description}</CardContent>
-		</Card>
+		<div className="flex min-w-0 flex-col gap-2 px-1 py-2">
+			<div className="text-xs font-medium tracking-wide text-muted-foreground">{title}</div>
+			<div className="truncate text-2xl font-semibold leading-tight text-foreground">{value}</div>
+			<div className="text-sm leading-snug text-muted-foreground">{description}</div>
+		</div>
 	);
 }

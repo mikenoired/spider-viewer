@@ -28,11 +28,5 @@ export const Route = createFileRoute("/app/backdated")({
 function BackdatedPage() {
 	const entries = Route.useLoaderData();
 
-	return (
-		<HistoryPanel
-			description="Отдельный журнал кабельных изменений, где дата действия не совпадает с фактическим моментом изменения."
-			initialEntries={entries}
-			backdatedOnly
-		/>
-	);
+	return <HistoryPanel initialEntries={entries} backdatedOnly />;
 }

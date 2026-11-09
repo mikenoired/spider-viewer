@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
 	Popover,
 	PopoverContent,
@@ -178,11 +178,9 @@ function SortIcon({ active, direction }: { active: boolean; direction: SortDirec
 }
 
 export function HistoryPanel({
-	description,
 	initialEntries,
 	backdatedOnly,
 }: {
-	description: string;
 	initialEntries: HistoryEntryView[];
 	backdatedOnly?: boolean;
 }) {
@@ -279,13 +277,9 @@ export function HistoryPanel({
 	}
 
 	return (
-		<Card className="border-none rounded-none ring-0 px-0 flex-1">
+		<Card className="border-none rounded-none bg-transparent ring-0 px-0 py-0 flex-1">
 			<CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-				<div className="flex flex-col gap-1">
-					<CardDescription>{description}</CardDescription>
-				</div>
-
-				<div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+				<div className="flex justify-end w-full gap-2">
 					<Popover>
 						<PopoverTrigger asChild>
 							<Button

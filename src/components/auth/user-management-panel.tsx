@@ -2,15 +2,7 @@
 
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "@tanstack/react-router";
-import {
-	CheckIcon,
-	LoaderCircleIcon,
-	ShieldCheckIcon,
-	UserCogIcon,
-	UserPlusIcon,
-	UsersIcon,
-	XIcon,
-} from "lucide-react";
+import { CheckIcon, LoaderCircleIcon, UserCogIcon, UserPlusIcon, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -93,30 +85,13 @@ function EmptyTableState({ title, description }: { title: string; description: s
 	);
 }
 
-function SummaryCard({
-	title,
-	value,
-	description,
-	icon: Icon,
-}: {
-	title: string;
-	value: string;
-	description: string;
-	icon: typeof UsersIcon;
-}) {
+function SummaryCard({ title, value, description }: { title: string; value: string; description: string }) {
 	return (
-		<Card>
-			<CardContent className="flex items-start justify-between gap-3 pt-6">
-				<div>
-					<div className="text-sm text-muted-foreground">{title}</div>
-					<div className="mt-2 text-3xl font-semibold">{value}</div>
-					<div className="mt-1 text-sm text-muted-foreground">{description}</div>
-				</div>
-				<div className="rounded-lg border bg-muted/30 p-3 text-muted-foreground">
-					<Icon />
-				</div>
-			</CardContent>
-		</Card>
+		<div className="flex min-w-0 flex-col gap-2 px-1 py-2">
+			<div className="text-xs font-medium tracking-wide text-muted-foreground">{title}</div>
+			<div className="text-3xl font-semibold leading-tight tabular-nums">{value}</div>
+			<div className="text-sm leading-snug text-muted-foreground">{description}</div>
+		</div>
 	);
 }
 
@@ -492,47 +467,33 @@ export function UserManagementPanel({
 		<div className="flex flex-col gap-4 px-4 pb-4">
 			<CreateUserDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={refreshUsers} />
 
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-				<div>
-					<h1 className="text-2xl font-semibold">Профили пользователей</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Просмотр всех аккаунтов, создание пользователей и назначение ролей.
-					</p>
-				</div>
-				<Button type="button" onClick={() => setCreateOpen(true)}>
-					<UserPlusIcon data-icon="inline-start" />
-					Создать пользователя
-				</Button>
-			</div>
-
 			<div className="grid gap-4 md:grid-cols-3">
 				<SummaryCard
 					title="Ожидают подтверждения"
 					value={String(data.pending.length)}
 					description="Старые заявки до закрытия публичной регистрации"
-					icon={UserPlusIcon}
 				/>
 				<SummaryCard
 					title="Активные пользователи"
 					value={String(data.active.length)}
 					description="Могут входить в систему"
-					icon={UsersIcon}
 				/>
 				<SummaryCard
 					title="Суперпользователи"
 					value={String(superAdminCount)}
 					description="Имеют доступ к управлению профилями"
-					icon={ShieldCheckIcon}
 				/>
 			</div>
 
 			<Card>
-				<CardHeader>
-					<CardTitle>Управление доступом</CardTitle>
-					<CardDescription>
-						Создавать пользователей и назначать роли могут только суперпользователи. Публичная регистрация
-						доступна только для создания первого суперпользователя в пустой системе.
-					</CardDescription>
+				<CardHeader className="flex flex-col gap-3 sm:flex-row items-center justify-between">
+					<div className="flex flex-col gap-1">
+						<CardTitle>Управление доступом</CardTitle>
+					</div>
+					<Button type="button" onClick={() => setCreateOpen(true)}>
+						<UserPlusIcon data-icon="inline-start" />
+						Создать пользователя
+					</Button>
 				</CardHeader>
 				<CardContent>
 					<Tabs defaultValue={data.pending.length > 0 ? "pending" : "active"}>

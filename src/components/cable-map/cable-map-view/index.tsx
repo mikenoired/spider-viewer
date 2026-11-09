@@ -4,13 +4,10 @@ import { Link } from "@tanstack/react-router";
 import {
 	DownloadIcon,
 	FileUpIcon,
-	Layers2Icon,
 	LoaderCircleIcon,
-	MapIcon,
 	Maximize2Icon,
 	Minimize2Icon,
 	MinusIcon,
-	PercentIcon,
 	PlusIcon,
 	RefreshCcwIcon,
 	StarIcon,
@@ -983,7 +980,7 @@ export function CableMapView({
 
 	if (!data.snapshot) {
 		return (
-			<div className="grid gap-4 px-4 pt-4">
+			<div className="grid gap-4 px-4">
 				<Card className="border-dashed">
 					<CardHeader>
 						<CardTitle>Активный граф пока не загружен</CardTitle>
@@ -1014,19 +1011,16 @@ export function CableMapView({
 					title="Активный снимок"
 					value={data.snapshot.fileName}
 					description={`Загружено строк: ${data.snapshot.rowCount}`}
-					icon={<MapIcon />}
 				/>
 				<SummaryCard
 					title="Отметки"
 					value={String(data.snapshot.levelCount)}
 					description={`Групп на карте: ${data.snapshot.groupCount}`}
-					icon={<Layers2Icon />}
 				/>
 				<SummaryCard
 					title="Помещения"
 					value={String(data.snapshot.roomCount)}
 					description={`Импортировал: ${data.snapshot.importedByLogin}`}
-					icon={<PercentIcon />}
 				/>
 				<Card>
 					<CardHeader>
@@ -1057,7 +1051,7 @@ export function CableMapView({
 							animate={{ opacity: 1 }}
 							exit={{ opacity: 0 }}
 							transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-							className="fixed inset-0 z-[80] bg-background/80"
+							className="fixed inset-0 z-80 bg-background/80"
 						/>
 					) : null}
 				</AnimatePresence>
@@ -1073,7 +1067,7 @@ export function CableMapView({
 					className={cn(
 						"relative overflow-hidden rounded-lg border border-border bg-card",
 						isFullscreen &&
-							"fixed inset-0 z-[90] flex rounded-none border-none bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-none"
+							"fixed inset-0 z-90 flex rounded-none border-none bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-none"
 					)}>
 					{!isFullscreen ? (
 						<div className="border-b border-border/70 px-4 py-3">
@@ -1178,7 +1172,7 @@ export function CableMapView({
 									animate={{ opacity: 1, x: 0, scale: 1 }}
 									exit={{ opacity: 0, x: -18, scale: 0.98 }}
 									transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
-									className="pointer-events-none absolute top-4 left-4 z-[95] flex max-w-[calc(100vw-2rem)] flex-col gap-3 sm:top-6 sm:left-6">
+									className="pointer-events-none absolute top-4 left-4 z-95 flex max-w-[calc(100vw-2rem)] flex-col gap-3 sm:top-6 sm:left-6">
 									<FloatingContrastPanel className="pointer-events-auto p-2">
 										<Button
 											type="button"
@@ -1197,7 +1191,7 @@ export function CableMapView({
 									animate={{ opacity: 1, y: 0, scale: 1 }}
 									exit={{ opacity: 0, y: -14, scale: 0.98 }}
 									transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1], delay: 0.02 }}
-									className="pointer-events-none absolute top-4 right-4 z-[95] flex max-w-[calc(100vw-2rem)] flex-col items-end gap-2 sm:top-6 sm:right-6">
+									className="pointer-events-none absolute top-4 right-4 z-95 flex max-w-[calc(100vw-2rem)] flex-col items-end gap-2 sm:top-6 sm:right-6">
 									<FloatingContrastPanel className="pointer-events-auto p-2">
 										<div className="flex items-center gap-1 rounded-lg">
 											<Button
@@ -1253,7 +1247,7 @@ export function CableMapView({
 									animate={{ opacity: 1, y: 0, scale: 1 }}
 									exit={{ opacity: 0, y: 14, scale: 0.98 }}
 									transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1], delay: 0.04 }}
-									className="pointer-events-none absolute right-4 bottom-4 z-[95] flex max-w-[calc(100vw-2rem)] flex-col items-end gap-2 sm:right-6 sm:bottom-6">
+									className="pointer-events-none absolute right-4 bottom-4 z-95 flex max-w-[calc(100vw-2rem)] flex-col items-end gap-2 sm:right-6 sm:bottom-6">
 									{canExportDailyReport ? (
 										<FloatingContrastPanel className="pointer-events-auto p-2">
 											<Button
@@ -1287,7 +1281,7 @@ export function CableMapView({
 							onLostPointerCapture={handleViewportLostPointerCapture}
 							className={cn(
 								"relative overflow-hidden overscroll-contain bg-background touch-none",
-								isFullscreen ? "h-full min-h-0" : "h-[min(72vh,48rem)] min-h-[26rem]",
+								isFullscreen ? "h-full min-h-0" : "h-[min(72vh,48rem)] min-h-104",
 								isOverlayOpen ? "cursor-default" : isDragging ? "cursor-grabbing" : "cursor-grab"
 							)}>
 							<div

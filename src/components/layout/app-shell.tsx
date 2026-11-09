@@ -9,8 +9,6 @@ import {
 	KanbanIcon,
 	MapIcon,
 	MessageSquareIcon,
-	PanelLeftIcon,
-	UserCheckIcon,
 	UserPlusIcon,
 	UsersIcon,
 } from "lucide-react";
@@ -42,7 +40,6 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarProvider,
-	SidebarRail,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
 import type { AuthSession } from "@/lib/auth/shared";
@@ -113,29 +110,16 @@ export function AppShell({ children, user }: { children: React.ReactNode; user: 
 		<AppShellChromeContext.Provider value={chromeContextValue}>
 			<SidebarProvider>
 				<AppSidebar pathname={pathname} user={user} chromeHidden={chromeHidden} />
-				<SidebarInset className="min-w-0 [--app-shell-content-padding:1rem] [--app-shell-header-height:calc(1.5rem+env(safe-area-inset-top))] [--app-shell-sidebar-offset:0px] md:peer-data-[state=collapsed]:[--app-shell-sidebar-offset:var(--sidebar-width-icon)] md:peer-data-[state=expanded]:[--app-shell-sidebar-offset:var(--sidebar-width)]">
-					<header
-						aria-hidden={chromeHidden}
-						inert={chromeHidden ? true : undefined}
+				<SidebarInset className="h-svh min-w-0 overflow-hidden [--app-shell-header-height:0rem] [--app-shell-content-padding:0rem]">
+					<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto py-4">{children}</div>
+					<div
 						className={cn(
-							"fixed top-0 right-0 left-0 z-50 flex h-[calc(2.5rem+env(safe-area-inset-top))] items-center gap-2 border-b bg-background px-2 pt-[env(safe-area-inset-top)] transition-[opacity,transform] duration-300 ease-out md:left-(--app-shell-sidebar-offset)",
-							chromeHidden && "pointer-events-none -translate-y-full opacity-0"
+							"shrink-0 px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 text-xs text-muted-foreground",
+							chromeHidden && "hidden"
 						)}>
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon-sm"
-							className="md:hidden"
-							onClick={() => setMobileNavigationOpen(true)}
-							aria-label="Открыть навигацию">
-							<PanelLeftIcon />
-						</Button>
-						<SidebarTrigger className="hidden md:inline-flex" />
-						<div className="min-w-0 flex-1 text-sm font-medium">{getPageTitle(pathname)}</div>
-						{canManageUsers(user.role) ? <ApprovalAccountsButton pathname={pathname} /> : null}
-					</header>
-					<div className="flex min-w-0 flex-1 flex-col pt-[calc(var(--app-shell-header-height)+var(--app-shell-content-padding))]">
-						{children}
+						<nav aria-label="Хлебные крошки">
+							{PROJECT_NAME} / <span aria-current="page">{getPageTitle(pathname)}</span>
+						</nav>
 					</div>
 					<MobileNavigationSheet
 						pathname={pathname}
@@ -166,24 +150,14 @@ function AppSidebar({
 			aria-hidden={chromeHidden}
 			inert={chromeHidden ? true : undefined}
 			className={cn(
-				"z-50 transition-[opacity,transform] duration-300 ease-out",
+				"z-50 transition-[left,right,width,opacity,transform] duration-200 ease-linear",
 				chromeHidden && "pointer-events-none -translate-x-6 opacity-0"
 			)}>
-			<SidebarHeader className="border-b p-2">
-				<Link
-					to="/app"
-					className={cn(
-						"flex items-center gap-3 rounded-lg transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-						"group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center"
-					)}>
-					<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
-						SV
-					</div>
-					<div className="min-w-0 group-data-[collapsible=icon]:hidden">
-						<div className="truncate text-sm font-semibold">{PROJECT_NAME}</div>
-						<div className="truncate text-xs text-muted-foreground">Рабочее пространство</div>
-					</div>
-				</Link>
+			<SidebarHeader className="flex-row items-center group-data-[collapsible=icon]:justify-center justify-between border-b p-2">
+				<span className="truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">
+					{PROJECT_NAME}
+				</span>
+				<SidebarTrigger aria-label="Свернуть или развернуть сайдбар" />
 			</SidebarHeader>
 			<SidebarContent>
 				<SidebarGroup>
@@ -210,7 +184,6 @@ function AppSidebar({
 			<SidebarFooter>
 				<SidebarUserMenu user={user} />
 			</SidebarFooter>
-			<SidebarRail />
 		</Sidebar>
 	);
 }
@@ -368,30 +341,6 @@ function SidebarUserMenu({ user, mobile = false }: { user: AuthSession; mobile?:
 			</DropdownMenu>
 			<ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
 			<LogoutConfirmDialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen} />
-		</>
-	);
-}
-
-function ApprovalAccountsButton({ pathname }: { pathname: string }) {
-	const isUsersPage = pathname.startsWith("/app/users");
-
-	return (
-		<>
-			<Button
-				asChild
-				variant={isUsersPage ? "secondary" : "outline"}
-				size="sm"
-				className="hidden sm:inline-flex">
-				<Link to="/app/users">
-					<UserCheckIcon data-icon="inline-start" />
-					Пользователи
-				</Link>
-			</Button>
-			<Button asChild variant={isUsersPage ? "secondary" : "outline"} size="icon-sm" className="sm:hidden">
-				<Link to="/app/users" aria-label="Пользователи">
-					<UserCheckIcon />
-				</Link>
-			</Button>
 		</>
 	);
 }

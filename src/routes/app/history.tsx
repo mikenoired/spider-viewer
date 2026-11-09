@@ -28,10 +28,5 @@ export const Route = createFileRoute("/app/history")({
 function HistoryPage() {
 	const entries = Route.useLoaderData();
 
-	return (
-		<HistoryPanel
-			description="Все зафиксированные изменения прогресса по кабелям."
-			initialEntries={entries}
-		/>
-	);
+	return <HistoryPanel initialEntries={entries} />;
 }

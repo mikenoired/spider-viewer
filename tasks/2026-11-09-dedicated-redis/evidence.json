@@ -1,0 +1,42 @@
+{
+	"source_commit": "f4d1086cccddc9ecdc1141813bec019173a43e98",
+	"redis_service": {
+		"id": "e6ffb070-bb79-4a81-8365-d78ca4cf5207",
+		"name": "spider-viewer-redis"
+	},
+	"redis_image": "redis:8.2",
+	"redis_deployment": {
+		"id": "b6d12d86-d94d-4aa9-9e85-6d805de89b9a",
+		"status": "SUCCESS"
+	},
+	"volume": {
+		"id": "b6a1a131-0102-4dbf-961e-cbd6bd112af7",
+		"mount": "/data",
+		"mountpoint_verified": true,
+		"appendonly_directory_exists": true
+	},
+	"authentication": {
+		"own_random_password_bits": 256,
+		"without_password": "NOAUTH",
+		"with_password": "PONG"
+	},
+	"application": {
+		"variable_reference": "${{spider-viewer-redis.REDIS_URL}}",
+		"deployment": "9c9b0f0f-3298-42d2-9b4f-31c219562358",
+		"status": "SUCCESS",
+		"same_image": true,
+		"active_deployment_count": 1,
+		"previous_deployment_not_active": true
+	},
+	"runtime_probe": {
+		"host": "spider-viewer-redis.railway.internal",
+		"ping": "PONG",
+		"writeRead": "OK",
+		"probeDeleted": true
+	},
+	"health": {
+		"healthz": 200,
+		"readyz": 200
+	},
+	"previous_redis_commands_or_mutations": false
+}

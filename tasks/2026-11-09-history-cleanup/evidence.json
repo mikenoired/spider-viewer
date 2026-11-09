@@ -1,0 +1,46 @@
+{
+	"source_commit": "f4d1086cccddc9ecdc1141813bec019173a43e98",
+	"redis": {
+		"service": "Redis",
+		"image": "redis:8.2",
+		"logical_database": 0,
+		"service_ping": "PONG",
+		"application_ping": "PONG",
+		"application_variable": "${{Redis.REDIS_URL}}",
+		"audit_keys_after": 0
+	},
+	"before": {
+		"rooms": 0,
+		"cables": 93,
+		"events": 19,
+		"remarks": 1
+	},
+	"after": {
+		"preservedTables": 21,
+		"preservedData": "all row counts and hashes match",
+		"history": {
+			"rooms": 0,
+			"cables": 0,
+			"events": 0,
+			"remarks": 0
+		}
+	},
+	"backup": {
+		"key": "backups/production/2026-11-09T17-15-20.029Z-e20f2e6f-daaa-4321-8e4f-68de185ddeac.dump",
+		"sha256": "4ec6d2d1d969f08e2a16e3e519850acac1b76d878231f0b1d97c618ca2b9198a",
+		"bytes": 1553805,
+		"createdAt": "2026-11-09T17:15:50.548Z"
+	},
+	"deployment_after": {
+		"id": "bf90192a-1b81-4bf3-b0e3-c8017a00c96f",
+		"status": "SUCCESS",
+		"commit": "f4d1086cccddc9ecdc1141813bec019173a43e98",
+		"reused_previous_image": true
+	},
+	"health": {
+		"healthz": 200,
+		"readyz": 200
+	},
+	"sql_repeated": false,
+	"redis_recovery": "CLI reported a post-commit Redis error; remote DEL/EXISTS on the correct Railway Redis DB succeeded before app resume."
+}
