@@ -182,4 +182,87 @@ describe.skipIf(!url)("storage and history maintenance on disposable PostgreSQL"
 			}
 		}
 	);
+	it("resets the visible work state while preserving accounts, imported maps and cables", async () => {
+		const snapshotId = randomUUID(),
+			groupId = randomUUID(),
+			roomId = randomUUID(),
+			rowId = randomUUID();
+		await db`insert into import_snapshots(id,file_name,file_type,checksum,imported_by_user_id,is_active) values (${snapshotId},'map.xlsx','xlsx','map-test',${userId},true)`;
+		await db`insert into graph_groups(id,snapshot_id,group_key,graph_side,source_zone,level) values (${groupId},${snapshotId},'dirty:none:test:0','dirty','test','0')`;
+		await db`insert into graph_group_rooms(id,snapshot_id,group_id,room_name,room_role,progress,updated_by_user_id) values (${roomId},${snapshotId},${groupId},'room','primary',75,${userId})`;
+		await db`insert into imported_cable_rows(id,cable_id,snapshot_id,source_row_index,cable_label,graph_side,from_room,from_zone,level) values (${rowId},${cableId},${snapshotId},1,'Test','dirty','room','test','0')`;
+		await db`insert into cable_progress(snapshot_id,group_id,room_id,cable_row_id,progress) values (${snapshotId},${groupId},${roomId},${rowId},75)`;
+		await db`insert into cable_list_items(list_id,cable_id) values (${listId},${cableId})`;
+		await db`insert into priority_room_entries(list_id,snapshot_id,room_name,normalized_room_name) values (${listId},${snapshotId},'room','room')`;
+		await db`insert into priority_room_kanban_states(snapshot_id,room_id,updated_by_user_id,status) values (${snapshotId},${roomId},${userId},'done')`;
+		const installationId = randomUUID(),
+			installationGroup = randomUUID(),
+			installationItem = randomUUID();
+		await db`insert into installation_snapshots(id,file_name,file_type,checksum,imported_by_user_id) values (${installationId},'board.xlsx','xlsx','board-test',${userId})`;
+		await db`insert into installation_kks_groups(id,snapshot_id,name) values (${installationGroup},${installationId},'group')`;
+		await db`insert into installation_kks_items(id,snapshot_id,group_id,name,is_done,revision) values (${installationItem},${installationId},${installationGroup},'KKS',true,3)`;
+		await db`insert into installation_pending_changes(client_mutation_id,snapshot_id,group_id,kks_item_id,user_id,user_login,base_done,desired_done,server_done) values ('reset-pending',${installationId},${installationGroup},${installationItem},${userId},'storage-test',false,true,true)`;
+		globalThis.__spiderViewerDb__ = drizzle(db, { schema });
+		const { getActiveDashboardData, getHistoryEntries } =
+			await import("../../src/lib/cable-map/queries.server");
+		expect((await getActiveDashboardData()).snapshot?.averageProgress).toBe(75);
+		const backup = async () => ({ key: "verified-work-reset", sha256: "test", bytes: 1 });
+		await clearHistory(db, false, backup, { resetWorkState: true });
+		expect((await getActiveDashboardData()).priorityLists.length).toBe(1);
+		await expect(
+			clearHistory(
+				db,
+				true,
+				async () => {
+					throw new Error("backup offline");
+				},
+				{ resetWorkState: true }
+			)
+		).rejects.toThrow("backup offline");
+		expect((await getActiveDashboardData()).snapshot?.averageProgress).toBe(75);
+		await db.unsafe(
+			"create function work_reset_fail() returns trigger language plpgsql as $$ begin raise exception 'injected reset failure'; end $$"
+		);
+		await db.unsafe(
+			"create trigger work_reset_fail before update on cables for each statement execute function work_reset_fail()"
+		);
+		try {
+			await expect(clearHistory(db, true, backup, { resetWorkState: true })).rejects.toThrow(
+				"injected reset failure"
+			);
+			expect((await getActiveDashboardData()).priorityLists.length).toBe(1);
+			expect((await getActiveDashboardData()).snapshot?.averageProgress).toBe(75);
+			expect((await db`select count(*)::int as n from installation_pending_changes`)[0].n).toBe(1);
+		} finally {
+			await db.unsafe("drop trigger work_reset_fail on cables");
+			await db.unsafe("drop function work_reset_fail()");
+		}
+		await clearHistory(db, true, backup, { resetWorkState: true });
+		const page = await getActiveDashboardData();
+		expect(page.priorityLists).toEqual([]);
+		expect(page.snapshot?.averageProgress).toBe(0);
+		expect(page.snapshot?.id).toBe(snapshotId);
+		expect(await getHistoryEntries()).toEqual([]);
+		for (const table of [
+			"remarks",
+			"remark_cable_items",
+			"notifications",
+			"task_comments",
+			"task_events",
+			"cable_list_items",
+			"priority_room_lists",
+			"priority_room_entries",
+			"priority_room_kanban_states",
+			"cable_progress",
+			"installation_pending_changes",
+		])
+			expect((await db`select count(*)::int as n from ${db(table)}`)[0].n).toBe(0);
+		expect((await db`select progress from cables where id=${cableId}`)[0].progress).toBe(0);
+		expect(
+			(await db`select is_done,revision from installation_kks_items where id=${installationItem}`)[0]
+		).toMatchObject({ is_done: false, revision: 4 });
+		expect((await db`select password_hash from users where id=${userId}`)[0].password_hash).toBe("unused");
+		expect((await db`select count(*)::int as n from imported_cable_rows where id=${rowId}`)[0].n).toBe(1);
+		globalThis.__spiderViewerDb__ = undefined;
+	});
 });

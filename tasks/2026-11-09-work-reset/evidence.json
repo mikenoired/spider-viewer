@@ -1,0 +1,85 @@
+{
+	"source_base": "f4d1086cccddc9ecdc1141813bec019173a43e98",
+	"reset": {
+		"execute": true,
+		"counts": {
+			"rooms": 0,
+			"cables": 0,
+			"events": 0,
+			"remarks": 0
+		},
+		"workState": {
+			"lists": 3,
+			"remarks": 1,
+			"notifications": 24,
+			"progressed_cables": 11,
+			"progressed_rooms": 0,
+			"completed_installation_items": 0
+		},
+		"backup": {
+			"key": "backups/production/2026-11-09T17-39-50.579Z-f8722f87-4205-4153-816a-8704961f75ce.dump",
+			"sha256": "0313e69a18eb018400b85d66a31c0877d1fb371728dfee7136a03ce83e2dd34d",
+			"bytes": 1545093
+		}
+	},
+	"after": {
+		"counts": {
+			"cable_change_audit_logs": 0,
+			"cable_list_items": 0,
+			"cable_progress": 0,
+			"cables": 4949,
+			"change_audit_logs": 0,
+			"graph_group_rooms": 1657,
+			"graph_groups": 73,
+			"import_snapshots": 2,
+			"imported_cable_rows": 11083,
+			"installation_kks_groups": 0,
+			"installation_kks_items": 0,
+			"installation_pending_changes": 0,
+			"installation_snapshots": 0,
+			"manual_graph_rooms": 0,
+			"notifications": 0,
+			"priority_room_entries": 0,
+			"priority_room_kanban_states": 0,
+			"priority_room_lists": 0,
+			"remark_cable_items": 0,
+			"remarks": 0,
+			"task_comments": 0,
+			"task_events": 0,
+			"uploaded_files": 0,
+			"users": 11
+		},
+		"progress": {
+			"nonzero_cables": 0,
+			"nonzero_rooms": 0,
+			"done_installation": 0
+		},
+		"preserved_table_count": 11,
+		"preserved_data_hashes_match": true
+	},
+	"page_queries": {
+		"modes": [
+			{
+				"kind": "demolition",
+				"progress": 0,
+				"lists": 0,
+				"kanbanRooms": 0,
+				"loadedMap": true
+			},
+			{
+				"kind": "installation",
+				"progress": 0,
+				"lists": 0,
+				"kanbanRooms": 0,
+				"loadedMap": true
+			}
+		],
+		"remarks": 0,
+		"history": 0
+	},
+	"redis": {
+		"service_id": "e6ffb070-bb79-4a81-8365-d78ca4cf5207",
+		"audit_keys_after": 0
+	},
+	"source_sha256": "f53c4b1cde82a3b89e7a0ff8cbfd5443046d369e5c1257a80d30da613fe244dd"
+}
