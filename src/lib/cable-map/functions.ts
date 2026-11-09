@@ -280,7 +280,7 @@ export const downloadBackdatedDocx = createServerFn({ method: "POST" })
 	});
 
 export const downloadDailyHistoryDocx = createServerFn({ method: "POST" })
-	.inputValidator(exportDailyHistorySchema)
+	.validator(exportDailyHistorySchema)
 	.handler(async ({ data }) => {
 		const session = await requireRole(["super-admin"]);
 

@@ -219,6 +219,85 @@ describe("workbook import validation", () => {
 		expect(rows[0]?.graphSide).toBe("dirty");
 	});
 
+	it("imports the PSE base into clean zones without merging repeated journal numbers", () => {
+		const headers = [
+			"Договор",
+			"Проект",
+			"Наименование",
+			"№ кабеля",
+			"Марка кабеля\r\n(монтажная)",
+			"Марка кабеля\r\n(заводская)",
+			"Сечение",
+			"Откуда (оборудование)",
+			"Откуда (помещение)",
+			"X начало",
+			"Y начало",
+			"Z начало",
+			"Куда (оборудование)",
+			"Куда (помещение)",
+			"X конец",
+			"Y конец",
+			"Z конец",
+			"Длина проектная, м",
+			"Трассировка",
+		];
+		const data = [
+			"Договор",
+			"П-1",
+			"Журнал",
+			"3.0001",
+			"1EM01-01",
+			"ВВГ",
+			"5*150",
+			"Источник",
+			"A101",
+			"0",
+			"0",
+			"-3,6",
+			"Приемник",
+			"A102",
+			"0",
+			"0",
+			"0",
+			"12,5",
+			"3125",
+		];
+		const second = [...data];
+		second[4] = "1EM01-02";
+		second[11] = "";
+		second[8] = second[13] = "";
+		const rows = parseWorkbookRows(
+			"base.xlsx",
+			createWorkbookBuffer([["", "", "Итого"], headers, data, second], "Лист1")
+		);
+		expect(rows).toHaveLength(2);
+		expect(rows[0]).toMatchObject({
+			sourceRowIndex: 3,
+			cableLabel: "1EM01-01",
+			cableJournal: "Журнал",
+			cableNumber: "3.0001",
+			fromRoom: "А101",
+			toRoom: "А102",
+			fromEquipment: "Источник",
+			level: "-3,6",
+			levelOrder: -3.6,
+			threadLength: 12.5,
+			totalLength: 12.5,
+			threadCount: 1,
+			route: "3125",
+			graphSide: "clean",
+			graphSubzone: "clean",
+			fromZone: "ЧЗ",
+			toZone: "ЧЗ",
+			farthestShaft: null,
+		});
+		expect(rows[1]?.level).toBe("Уровень не указан");
+		expect(rows[1]?.fromRoom).toBe("Помещение не указано");
+		expect(getCableExternalKey(rows[0]!)).not.toBe(getCableExternalKey(rows[1]!));
+		const resolveKey = createCanonicalCableKeyResolver([]);
+		expect(resolveKey(rows[0]!)).toBe(getCableExternalKey(rows[0]!));
+	});
+
 	it("parses a valid ods row", () => {
 		const rows = parseWorkbookRows("report.ods", createWorkbookBufferForType(createWorkbookRows(), "ods"));
 

@@ -23,6 +23,7 @@ type GraphSide = (typeof graphSideEnum.enumValues)[number];
 type GraphSubzone = (typeof graphSubzoneEnum.enumValues)[number] | null;
 
 type ParsedCableRow = {
+	identityMarking?: string;
 	sourceRowIndex: number;
 	cableLabel: string;
 	cableJournal: string;
@@ -160,13 +161,16 @@ export function getCanonicalCableAttributes(
 }
 
 export function getCableExternalKey(
-	row: Pick<ParsedCableRow, "cableJournal" | "cableNumber" | "cableLabel" | "fromRoom" | "toRoom">
+	row: Pick<
+		ParsedCableRow,
+		"cableJournal" | "cableNumber" | "cableLabel" | "fromRoom" | "toRoom" | "identityMarking"
+	>
 ) {
 	const journal = normalizeCableIdentityPart(row.cableJournal);
 	const number = normalizeCableIdentityPart(row.cableNumber);
 
 	if (journal && number) {
-		return `journal:${journal}|number:${number}`;
+		return `journal:${journal}|number:${number}${row.identityMarking ? `|marking:${normalizeCableIdentityPart(row.identityMarking)}` : ""}`;
 	}
 
 	return [row.cableLabel, row.fromRoom, row.toRoom].map(normalizeCableIdentityPart).join("|");
@@ -638,12 +642,70 @@ function chunkValues<T>(values: T[], size: number) {
 	return chunks;
 }
 
+// PSE registers have no zone columns: the owner assigns this format to ЧЗ.
+function parsePseWorkbookRows(workbook: Xlsx.WorkBook): ParsedCableRow[] | null {
+	const requiredHeaders = [
+		"наименование",
+		"№ кабеля",
+		"марка кабеля (монтажная)",
+		"откуда (оборудование)",
+		"откуда (помещение)",
+		"куда (помещение)",
+		"z начало",
+		"длина проектная, м",
+		"трассировка",
+	];
+	for (const name of workbook.SheetNames) {
+		const rows = Xlsx.utils.sheet_to_json<string[]>(workbook.Sheets[name], {
+			header: 1,
+			raw: false,
+			defval: "",
+			blankrows: true,
+		});
+		const headerIndex = rows.slice(0, 6).findIndex((row) => {
+			const headers = row.map((cell) => normalizeCellValue(cell).toLowerCase().replace(/\s+/g, " "));
+			return requiredHeaders.every((header) => headers.includes(header));
+		});
+		if (headerIndex < 0) continue;
+		validateWorkbookRowCount(rows.length - headerIndex - 1);
+		const headers = rows[headerIndex]!.map((cell) =>
+			normalizeCellValue(cell).toLowerCase().replace(/\s+/g, " ")
+		);
+		return rows.slice(headerIndex + 1).flatMap((source, offset) => {
+			const cell = (header: string) => normalizeCellValue(source[headers.indexOf(header)]);
+			const marking = cell("марка кабеля (монтажная)");
+			if (!marking) return [];
+			const row = Array<string>(32).fill("");
+			row[0] = marking;
+			row[1] = cell("наименование");
+			row[2] = cell("№ кабеля");
+			row[7] = enToRuVisual(cell("откуда (помещение)"));
+			row[9] = cell("откуда (оборудование)");
+			row[10] = enToRuVisual(cell("куда (помещение)"));
+			if (!row[7] && !row[10]) row[7] = "Помещение не указано";
+			row[11] = row[13] = cell("длина проектная, м");
+			row[12] = "1";
+			row[14] = cell("z начало") || "Уровень не указан";
+			row[15] = row[16] = "ЧЗ";
+			row[31] = cell("трассировка");
+			const parsed = parseWorkbookDataRow(row, headerIndex + offset, []);
+			return parsed ? [{ ...parsed, identityMarking: marking }] : [];
+		});
+	}
+	return null;
+}
+
 export function parseWorkbookRows(fileName: string, buffer: Buffer): ParsedCableRow[] {
 	const workbook = Xlsx.read(buffer, {
 		type: "buffer",
 		cellDates: false,
 		raw: false,
 	});
+	const pseRows = parsePseWorkbookRows(workbook);
+	if (pseRows !== null) {
+		if (pseRows.length === 0) throw new Error(`В "${fileName}" не найдены строки кабельной базы.`);
+		return pseRows;
+	}
 	const sheet = workbook.Sheets.Общ;
 
 	if (!sheet) {
@@ -962,12 +1024,15 @@ export async function importWorkbookFromFormData(
 		const cableIdByKey = new Map(canonicalRows.map((row) => [row.externalKey, row.id]));
 
 		for (const chunk of chunkValues(
-			parsedRows.map((row) => ({
-				snapshotId: createdSnapshot.id,
-				cableId: cableIdByKey.get(resolveKey(row)) ?? null,
-				...row,
-				createdAt: now,
-			})),
+			parsedRows.map((parsedRow) => {
+				const { identityMarking: _identityMarking, ...row } = parsedRow;
+				return {
+					snapshotId: createdSnapshot.id,
+					cableId: cableIdByKey.get(resolveKey(parsedRow)) ?? null,
+					...row,
+					createdAt: now,
+				};
+			}),
 			500
 		)) {
 			await tx.insert(importedCableRows).values(chunk);
