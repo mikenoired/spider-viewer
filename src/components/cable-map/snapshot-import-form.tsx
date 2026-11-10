@@ -52,7 +52,8 @@ export function SnapshotImportForm({ snapshot }: { snapshot: SnapshotSummaryView
 				<CardHeader>
 					<CardTitle>Импорт графа из workbook</CardTitle>
 					<CardDescription>
-						Поддерживаются файлы Excel и LibreOffice Calc. В обработку идёт только лист {'"Общ"'}.
+						Поддерживаются файлы Excel и LibreOffice Calc: лист «Общ» или кабельная база ПСЭ. Кабели базы ПСЭ
+						загружаются в чистую зону, уровень берётся из «Z начало».
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
