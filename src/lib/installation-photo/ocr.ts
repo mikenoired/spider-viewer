@@ -93,7 +93,54 @@ export type InstallationPhotoRecognitionResult = {
 	ocrText: string;
 };
 
-export async function recognizeInstallationPhoto(
+// PDF scans and camera jobs share one worker and its mutable segmentation settings.
+let ocrQueue: Promise<void> = Promise.resolve();
+function queueOcr<T>(operation: () => Promise<T>): Promise<T> {
+	const result = ocrQueue.then(operation);
+	ocrQueue = result.then(
+		() => undefined,
+		() => undefined
+	);
+	return result;
+}
+
+export function recognizeDocumentCanvas(
+	canvas: HTMLCanvasElement,
+	onProgress: OcrProgressCallback,
+	pageSegmentationMode = "11"
+) {
+	return queueOcr(() => recognizeCanvas(canvas, onProgress, pageSegmentationMode));
+}
+
+async function recognizeCanvas(
+	canvas: HTMLCanvasElement,
+	onProgress: OcrProgressCallback,
+	pageSegmentationMode: string
+) {
+	activeProgressCallback = onProgress;
+	let worker: TesseractWorker | undefined;
+	try {
+		worker = await getOcrWorker();
+		await worker.setParameters({ tessedit_pageseg_mode: pageSegmentationMode });
+		const result = await worker.recognize(canvas, {}, { text: true, blocks: true });
+		return { text: result.data.text, lines: readRecognizedLines(result) };
+	} finally {
+		await worker
+			?.setParameters({ tessedit_pageseg_mode: sparseTextPageSegmentationMode })
+			.catch(() => undefined);
+		activeProgressCallback = null;
+	}
+}
+
+export function recognizeInstallationPhoto(
+	file: Blob,
+	knownItems: InstallationPhotoKnownItem[],
+	onProgress: OcrProgressCallback
+): Promise<InstallationPhotoRecognitionResult> {
+	return queueOcr(() => recognizePhoto(file, knownItems, onProgress));
+}
+
+async function recognizePhoto(
 	file: Blob,
 	knownItems: InstallationPhotoKnownItem[],
 	onProgress: OcrProgressCallback

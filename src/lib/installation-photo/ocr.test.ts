@@ -7,7 +7,7 @@ const worker = {
 };
 const createWorker = mock(async () => worker);
 mock.module("tesseract.js", () => ({ createWorker }));
-const { recognizeInstallationPhoto } = await import("./ocr");
+const { recognizeInstallationPhoto, recognizeDocumentCanvas } = await import("./ocr");
 const originalBitmap = globalThis.createImageBitmap;
 const originalWindowBitmap = window.createImageBitmap;
 const originalGetContext = HTMLCanvasElement.prototype.getContext;
@@ -31,4 +31,22 @@ it("retries OCR initialization after a transient worker load failure", async () 
 	});
 	expect(createWorker).toHaveBeenCalledTimes(2);
 	expect(worker.recognize).toHaveBeenCalledTimes(1);
+});
+
+it("serializes camera and document work on the shared mutable OCR worker", async () => {
+	let finish!: (value: { data: { text: string; blocks: [] } }) => void;
+	worker.recognize.mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				finish = resolve;
+			})
+	);
+	const before = worker.recognize.mock.calls.length;
+	const first = recognizeDocumentCanvas(document.createElement("canvas"), () => undefined, "6");
+	const second = recognizeInstallationPhoto(new Blob(), [], () => undefined);
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	expect(worker.recognize.mock.calls.length).toBe(before + 1);
+	finish({ data: { text: "", blocks: [] } });
+	await Promise.all([first, second]);
+	expect(worker.recognize.mock.calls.length).toBe(before + 2);
 });
