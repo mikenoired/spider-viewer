@@ -33,6 +33,14 @@ import type {
 	TransitionKanbanTaskInput,
 	UpdateTaskItemCompletionInput,
 } from "./shared";
+import { archiveTaskDocument, getTaskAttachments, linkTaskDocument } from "./task-attachments.server";
+import {
+	assertTaskDocumentStage,
+	documentCableRowsSchema,
+	getTaskDocumentStage,
+	isTaskDocument,
+	validateTaskDocument,
+} from "./task-documents";
 
 const stageRecipient: Record<PriorityListKanbanStatus, UserDepartment> = {
 	formed: "skm",
@@ -441,9 +449,46 @@ export function getAllowedImportStages(session: AuthSession): PriorityListKanban
 	return [];
 }
 
+async function readTaskListUpload(formData: FormData, session: AuthSession) {
+	const file = formData.get("file");
+	if (file instanceof File && isTaskDocument(file)) {
+		const stage = getTaskDocumentStage(session);
+		if (!stage) throw new Error("Для вашего подразделения загрузка PDF/сканов не разрешена.");
+		const { fileType } = await validateTaskDocument(file);
+		const input = formData.get("reviewedRows");
+		if (typeof input !== "string" || input.length > 4_000_000)
+			throw new Error("Сначала распознайте и проверьте строки документа.");
+		const rawRows: unknown = JSON.parse(input);
+		if (!Array.isArray(rawRows) || rawRows.length === 0 || rawRows.length > 5000)
+			throw new Error("Подтвердите от 1 до 5000 строк документа.");
+		const reviewedRows = documentCableRowsSchema.parse(rawRows);
+		const parsed: ParsedTaskCable[] = reviewedRows.map((row, index) => ({
+			rowIndex: index + 1,
+			sheetName: `Страница ${row.page}`,
+			cableLabel: row.cableLabel,
+			cableNumber: row.cableNumber,
+			cableJournal: "",
+			fromRoom: row.fromRoom,
+			toRoom: row.toRoom,
+			progress: null,
+		}));
+		return {
+			file,
+			fileType,
+			buffer: Buffer.from(await file.arrayBuffer()),
+			parsed,
+			reviewedRows,
+			skippedSheets: [] as Array<{ sheetName: string; cablePositionCount: number }>,
+			scan: true as const,
+		};
+	}
+	const upload = await ensureUploadFile(formData);
+	const { parsed, skippedSheets } = parseTaskCableWorkbook(upload.file.name, upload.buffer);
+	return { ...upload, parsed, skippedSheets, reviewedRows: null, scan: false as const };
+}
+
 export async function analyzeCableTaskListFromFormData(formData: FormData, session: AuthSession) {
-	const { file, buffer } = await ensureUploadFile(formData);
-	const { parsed, skippedSheets } = parseTaskCableWorkbook(file.name, buffer);
+	const { file, parsed, skippedSheets, scan } = await readTaskListUpload(formData, session);
 	const result = await analyzeParsedTaskCables(parsed);
 	const importable = createImportableTaskMatches(result.matched);
 
@@ -459,7 +504,7 @@ export async function analyzeCableTaskListFromFormData(formData: FormData, sessi
 		baseCount: result.baseCount,
 		warnings: result.warnings,
 		skippedSheets,
-		allowedStages: getAllowedImportStages(session),
+		allowedStages: scan ? [getTaskDocumentStage(session)!] : getAllowedImportStages(session),
 	};
 }
 
@@ -508,7 +553,7 @@ async function addTaskEvent(
 }
 
 export async function importCableTaskListFromFormData(formData: FormData, session: AuthSession) {
-	const { file, fileType, buffer } = await ensureUploadFile(formData);
+	const { file, fileType, buffer, parsed, scan, reviewedRows } = await readTaskListUpload(formData, session);
 	const stage = String(formData.get("stage") ?? "formed") as PriorityListKanbanStatus;
 	const title = normalize(formData.get("title")) || file.name;
 	const priority = normalize(formData.get("priority")) || "normal";
@@ -516,11 +561,11 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 	if (!["high", "normal", "low"].includes(priority)) throw new Error("Неизвестный приоритет списка.");
 	if (title.length > 240) throw new Error("Название списка не должно быть длиннее 240 символов.");
 
-	if (!getAllowedImportStages(session).includes(stage)) {
+	if (scan) assertTaskDocumentStage(session, stage);
+	if (!scan && !getAllowedImportStages(session).includes(stage)) {
 		throw new Error("У вашей роли нет права добавить список в выбранный этап.");
 	}
 
-	const parsed = parseTaskCableRows(file.name, buffer);
 	const result = await analyzeParsedTaskCables(parsed);
 	const importable = createImportableTaskMatches(result.matched);
 	const ambiguousCount = result.ambiguous.length + importable.duplicateCount;
@@ -528,15 +573,20 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 	if (importable.matches.length === 0)
 		throw new Error("Ни одна позиция списка не найдена в генеральной кабельной базе.");
 
-	const checksum = createHash("sha256").update(buffer).digest("hex");
+	const checksum = createHash("sha256")
+		.update(buffer)
+		.update(scan ? stage : "")
+		.digest("hex");
 	const db = getDb();
 	const [existing] = await db
-		.select({ id: priorityRoomLists.id })
+		.select({ id: priorityRoomLists.id, status: priorityRoomLists.status })
 		.from(priorityRoomLists)
 		.where(eq(priorityRoomLists.sourceChecksum, checksum))
 		.limit(1);
 
-	await archiveUpload(file, session.id, "kanban-list");
+	if (scan && existing) assertTaskDocumentStage(session, existing.status);
+	const attachment = scan ? await archiveTaskDocument(file, session) : null;
+	if (!scan) await archiveUpload(file, session.id, "kanban-list");
 	if (existing) {
 		return {
 			id: existing.id,
@@ -549,7 +599,20 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 
 	const now = new Date();
 	const recipientDepartment = stageRecipient[stage];
+	let reused = false;
 	const [list] = await db.transaction(async (tx) => {
+		if (scan) {
+			await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${checksum}))`);
+			const [same] = await tx
+				.select({ id: priorityRoomLists.id, status: priorityRoomLists.status })
+				.from(priorityRoomLists)
+				.where(eq(priorityRoomLists.sourceChecksum, checksum));
+			if (same) {
+				assertTaskDocumentStage(session, same.status);
+				reused = true;
+				return [same];
+			}
+		}
 		const [{ count }] = await tx.select({ count: sql<number>`count(*)::int` }).from(priorityRoomLists);
 		const taskCode = String(count + 1);
 		const [created] = await tx
@@ -567,6 +630,8 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 				senderDepartment: session.department,
 				recipientDepartment,
 				status: stage,
+				responsibleUserId: scan && stage === "in_progress" ? session.id : null,
+				acceptedAt: scan && stage === "in_progress" ? now : null,
 				statusUpdatedByUserId: session.id,
 				statusUpdatedAt: now,
 				importedByUserId: session.id,
@@ -574,6 +639,25 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 				updatedAt: now,
 			})
 			.returning({ id: priorityRoomLists.id });
+
+		if (attachment) {
+			await linkTaskDocument(tx, created.id, attachment);
+			await tx.insert(taskEvents).values({
+				listId: created.id,
+				actorUserId: session.id,
+				eventType: "attachment_added",
+				message: `${session.login} прикрепил исходный документ «${file.name}».`,
+				payload: { uploadId: attachment.uploadId, fileName: attachment.fileName },
+			});
+		}
+		if (reviewedRows)
+			await tx.insert(taskEvents).values({
+				listId: created.id,
+				actorUserId: session.id,
+				eventType: "document_reviewed",
+				message: `${session.login} проверил распознанные строки (${reviewedRows.length}). Готовность не изменена.`,
+				payload: { rows: reviewedRows },
+			});
 
 		for (let start = 0; start < importable.matches.length; start += 500) {
 			await tx.insert(cableListItems).values(
@@ -625,7 +709,7 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 
 	return {
 		id: list.id,
-		reused: false,
+		reused,
 		matchedCount: importable.matches.length,
 		missingCount: result.missing.length,
 		ambiguousCount,
@@ -1210,13 +1294,14 @@ export async function getKanbanTaskData(listId: string) {
 
 	return {
 		list,
+		attachments: await getTaskAttachments(listId),
 		items: items.map((item) => ({ ...item, completedAt: item.completedAt?.toISOString() ?? null })),
 		parent: parent[0] ?? null,
 		children,
 		comments: comments.map((comment) => ({ ...comment, createdAt: comment.createdAt.toISOString() })),
 		events: events.map((event) => ({
 			...event,
-			payload: JSON.stringify(event.payload),
+			payload: event.eventType === "attachment_added" ? "{}" : JSON.stringify(event.payload),
 			login: event.login ?? "Система",
 			createdAt: event.createdAt.toISOString(),
 			revertedAt: event.revertedAt?.toISOString() ?? null,

@@ -300,3 +300,19 @@ export const downloadDailyHistoryDocx = createServerFn({ method: "POST" })
 			},
 		});
 	});
+
+export const attachKanbanFile = createServerFn({ method: "POST" })
+	.inputValidator((data: FormData) => data)
+	.handler(async ({ data }) => {
+		const session = await requireSession();
+		const { addTaskAttachment } = await import("./task-attachments.server");
+		return addTaskAttachment(data, session);
+	});
+
+export const downloadKanbanFile = createServerFn({ method: "POST" })
+	.inputValidator((id: string) => id)
+	.handler(async ({ data }) => {
+		await requireSession();
+		const { downloadTaskAttachment } = await import("./task-attachments.server");
+		return downloadTaskAttachment(data);
+	});

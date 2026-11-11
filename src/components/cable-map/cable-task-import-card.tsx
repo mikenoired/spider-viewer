@@ -18,6 +18,9 @@ import type { AuthSession } from "@/lib/auth/shared";
 import { departmentLabels } from "@/lib/auth/shared";
 import { analyzeCableTaskList, seedKanbanDemo, uploadCableTaskList } from "@/lib/cable-map/functions";
 import type { PriorityListKanbanStatus, TaskPriority } from "@/lib/cable-map/shared";
+import { type DocumentCableRow, getTaskDocumentStage, isTaskDocument } from "@/lib/cable-map/task-documents";
+
+import { DocumentRecognition } from "./document-recognition";
 
 const stageLabels: Record<PriorityListKanbanStatus, string> = {
 	formed: "Задачи заказчика",
@@ -37,6 +40,10 @@ function parseDeadline(value: string, pattern: string) {
 export function CableTaskImportCard({ session }: { session: AuthSession }) {
 	const router = useRouter();
 	const [file, setFile] = useState<File | null>(null);
+	const [fileRevision, setFileRevision] = useState(0);
+	const [recognizingDocument, setRecognizingDocument] = useState(false);
+	const [reviewedRows, setReviewedRows] = useState<DocumentCableRow[] | null>(null);
+	const scan = Boolean(file && isTaskDocument(file));
 	const [analysis, setAnalysis] = useState<Analysis | null>(null);
 	const [stage, setStage] = useState<PriorityListKanbanStatus>("formed");
 	const [title, setTitle] = useState("");
@@ -54,7 +61,7 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 
 	async function analyze() {
 		if (!file) {
-			toast.error("Выберите Excel/LibreOffice файл со списком кабелей.");
+			toast.error("Выберите таблицу, PDF или скан со списком кабелей.");
 			return;
 		}
 
@@ -62,6 +69,7 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 		try {
 			const formData = new FormData();
 			formData.set("file", file);
+			if (reviewedRows) formData.set("reviewedRows", JSON.stringify(reviewedRows));
 			const result = await analyzeCableTaskList({ data: formData });
 			setAnalysis(result);
 			setStage(result.allowedStages[0] ?? "formed");
@@ -83,6 +91,7 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 		try {
 			const formData = new FormData();
 			formData.set("file", file);
+			if (reviewedRows) formData.set("reviewedRows", JSON.stringify(reviewedRows));
 			formData.set("stage", stage);
 			formData.set("title", title || file.name);
 			formData.set("priority", priority);
@@ -202,11 +211,13 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 						<Input
 							id="cable-task-file"
 							type="file"
-							accept=".ods,.xlsx,.xls"
-							disabled={analyzing || importing}
+							accept=".ods,.xlsx,.xls,.pdf,.png,.jpg,.jpeg"
+							disabled={analyzing || importing || recognizingDocument}
 							onChange={(event) => {
+								setFileRevision((previous) => previous + 1);
 								setFile(event.target.files?.[0] ?? null);
 								setAnalysis(null);
+								setReviewedRows(null);
 							}}
 						/>
 						<FieldDescription>
@@ -216,6 +227,22 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 						</FieldDescription>
 					</Field>
 				</FieldGroup>
+
+				{file && scan ? (
+					<DocumentRecognition
+						key={fileRevision}
+						file={file}
+						disabled={analyzing || importing}
+						onBusyChange={setRecognizingDocument}
+						onRows={(rows) => {
+							setReviewedRows(rows);
+							setAnalysis(null);
+						}}
+					/>
+				) : null}
+				{scan && !getTaskDocumentStage(session) ? (
+					<p className="text-sm text-amber-700">Загрузка PDF/сканов для вашего подразделения недоступна.</p>
+				) : null}
 
 				{analysis ? (
 					<div className="grid gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
@@ -308,7 +335,9 @@ export function CableTaskImportCard({ session }: { session: AuthSession }) {
 						type="button"
 						variant="outline"
 						onClick={() => void analyze()}
-						disabled={!file || analyzing || importing}>
+						disabled={
+							!file || analyzing || importing || (scan && (!reviewedRows || !getTaskDocumentStage(session)))
+						}>
 						{analyzing ? <LoaderCircleIcon className="animate-spin" /> : <FileSearchIcon />}
 						Анализировать файл
 					</Button>

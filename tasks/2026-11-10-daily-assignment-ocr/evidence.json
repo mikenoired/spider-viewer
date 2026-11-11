@@ -1,0 +1,94 @@
+{
+	"base_commit": "4600c1a0efc70858dac5df861b2032514bf51158",
+	"source_fingerprint_sha256": "db01c3d323b6be74b7835f84612953f68bd2cbe664dc9ba936cf71370e45346c",
+	"source_files": [
+		"bun.lock",
+		"package.json",
+		"scripts/prepare-ocr-assets.mjs",
+		"src/components/cable-map/cable-task-import-card.test.tsx",
+		"src/components/cable-map/cable-task-import-card.tsx",
+		"src/components/cable-map/document-recognition.tsx",
+		"src/components/cable-map/installation-kanban-board.tsx",
+		"src/components/cable-map/task-attachments.tsx",
+		"src/lib/cable-map/document-ocr.ts",
+		"src/lib/cable-map/functions.ts",
+		"src/lib/cable-map/task-attachments.server.ts",
+		"src/lib/cable-map/task-documents.test.ts",
+		"src/lib/cable-map/task-documents.ts",
+		"src/lib/cable-map/task-workflow.server.ts",
+		"src/lib/installation-photo/assets.ts",
+		"src/lib/installation-photo/ocr.test.ts",
+		"src/lib/installation-photo/ocr.ts",
+		"test/integration/documents.test.ts"
+	],
+	"reference_pdf_sha256": "46d5ce050f999a470acbce231fff4524a34e73191cf7cc2bc78200ce536362d0",
+	"browser_qa": {
+		"engine": "Chromium 156 / Playwright outside app dependencies",
+		"pages": 16,
+		"candidate_rows": 485,
+		"page_errors": 0,
+		"all_rotations": [90],
+		"per_page_candidates": [27, 8, 32, 7, 50, 25, 45, 29, 23, 30, 33, 37, 9, 61, 59, 10],
+		"page_1_manual_reference": {
+			"expected_markings": 27,
+			"correct_markings": 26,
+			"missed_markings": 1,
+			"extra_candidates": 1
+		},
+		"additional_manual_samples": {
+			"page_7": {
+				"expected": 4,
+				"found": 3
+			},
+			"page_14": {
+				"expected": 4,
+				"found": 2
+			}
+		},
+		"note": "Candidates are not validated cables; full 16-page transcription accuracy was not measured.",
+		"failure_tests": {
+			"cancel": {
+				"processed_pages": 1,
+				"aborted": true
+			},
+			"controlled_page_failure": {
+				"pages": [1, 2, 3],
+				"error_pages": [2],
+				"candidate_counts": [27, 0, 32]
+			}
+		}
+	},
+	"verification": {
+		"unit_auth": {
+			"pass": 90,
+			"skip": 31,
+			"fail": 0
+		},
+		"integration_app": {
+			"pass": 20,
+			"skip": 7,
+			"fail": 0
+		},
+		"documents_postgres_final": {
+			"pass": 9,
+			"fail": 0
+		},
+		"mutation": "Inverting own-column guard fails; original restored and targeted tests pass",
+		"cloud": "S3 adapter mocked; production data untouched",
+		"self_review": "Requirements and implementation; not independent acceptance"
+	},
+	"pr_preparation": {
+		"base_commit": "f3f14b03ff93aebe955b57a2a0d785d7cfcee6cf",
+		"branch": "feat/kanban-document-ocr-attachments",
+		"source_fingerprint_unchanged": true,
+		"fresh_checks": [
+			"lint:check",
+			"typecheck",
+			"build",
+			"test with isolated auth PostgreSQL: 90 pass, 31 skip",
+			"test:integration with disposable PostgreSQL: 20 pass, 7 skip"
+		],
+		"browser_evidence": "Previous real-browser results remain bound to the identical application-source fingerprint; not rerun during PR preparation.",
+		"publication_scope": "Branch push and PR only; no merge or Railway deploy."
+	}
+}

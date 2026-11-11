@@ -2,6 +2,7 @@ export const installationPhotoOcrAssetUrls = [
 	"/vision/tesseract/worker.min.js",
 	"/vision/tesseract-core/tesseract-core-lstm.wasm.js",
 	"/vision/tesseract-core/tesseract-core-simd-lstm.wasm.js",
+	"/vision/tesseract-core/tesseract-core-relaxedsimd-lstm.wasm.js",
 	"/vision/tessdata/eng.traineddata.gz",
 	"/vision/tessdata/rus.traineddata.gz",
 ] as const;

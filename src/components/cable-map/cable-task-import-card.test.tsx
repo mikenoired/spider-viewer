@@ -1,18 +1,25 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const analyzeCableTaskList = mock();
+const attach = mock(async (_request: { data: FormData }) => ({ id: "event-id", reused: false }));
 mock.module("@tanstack/react-router", () => ({ useRouter: () => ({ invalidate: mock() }) }));
 mock.module("@/lib/cable-map/functions", () => ({
 	analyzeCableTaskList,
+	attachKanbanFile: attach,
+	downloadKanbanFile: mock(),
 	uploadCableTaskList: mock(),
 	seedKanbanDemo: mock(),
 }));
 
 const { CableTaskImportCard } = await import("./cable-task-import-card");
 
-afterEach(cleanup);
+const { TaskAttachments } = await import("./task-attachments");
+afterEach(() => {
+	cleanup();
+	mock.clearAllMocks();
+});
 
 describe("task import warnings", () => {
 	it("shows the selected cable, differences and skipped sheets while allowing import", async () => {
@@ -51,4 +58,40 @@ describe("task import warnings", () => {
 			false
 		);
 	});
+});
+
+it("uploads into the current mounting card without calling a list-import action", async () => {
+	const refresh = mock(async () => undefined);
+	render(
+		<TaskAttachments
+			listId="list-id"
+			status="in_progress"
+			session={{ id: "user-id", role: "user", login: "tester", department: "skm" }}
+			attachments={[]}
+			onChange={refresh}
+		/>
+	);
+	fireEvent.change(screen.getByLabelText("Прикрепить PDF или скан"), {
+		target: { files: [new File(["%PDF-1.7"], "task.pdf")] },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Прикрепить файл" }));
+	await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+	const request = attach.mock.calls[0]![0] as unknown as { data: FormData };
+	expect(request.data.get("listId")).toBe("list-id");
+	expect((request.data.get("file") as File).name).toBe("task.pdf");
+});
+
+it("hides upload in another column while keeping existing attachments visible", () => {
+	render(
+		<TaskAttachments
+			listId="list-id"
+			status="adjustment"
+			session={{ id: "user-id", role: "super-admin", login: "tester", department: "skm" }}
+			attachments={[{ id: "attachment", fileName: "scan.pdf", sizeBytes: 512 }]}
+			onChange={async () => undefined}
+		/>
+	);
+	expect(screen.queryByLabelText("Прикрепить PDF или скан")).toBeNull();
+	expect(screen.getByRole("button", { name: "scan.pdf · 1 КБ" })).toBeTruthy();
+	expect(attach).not.toHaveBeenCalled();
 });

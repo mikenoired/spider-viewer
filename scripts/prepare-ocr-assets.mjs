@@ -26,7 +26,10 @@ async function languageModel(packageName, language) {
 }
 
 const tesseractRoot = packageRoot("tesseract.js");
-const coreRoot = packageRoot("tesseract.js-core");
+// Resolve the core required by the worker, not a different top-level version.
+const coreRoot = path.dirname(
+	createRequire(path.join(tesseractRoot, "package.json")).resolve("tesseract.js-core/package.json")
+);
 const assets = [
 	[path.join(tesseractRoot, "dist", "worker.min.js"), "tesseract/worker.min.js"],
 	[path.join(tesseractRoot, "dist", "worker.min.js.LICENSE.txt"), "tesseract/worker.min.js.LICENSE.txt"],
@@ -34,6 +37,10 @@ const assets = [
 	[
 		path.join(coreRoot, "tesseract-core-simd-lstm.wasm.js"),
 		"tesseract-core/tesseract-core-simd-lstm.wasm.js",
+	],
+	[
+		path.join(coreRoot, "tesseract-core-relaxedsimd-lstm.wasm.js"),
+		"tesseract-core/tesseract-core-relaxedsimd-lstm.wasm.js",
 	],
 	[await languageModel("@tesseract.js-data/eng", "eng"), "tessdata/eng.traineddata.gz"],
 	[await languageModel("@tesseract.js-data/rus", "rus"), "tessdata/rus.traineddata.gz"],

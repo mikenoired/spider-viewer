@@ -24,6 +24,8 @@ import {
 } from "@/lib/cable-map/functions";
 import type { PriorityListKanbanStatus, PriorityRoomListView } from "@/lib/cable-map/shared";
 
+import { TaskAttachments } from "./task-attachments";
+
 const columns: Array<{
 	status: PriorityListKanbanStatus;
 	title: string;
@@ -307,6 +309,13 @@ function TaskDialog({
 								{task.list.recipientDepartment ? departmentLabels[task.list.recipientDepartment] : "—"}
 							</span>
 						</div>
+						<TaskAttachments
+							listId={task.list.id}
+							status={task.list.status}
+							session={session}
+							attachments={task.attachments}
+							onChange={refresh}
+						/>
 						{task.parent || task.children.length > 0 ? (
 							<div className="rounded-lg border p-3 text-sm">
 								<b>Нитка карточки:</b>{" "}
