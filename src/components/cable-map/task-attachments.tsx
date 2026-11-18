@@ -8,8 +8,11 @@ import { Input } from "@/components/ui/input";
 import type { AuthSession } from "@/lib/auth/shared";
 import { attachKanbanFile, downloadKanbanFile } from "@/lib/cable-map/functions";
 import type { PriorityListKanbanStatus } from "@/lib/cable-map/shared";
+import type { DocumentCableRow } from "@/lib/cable-map/task-documents";
 import { getTaskDocumentStage, taskDocumentAccept } from "@/lib/cable-map/task-documents";
 import { downloadResponseFile } from "@/lib/utils";
+
+import { DocumentRecognition } from "./document-recognition";
 
 export function TaskAttachments({
 	listId,
@@ -26,19 +29,31 @@ export function TaskAttachments({
 }) {
 	const [pending, setPending] = useState(false);
 	const [file, setFile] = useState<File | null>(null);
+	const [recognize, setRecognize] = useState(true);
+	const [ocrBusy, setOcrBusy] = useState(false);
+	const [rows, setRows] = useState<DocumentCableRow[] | null>(null);
+	const [revision, setRevision] = useState(0);
 	const input = useRef<HTMLInputElement>(null);
 	async function upload() {
-		if (!file || pending) return;
+		if (!file || pending || ocrBusy || (recognize && !rows)) return;
 		setPending(true);
 		try {
 			const data = new FormData();
 			data.set("listId", listId);
 			data.set("file", file);
+			if (recognize && rows) data.set("reviewedRows", JSON.stringify(rows));
 			const result = await attachKanbanFile({ data });
 			await onChange();
 			setFile(null);
+			setRows(null);
 			if (input.current) input.current.value = "";
-			toast.success(result.reused ? "Этот файл уже прикреплён." : "Вложение сохранено.");
+			toast.success(
+				recognize
+					? "Документ сохранён. Подтверждённые отметки выполнения применены."
+					: result.reused
+						? "Этот файл уже прикреплён."
+						: "Вложение сохранено."
+			);
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Не удалось прикрепить файл.");
 		} finally {
@@ -72,20 +87,49 @@ export function TaskAttachments({
 				</Button>
 			))}
 			{getTaskDocumentStage(session) === status ? (
-				<div className="flex flex-wrap gap-2">
+				<div className="grid gap-2">
+					<label>
+						<input
+							type="checkbox"
+							checked={recognize}
+							disabled={pending || ocrBusy}
+							onChange={(event) => {
+								setRecognize(event.target.checked);
+								setRows(null);
+								setRevision((value) => value + 1);
+							}}
+						/>{" "}
+						Распознать кабели и отметки выполнения
+					</label>
 					<Input
 						ref={input}
 						aria-label="Прикрепить PDF или скан"
 						type="file"
 						accept={taskDocumentAccept}
-						disabled={pending}
-						onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+						disabled={pending || ocrBusy}
+						onChange={(event) => {
+							setFile(event.target.files?.[0] ?? null);
+							setRows(null);
+							setRevision((value) => value + 1);
+						}}
 					/>
-					<Button type="button" disabled={!file || pending} onClick={() => void upload()}>
-						{pending ? "Подождите…" : "Прикрепить файл"}
+					{file && recognize ? (
+						<DocumentRecognition
+							key={revision}
+							file={file}
+							onRows={setRows}
+							disabled={pending}
+							onBusyChange={setOcrBusy}
+						/>
+					) : null}
+					<Button
+						type="button"
+						disabled={!file || pending || ocrBusy || (recognize && !rows)}
+						onClick={() => void upload()}>
+						{pending ? "Подождите…" : recognize ? "Сохранить файл и выполнение" : "Прикрепить файл"}
 					</Button>
 					<p className="text-xs text-muted-foreground">
-						PDF, JPEG или PNG до 25 МБ. Вложение не меняет список кабелей и их готовность.
+						PDF, JPEG или PNG до 25 МБ. При распознавании подтвердите выполнение только кабелей этой карточки.
 					</p>
 				</div>
 			) : (

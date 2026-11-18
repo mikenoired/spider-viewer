@@ -84,8 +84,9 @@ export function DocumentRecognition({
 	return (
 		<section className="grid gap-3 rounded-lg border p-3">
 			<p className="text-sm">
-				PDF и сканы: сначала распознайте и проверьте маркировки. Цвета игнорируются; плюсы и даты не изменяют
-				готовность автоматически.
+				PDF и сканы: сначала распознайте и проверьте маркировки. Цвета и даты игнорируются. Плюс напротив
+				строки означает выполнение кабеля целиком. Проверьте флажки «Выполнен»: после подтверждения они
+				установят готовность 100%.
 			</p>
 			<div className="flex flex-wrap gap-2">
 				<select
@@ -140,6 +141,7 @@ export function DocumentRecognition({
 								{Object.values(columns).map((label) => (
 									<th key={label}>{label}</th>
 								))}
+								<th>Выполнен</th>
 								<th>Источник</th>
 								<th>Исключить</th>
 							</tr>
@@ -176,6 +178,21 @@ export function DocumentRecognition({
 											/>
 										</td>
 									))}
+									<td>
+										<input
+											type="checkbox"
+											aria-label={`Выполнен, строка ${index + 1}`}
+											checked={row.completed}
+											disabled={running || disabled}
+											onChange={(event) => {
+												const completed = event.target.checked;
+												setRows((previous) =>
+													previous.map((item, i) => (i === index ? { ...item, completed } : item))
+												);
+												onRows(null);
+											}}
+										/>
+									</td>
 									<td className="min-w-64">
 										{row.confidence !== null ? (
 											<span className="block">OCR: {Math.round(row.confidence)}%</span>
@@ -226,7 +243,7 @@ export function DocumentRecognition({
 							toast.error("Проверьте маркировки и номера страниц (1–50).");
 						}
 					}}>
-					Строки проверены
+					Строки и выполнение проверены
 				</Button>
 			</div>
 		</section>

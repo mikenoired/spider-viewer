@@ -49,6 +49,7 @@ export async function validateTaskDocument(file: File) {
 const field = z.string().trim().max(500).default("");
 export const documentCableRowSchema = z.object({
 	page: z.number().int().min(1).max(50),
+	completed: z.boolean().default(false),
 	cableLabel: z.string().trim().min(1).max(200),
 	cableNumber: field,
 	fromRoom: field,
@@ -76,6 +77,7 @@ export function extractDocumentCableRows(text: string, page: number): DocumentCa
 				page,
 				cableLabel,
 				sourceText: line.trim(),
+				completed: /(?:^|\s)[+＋](?=\s|$)/u.test(line) && new Set(labels).size === 1,
 				cableNumber: line.trim().match(/^[+|[\]\s]*(\d{1,6})\s/)?.[1] ?? "",
 				section: line.match(/\b\d{1,3}[xхХX*×]\d+(?:[,.]\d+)?\b/)?.[0] ?? "",
 				drum: line.match(/\b\d{8,12}\b(?=[^\d]*$)/)?.[0] ?? "",

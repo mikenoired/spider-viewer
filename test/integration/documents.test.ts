@@ -166,6 +166,68 @@ describe.skipIf(!testUrl)("PDF and scan Kanban operations with PostgreSQL", () =
 		expect((await db.select().from(schema.cableListItems))[0]?.importedProgress).toBeNull();
 		expect((await importCableTaskListFromFormData(form, mounting)).id).toBe(result.id);
 	});
+	it("applies reviewed completion to new and existing cards without resetting other progress", async () => {
+		const inserted = await db
+			.insert(schema.cables)
+			.values(
+				["1HX98K176", "1HX98K177"].map((label, i) => ({
+					externalKey: `completion-${i}`,
+					cableLabel: label,
+					cableMarking: label,
+					fromRoom: "A101",
+					toRoom: "A102",
+					progress: 30,
+				}))
+			)
+			.returning();
+		const form = data();
+		form.set("stage", "in_progress");
+		form.set(
+			"reviewedRows",
+			JSON.stringify(
+				inserted.map((cable) => ({
+					page: 1,
+					cableLabel: cable.cableLabel,
+					completed: cable.cableLabel === "1HX98K176",
+				}))
+			)
+		);
+		const created = await importCableTaskListFromFormData(form, mounting);
+		let items = await db.select().from(schema.cableListItems);
+		expect(items.filter((item) => item.isCompleted)).toHaveLength(1);
+		expect((await db.select().from(schema.cables)).map((cable) => cable.progress).sort()).toEqual([100, 30]);
+		form.set("listId", created.id);
+		form.set("reviewedRows", JSON.stringify([{ page: 1, cableLabel: "1HX98K177", completed: true }]));
+		await addTaskAttachment(form, mounting);
+		items = await db.select().from(schema.cableListItems);
+		expect(items.every((item) => item.isCompleted)).toBe(true);
+		expect((await db.select().from(schema.cables)).every((cable) => cable.progress === 100)).toBe(true);
+		expect(await getTaskAttachments(created.id)).toHaveLength(1);
+		// Reimport the same original with updated review reuses the card.
+		expect((await importCableTaskListFromFormData(form, mounting)).id).toBe(created.id);
+		expect(await db.select().from(schema.priorityRoomLists)).toHaveLength(1);
+	});
+	it("rejects unmatched attachment rows without partially completing valid rows", async () => {
+		const [cable] = await db
+			.insert(schema.cables)
+			.values({ externalKey: "atomic", cableLabel: "1HX98K176", fromRoom: "A", toRoom: "B", progress: 30 })
+			.returning();
+		const list = await task();
+		await db.insert(schema.cableListItems).values({ listId: list.id, cableId: cable!.id });
+		const form = data(list.id);
+		form.set(
+			"reviewedRows",
+			JSON.stringify([
+				{ page: 1, cableLabel: "1HX98K176", completed: true },
+				{ page: 1, cableLabel: "1HX98K999", completed: true },
+			])
+		);
+		await expect(addTaskAttachment(form, mounting)).rejects.toThrow("не сопоставлены");
+		expect((await db.select().from(schema.cables))[0]?.progress).toBe(30);
+		expect((await db.select().from(schema.cableListItems))[0]?.isCompleted).toBe(false);
+		expect(await getTaskAttachments(list.id)).toHaveLength(0);
+	});
+
 	it("rejects oversized row collections before schema error expansion and archiving", async () => {
 		const form = data();
 		form.set("reviewedRows", JSON.stringify(Array(5001).fill(null)));

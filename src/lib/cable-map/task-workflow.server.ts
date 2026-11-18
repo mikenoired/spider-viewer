@@ -33,7 +33,12 @@ import type {
 	TransitionKanbanTaskInput,
 	UpdateTaskItemCompletionInput,
 } from "./shared";
-import { archiveTaskDocument, getTaskAttachments, linkTaskDocument } from "./task-attachments.server";
+import {
+	addTaskAttachment,
+	archiveTaskDocument,
+	getTaskAttachments,
+	linkTaskDocument,
+} from "./task-attachments.server";
 import {
 	assertTaskDocumentStage,
 	documentCableRowsSchema,
@@ -470,7 +475,7 @@ async function readTaskListUpload(formData: FormData, session: AuthSession) {
 			cableJournal: "",
 			fromRoom: row.fromRoom,
 			toRoom: row.toRoom,
-			progress: null,
+			progress: row.completed ? 100 : null,
 		}));
 		return {
 			file,
@@ -585,9 +590,12 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 		.limit(1);
 
 	if (scan && existing) assertTaskDocumentStage(session, existing.status);
-	const attachment = scan ? await archiveTaskDocument(file, session) : null;
 	if (!scan) await archiveUpload(file, session.id, "kanban-list");
 	if (existing) {
+		if (scan) {
+			formData.set("listId", existing.id);
+			await addTaskAttachment(formData, session);
+		}
 		return {
 			id: existing.id,
 			reused: true,
@@ -597,6 +605,7 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 		};
 	}
 
+	const attachment = scan ? await archiveTaskDocument(file, session) : null;
 	const now = new Date();
 	const recipientDepartment = stageRecipient[stage];
 	let reused = false;
@@ -655,7 +664,7 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 				listId: created.id,
 				actorUserId: session.id,
 				eventType: "document_reviewed",
-				message: `${session.login} проверил распознанные строки (${reviewedRows.length}). Готовность не изменена.`,
+				message: `${session.login} проверил распознанные строки (${reviewedRows.length}). Выполнены отмеченные при проверке позиции.`,
 				payload: { rows: reviewedRows },
 			});
 
@@ -666,6 +675,9 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 					cableId,
 					sourceRowIndex: item.rowIndex,
 					importedProgress: item.progress,
+					...(scan && item.progress === 100
+						? { isCompleted: true, completedAt: now, completedByUserId: session.id }
+						: {}),
 					createdAt: now,
 				}))
 			);
@@ -698,6 +710,10 @@ export async function importCableTaskListFromFormData(formData: FormData, sessio
 		return [created];
 	});
 
+	if (scan && reused) {
+		formData.set("listId", list.id);
+		await addTaskAttachment(formData, session);
+	}
 	await addDepartmentNotifications(
 		recipientDepartment,
 		list.id,

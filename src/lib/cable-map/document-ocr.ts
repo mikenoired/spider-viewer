@@ -2,6 +2,7 @@ import { recognizeDocumentCanvas } from "@/lib/installation-photo/ocr";
 import type { RecognizedTextLine } from "@/lib/installation-photo/recognition";
 import { enToRuVisual } from "@/lib/utils";
 
+import { applyMarginPluses, findMarginPluses } from "./task-document-marks";
 import { type DocumentCableRow, extractDocumentCableRows, validateTaskDocument } from "./task-documents";
 
 export type DocumentPageResult = {
@@ -99,6 +100,7 @@ async function recognizePage(
 		try {
 			const preview = canvas.toDataURL("image/jpeg", 0.65);
 			const context = canvas.getContext("2d")!;
+			const marginMarks = findMarginPluses(context.getImageData(0, 0, canvas.width, canvas.height));
 			context.putImageData(
 				cleanDocumentPixels(context.getImageData(0, 0, canvas.width, canvas.height)),
 				0,
@@ -110,6 +112,7 @@ async function recognizePage(
 			signal.throwIfAborted();
 			const text = joinDocumentOcrLines(result.lines) || result.text;
 			const rows = extractDocumentCableRows(text, page);
+			const rowLines = [...result.lines];
 			for (const row of rows)
 				row.confidence =
 					result.lines.find((line) => line.text.toUpperCase().includes(row.cableLabel))?.confidence ?? null;
@@ -123,6 +126,7 @@ async function recognizePage(
 					band.getContext("2d")!.drawImage(canvas, 0, 0);
 					const extra = await recognizeDocumentCanvas(band, () => undefined, "6");
 					signal.throwIfAborted();
+					rowLines.push(...extra.lines);
 					for (const row of extractDocumentCableRows(joinDocumentOcrLines(extra.lines) || extra.text, page)) {
 						if (!rows.some((current) => enToRuVisual(current.cableLabel) === enToRuVisual(row.cableLabel))) {
 							row.confidence =
@@ -135,6 +139,7 @@ async function recognizePage(
 					band.width = band.height = 0;
 				}
 			}
+			applyMarginPluses(rows, rowLines, marginMarks);
 			if (!best || rows.length > best.rows.length)
 				best = { page, preview, rotation: angle, text, rows, error: null };
 			// A table with several complete cable markings establishes readable orientation.

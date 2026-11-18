@@ -40,7 +40,7 @@ describe("Kanban documents", () => {
 			await expect(validateTaskDocument(file)).rejects.toThrow();
 		}
 	});
-	it("preserves distinct complete cable markings without turning equipment or pluses into completion", () => {
+	it("preserves distinct cable markings, excludes equipment and rejects arbitrary progress fields", () => {
 		const rows = extractDocumentCableRows(
 			"0012 1HX98k176 тип 5x1 + 1HX98 1HX29 000012345\n0013 1HX48-01 +",
 			2
@@ -52,4 +52,13 @@ describe("Kanban documents", () => {
 		expect(documentCableRowsSchema.parse([{ ...rows[0], progress: 100 }])[0]).not.toHaveProperty("progress");
 		expect(() => documentCableRowsSchema.parse([{ page: 0, cableLabel: "1HX98K176" }])).toThrow();
 	});
+});
+
+it("recognizes standalone completion pluses but not arithmetic or dates", () => {
+	const rows = extractDocumentCableRows(
+		"1 1HX98K176 +\n2 1HX98K177 5+1\n3 1HX98K178 18.11.26\n4 1HX98K179",
+		1
+	);
+	expect(rows.map((row) => row.completed)).toEqual([true, false, false, false]);
+	expect(documentCableRowsSchema.parse([{ page: 1, cableLabel: "1HX98K176" }])[0]?.completed).toBe(false);
 });

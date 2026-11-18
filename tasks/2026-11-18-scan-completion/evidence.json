@@ -1,0 +1,55 @@
+{
+	"base": "048755b",
+	"source_sha256": "50c182d5c70eaed80f57c3d6f017b0e6646107a22bdb273e0f0c6aef5f47bd62",
+	"source_files": [
+		"src/components/cable-map/cable-task-import-card.test.tsx",
+		"src/components/cable-map/document-recognition.tsx",
+		"src/components/cable-map/task-attachments.tsx",
+		"src/lib/cable-map/document-ocr.ts",
+		"src/lib/cable-map/task-attachments.server.ts",
+		"src/lib/cable-map/task-document-marks.test.ts",
+		"src/lib/cable-map/task-document-marks.ts",
+		"src/lib/cable-map/task-documents.test.ts",
+		"src/lib/cable-map/task-documents.ts",
+		"src/lib/cable-map/task-workflow.server.ts",
+		"test/integration/documents.test.ts"
+	],
+	"unit": {
+		"pass": 84,
+		"skip": 45,
+		"fail": 0
+	},
+	"integration": {
+		"pass": 22,
+		"skip": 7,
+		"fail": 0
+	},
+	"typecheck": "passed",
+	"lint": "passed with preexisting Date purity warning",
+	"build": "passed",
+	"image_smoke": {
+		"pages": 1,
+		"candidate_rows": 29,
+		"completion_candidates": 22,
+		"errors": 0
+	},
+	"pdf_smoke": {
+		"pages": 16,
+		"errors": 0,
+		"candidate_rows": 516,
+		"completion_candidates": 265,
+		"rotation": 90,
+		"per_page_completion_candidates": [20, 3, 12, 2, 24, 15, 15, 18, 13, 19, 20, 27, 5, 32, 37, 3],
+		"page1": {
+			"reference_cables": 27,
+			"candidate_rows": 28,
+			"correct_markings": 25,
+			"missing_markings": 2,
+			"extra_markings": 3,
+			"correct_completion_candidates": 20
+		},
+		"full_ground_truth_available": false
+	},
+	"S3": "mocked, no production writes",
+	"publication": "none"
+}
