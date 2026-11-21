@@ -110,6 +110,7 @@ export const importSnapshots = pgTable(
 		summary: jsonb("summary")
 			.$type<{
 				levels: string[];
+				showDestinationRooms?: boolean;
 				sides: Array<{
 					side: "dirty" | "clean";
 					groupCount: number;

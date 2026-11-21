@@ -264,6 +264,7 @@ export type GraphGroupView = {
 	averageProgress: number;
 	primaryRooms: GraphRoomView[];
 	secondaryRooms: GraphRoomView[];
+	showDestinationRooms?: boolean;
 	manualRooms: GraphManualRoomView[];
 	buckets: GraphBucketView[];
 };

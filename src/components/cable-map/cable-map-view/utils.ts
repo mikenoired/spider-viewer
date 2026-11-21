@@ -170,7 +170,9 @@ function getPdfRenderedGroupHeight(group: GraphGroupView | null) {
 	if (!group) return minPdfRowHeight;
 
 	return Math.max(
-		getPdfImportedRoomBlockHeight(group.primaryRooms.length),
+		getPdfImportedRoomBlockHeight(
+			group.primaryRooms.length + (group.showDestinationRooms ? group.secondaryRooms.length : 0)
+		),
 		getPdfManualRoomBlockHeight(group.manualRooms.length)
 	);
 }

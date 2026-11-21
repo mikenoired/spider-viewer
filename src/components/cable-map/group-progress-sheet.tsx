@@ -204,6 +204,9 @@ function GroupProgressTrigger({
 	highlightedRoomId?: string | null;
 	onHoverRoom?: (roomId: string | null) => void;
 }) {
+	const mapRooms = group.showDestinationRooms
+		? [...group.primaryRooms, ...group.secondaryRooms]
+		: group.primaryRooms;
 	return (
 		<div className="flex w-full items-center justify-center">
 			<button
@@ -223,9 +226,10 @@ function GroupProgressTrigger({
 							"grid grid-cols-2 gap-x-2 gap-y-1 overflow-hidden text-xs font-medium leading-4 text-zinc-700 dark:text-zinc-200",
 							align === "right" && "text-right"
 						)}>
-						{group.primaryRooms.map((room) => (
+						{mapRooms.map((room) => (
 							<span
 								key={room.id}
+								title={room.roomName}
 								onMouseEnter={() => onHoverRoom?.(room.id)}
 								onMouseLeave={() => onHoverRoom?.(null)}
 								className={cn(

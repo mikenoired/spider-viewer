@@ -9,6 +9,7 @@ import * as Xlsx from "xlsx";
 import type { AuthSession } from "@/lib/auth/shared";
 import { saveCableProgressChanges } from "@/lib/cable-map/history.server";
 import { ensureCanonicalCableBase, importWorkbookFromFormData } from "@/lib/cable-map/import.server";
+import { getActiveDashboardData } from "@/lib/cable-map/queries.server";
 import { getRemarksData } from "@/lib/cable-map/remarks.server";
 import { importCableTaskListFromFormData, transitionKanbanTask } from "@/lib/cable-map/task-workflow.server";
 import * as schema from "@/lib/db/schema";
@@ -338,6 +339,57 @@ describe.skipIf(!testUrl)("workflow regressions with real PostgreSQL", () => {
 			}),
 		];
 	}
+	it("places PSE destinations on their own floor and preserves cable progress on reimport", async () => {
+		const headers = [
+			"Наименование",
+			"№ кабеля",
+			"Марка кабеля (монтажная)",
+			"Откуда (оборудование)",
+			"Откуда (помещение)",
+			"Куда (помещение)",
+			"Z начало",
+			"Z конец",
+			"Длина проектная, м",
+			"Трассировка",
+		];
+		const rows = [
+			headers,
+			["Журнал", "1", "c-1", "Панель", "А101", "ГА201", "0", "25.7", "10", ""],
+			["Журнал", "2", "c-2", "Панель", "А101", "А102", "1.2", "41.4", "15", ""],
+			["Журнал", "3", "c-3", "Панель", "А102", "ГА201", "", "26.1", "20", ""],
+			["Журнал", "4", "c-4", "Панель", "", "А103", "1", "3.6", "30", ""],
+		];
+		const upload = () => importWorkbookFromFormData(workbook(rows, "Реестр"), master);
+		const first = await upload();
+		const [cable] = await db.select().from(schema.cables).where(eq(schema.cables.cableLabel, "c-1"));
+		await db.update(schema.cables).set({ progress: 80 }).where(eq(schema.cables.id, cable.id));
+		const second = await upload();
+		const dashboard = await getActiveDashboardData();
+		expect(first.snapshotId).not.toBe(second.snapshotId);
+		expect(second).toMatchObject({ rowCount: 4, groupCount: 4, levelCount: 4 });
+		expect(dashboard.snapshot).toMatchObject({ levelCount: 4, roomCount: 4 });
+		expect(dashboard.levels.map((level) => level.level)).toEqual(["41,4", "Гермообъём · 25,7", "3,6", "0"]);
+		const groups = dashboard.levels.flatMap((level) => level.cleanGroups);
+		expect(groups.every((group) => group.showDestinationRooms)).toBe(true);
+		expect(groups.map((group) => group.primaryRooms.map((room) => room.roomName))).toEqual([
+			["А102"],
+			[],
+			[],
+			["А101"],
+		]);
+		expect(groups.map((group) => group.secondaryRooms.map((room) => room.roomName))).toEqual([
+			[],
+			["ГА201"],
+			["А103"],
+			[],
+		]);
+		expect(groups.map((group) => group.cableCount)).toEqual([1, 0, 1, 2]);
+		expect(groups.map((group) => group.totalLength)).toEqual([20, 0, 30, 25]);
+		expect(groups[3]?.primaryRooms[0]?.cables.find((row) => row.cableLabel === "c-1")?.progress).toBe(80);
+		expect(await db.select().from(schema.cables).where(eq(schema.cables.id, cable.id))).toHaveLength(1);
+		expect(await db.select().from(schema.cables)).toHaveLength(4);
+	});
+
 	it("resets canonical progress even without a per-snapshot progress row", async () => {
 		await importWorkbookFromFormData(workbook(mapRows(1)), master);
 		const [cable] = await db.select().from(schema.cables);

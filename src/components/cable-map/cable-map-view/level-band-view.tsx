@@ -72,7 +72,11 @@ export const LevelBandView = memo(function LevelBandView({
 					} satisfies CSSProperties
 				}>
 				<div className="flex w-full flex-col items-center gap-3">
-					<div className="select-none text-3xl font-semibold leading-none text-zinc-900 dark:text-zinc-100">
+					<div
+						className={cn(
+							"max-w-full select-none font-semibold text-zinc-900 [overflow-wrap:anywhere] dark:text-zinc-100",
+							displayedLevelLabel.length > 10 ? "text-base leading-tight" : "text-3xl leading-none"
+						)}>
 						{displayedLevelLabel}
 					</div>
 					{canExportDailyReport ? (

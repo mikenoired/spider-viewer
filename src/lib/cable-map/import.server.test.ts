@@ -279,8 +279,8 @@ describe("workbook import validation", () => {
 			fromRoom: "А101",
 			toRoom: "А102",
 			fromEquipment: "Источник",
-			level: "-3,6",
-			levelOrder: -3.6,
+			level: "-4,2",
+			levelOrder: -4.2,
 			threadLength: 12.5,
 			totalLength: 12.5,
 			threadCount: 1,
@@ -296,6 +296,73 @@ describe("workbook import validation", () => {
 		expect(getCableExternalKey(rows[0]!)).not.toBe(getCableExternalKey(rows[1]!));
 		const resolveKey = createCanonicalCableKeyResolver([]);
 		expect(resolveKey(rows[0]!)).toBe(getCableExternalKey(rows[0]!));
+	});
+
+	it("assigns each PSE room by both endpoints and uses fixed floor boundaries", () => {
+		const headers = [
+			"Наименование",
+			"№ кабеля",
+			"Марка кабеля (монтажная)",
+			"Откуда (оборудование)",
+			"Откуда (помещение)",
+			"Куда (помещение)",
+			"Z начало",
+			"Z конец",
+			"Длина проектная, м",
+			"Трассировка",
+		];
+		const examples = [
+			["P100", "0", "R100", "41.4", "0"],
+			["P101", "3,6", "R101", "0", "3,6"],
+			["P102", "6.6", "R102", "3.6", "6,6"],
+			["P103", "12", "R103", "3.6", "6,6"],
+			["P104", "13.2", "R104", "3.6", "13,2"],
+			["P105", "16.6", "R105", "3.6", "16,6"],
+			["P106", "19,2", "R106", "3.6", "19,2"],
+			["P107", "24", "R107", "3.6", "24"],
+			["P108", "24.6", "R108", "3.6", "24,6"],
+			["P109", "28.8", "R109", "3.6", "28,8"],
+			["P110", "33.6", "R110", "3.6", "33,6"],
+			["P111", "36.6", "R111", "3.6", "36,6"],
+			["P112", "41.4", "R112", "3.6", "41,4"],
+			["P113", "45.6", "R113", "3.6", "45,6"],
+			["P114", "50.39", "R114", "3.6", "45,6"],
+			["P115", "50.4", "R115", "3.6", "Уровень не указан"],
+			["P116", "", "R116", "3.6", "Уровень не указан"],
+			["P117", "-4.21", "R117", "3.6", "Уровень не указан"],
+			["ГА101", "25.7", "R118", "3.6", "Гермообъём · 25,7"],
+			["ГA102", "29.4", "R119", "3.6", "Гермообъём · 29,4"],
+			["ГА103", "19.34", "R120", "3.6", "Гермообъём · 19,34"],
+			["ГА104", "13.2", "R121", "3.6", "Гермообъём · 13,2"],
+			["ГА105", "33.6", "R122", "3.6", "Гермообъём · 33,6"],
+			["ГА106", "36.6", "R123", "3.6", "Гермообъём · 36,6"],
+			["ГА107", "164", "R124", "3.6", "Уровень не указан"],
+			["P101", "0", "R125", "0", "3,6"],
+			["P101", "", "R126", "0", "3,6"],
+			["R127", "0", "P101", "4.1", "0"],
+			["P118", "10m", "R128", "0", "Уровень не указан"],
+			["P119", "0", "R129", "0", "Уровень не указан"],
+			["R130", "0", "P119", "3.6", "0"],
+		];
+		const sourceRows = examples.map(([from, startZ, to, endZ], i) => [
+			"Журнал",
+			String(i + 1),
+			`cable-${i + 1}`,
+			"Источник",
+			from,
+			to,
+			startZ,
+			endZ,
+			"1",
+			"",
+		]);
+		const read = (body: string[][]) =>
+			parseWorkbookRows("base.xlsx", createWorkbookBuffer([headers, ...body], "Лист1")).map(
+				(row) => row.level
+			);
+		const expected = examples.map((example) => example[4]);
+		expect(read(sourceRows)).toEqual(expected);
+		expect(read([...sourceRows].reverse())).toEqual([...expected].reverse());
 	});
 
 	it("parses a valid ods row", () => {

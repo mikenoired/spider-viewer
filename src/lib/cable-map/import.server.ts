@@ -17,6 +17,7 @@ import {
 import { archiveUpload } from "@/lib/uploads.server";
 import { enToRuVisual } from "@/lib/utils";
 
+import { buildPseRoomFloors, type PseFloor, pseUnknownFloor } from "./pse-floors";
 import { type SnapshotKind, supportedWorkbookExtensions, supportedWorkbookMimeTypes } from "./shared";
 
 type GraphSide = (typeof graphSideEnum.enumValues)[number];
@@ -24,6 +25,7 @@ type GraphSubzone = (typeof graphSubzoneEnum.enumValues)[number] | null;
 
 type ParsedCableRow = {
 	identityMarking?: string;
+	pseDestinationFloor?: PseFloor;
 	sourceRowIndex: number;
 	cableLabel: string;
 	cableJournal: string;
@@ -643,6 +645,12 @@ function chunkValues<T>(values: T[], size: number) {
 }
 
 // PSE registers have no zone columns: the owner assigns this format to ЧЗ.
+const pseMissingRoom = "Помещение не указано";
+
+function isPseRoom(room: string) {
+	return isMeaningfulValue(room) && !/^[-–—]+$/.test(room);
+}
+
 function parsePseWorkbookRows(workbook: Xlsx.WorkBook): ParsedCableRow[] | null {
 	const requiredHeaders = [
 		"наименование",
@@ -656,7 +664,8 @@ function parsePseWorkbookRows(workbook: Xlsx.WorkBook): ParsedCableRow[] | null 
 		"трассировка",
 	];
 	for (const name of workbook.SheetNames) {
-		const rows = Xlsx.utils.sheet_to_json<string[]>(workbook.Sheets[name], {
+		const sheet = workbook.Sheets[name];
+		const rows = Xlsx.utils.sheet_to_json<string[]>(sheet, {
 			header: 1,
 			raw: false,
 			defval: "",
@@ -671,7 +680,10 @@ function parsePseWorkbookRows(workbook: Xlsx.WorkBook): ParsedCableRow[] | null 
 		const headers = rows[headerIndex]!.map((cell) =>
 			normalizeCellValue(cell).toLowerCase().replace(/\s+/g, " ")
 		);
-		return rows.slice(headerIndex + 1).flatMap((source, offset) => {
+		const start = Xlsx.utils.decode_range(sheet["!ref"]!).s;
+		const startZColumn = headers.indexOf("z начало");
+		const endZColumn = headers.indexOf("z конец");
+		const cablesWithHeights = rows.slice(headerIndex + 1).flatMap((source, offset) => {
 			const cell = (header: string) => normalizeCellValue(source[headers.indexOf(header)]);
 			const marking = cell("марка кабеля (монтажная)");
 			if (!marking) return [];
@@ -682,15 +694,35 @@ function parsePseWorkbookRows(workbook: Xlsx.WorkBook): ParsedCableRow[] | null 
 			row[7] = enToRuVisual(cell("откуда (помещение)"));
 			row[9] = cell("откуда (оборудование)");
 			row[10] = enToRuVisual(cell("куда (помещение)"));
-			if (!row[7] && !row[10]) row[7] = "Помещение не указано";
+			if (!row[7] && !row[10]) row[7] = pseMissingRoom;
 			row[11] = row[13] = cell("длина проектная, м");
 			row[12] = "1";
 			row[14] = cell("z начало") || "Уровень не указан";
 			row[15] = row[16] = "ЧЗ";
 			row[31] = cell("трассировка");
 			const parsed = parseWorkbookDataRow(row, headerIndex + offset, []);
-			return parsed ? [{ ...parsed, identityMarking: marking }] : [];
+			const coordinate = (column: number) =>
+				column < 0
+					? undefined
+					: sheet[Xlsx.utils.encode_cell({ r: start.r + headerIndex + 1 + offset, c: start.c + column })]?.v;
+			return parsed
+				? [{ parsed, marking, startZ: coordinate(startZColumn), endZ: coordinate(endZColumn) }]
+				: [];
 		});
+		const roomFloors = buildPseRoomFloors(
+			cablesWithHeights
+				.flatMap(({ parsed, startZ, endZ }) => [
+					{ room: parsed.fromRoom, z: startZ },
+					{ room: parsed.toRoom, z: endZ },
+				])
+				.filter(({ room }) => isPseRoom(room) && room !== pseMissingRoom)
+		);
+		return cablesWithHeights.map(({ parsed, marking }) => ({
+			...parsed,
+			...(roomFloors.get(isPseRoom(parsed.fromRoom) ? parsed.fromRoom : parsed.toRoom) ?? pseUnknownFloor),
+			identityMarking: marking,
+			pseDestinationFloor: roomFloors.get(parsed.toRoom) ?? pseUnknownFloor,
+		}));
 	}
 	return null;
 }
@@ -788,8 +820,18 @@ export function parseInstallationWorkbookRows(fileName: string, buffer: Buffer):
 
 function aggregateGroups(rows: ParsedCableRow[]) {
 	const groups = new Map<string, AggregatedGroup>();
-	const uniqueLevels = new Set<string>();
 	const sideSummary = new Map<GraphSide, SideSummaryState>();
+	const showDestinationRooms = Boolean(rows[0]?.pseDestinationFloor);
+	const sourceRooms = new Set(showDestinationRooms ? rows.map((row) => row.fromRoom) : []);
+
+	function getGroup(row: ParsedCableRow) {
+		const groupKey = groupKeyForRow(row);
+		const existing = groups.get(groupKey);
+		if (existing) return existing;
+		const group = createAggregatedGroup(row);
+		groups.set(groupKey, group);
+		return group;
+	}
 
 	function updateGroupTotals(group: AggregatedGroup, row: ParsedCableRow) {
 		group.cableCount += 1;
@@ -822,27 +864,30 @@ function aggregateGroups(rows: ParsedCableRow[]) {
 		room.totalLength += row.totalLength;
 	}
 
-	function updateSideSummary(row: ParsedCableRow) {
+	function updateSideSummary(row: ParsedCableRow, room: string) {
 		const sideState = sideSummary.get(row.graphSide) ?? {
 			groupCount: 0,
 			roomNames: new Set<string>(),
 		};
 
-		sideState.roomNames.add(row.fromRoom);
+		sideState.roomNames.add(room);
 		sideSummary.set(row.graphSide, sideState);
 	}
 
 	for (const row of rows) {
-		uniqueLevels.add(row.level);
-
-		const groupKey = groupKeyForRow(row);
-		const group = groups.get(groupKey) ?? createAggregatedGroup(row);
-		groups.set(groupKey, group);
-
+		const group = getGroup(row);
 		updateGroupTotals(group, row);
-		updatePrimaryRoom(group, row);
-		updateSecondaryRoom(group, row);
-		updateSideSummary(row);
+		if (!showDestinationRooms || isPseRoom(row.fromRoom)) {
+			updatePrimaryRoom(group, row);
+			updateSideSummary(row, row.fromRoom);
+		}
+		if (!row.pseDestinationFloor) {
+			updateSecondaryRoom(group, row);
+		} else if (isPseRoom(row.toRoom) && !sourceRooms.has(row.toRoom)) {
+			const destinationGroup = getGroup({ ...row, ...row.pseDestinationFloor });
+			updateSecondaryRoom(destinationGroup, row);
+			updateSideSummary(row, row.toRoom);
+		}
 	}
 
 	for (const group of groups.values()) {
@@ -851,12 +896,15 @@ function aggregateGroups(rows: ParsedCableRow[]) {
 		if (sideState) sideState.groupCount += 1;
 	}
 
-	const orderedLevels = [...uniqueLevels].sort(
-		(left, right) => parseLocaleNumber(right) - parseLocaleNumber(left)
-	);
+	const levelOrders = new Map<string, number>();
+	for (const group of groups.values()) {
+		levelOrders.set(group.level, showDestinationRooms ? group.levelOrder : parseLocaleNumber(group.level));
+	}
+	const orderedLevels = [...levelOrders].sort((left, right) => right[1] - left[1]).map(([level]) => level);
 
 	return {
 		orderedLevels,
+		showDestinationRooms,
 		groups: [...groups.values()].sort((left, right) => {
 			if (left.levelOrder !== right.levelOrder) {
 				return right.levelOrder - left.levelOrder;
@@ -963,7 +1011,7 @@ export async function importWorkbookFromFormData(
 			)
 		).values(),
 	];
-	const { groups, orderedLevels, sideSummary } = aggregateGroups(parsedRows);
+	const { groups, orderedLevels, sideSummary, showDestinationRooms } = aggregateGroups(parsedRows);
 	const checksum = createHash("sha256").update(buffer).digest("hex");
 	const now = new Date();
 
@@ -989,6 +1037,7 @@ export async function importWorkbookFromFormData(
 				summary: {
 					levels: orderedLevels,
 					sides: sideSummary,
+					...(showDestinationRooms ? { showDestinationRooms: true } : {}),
 				},
 				createdAt: now,
 				updatedAt: now,
@@ -1025,7 +1074,11 @@ export async function importWorkbookFromFormData(
 
 		for (const chunk of chunkValues(
 			parsedRows.map((parsedRow) => {
-				const { identityMarking: _identityMarking, ...row } = parsedRow;
+				const {
+					identityMarking: _identityMarking,
+					pseDestinationFloor: _pseDestinationFloor,
+					...row
+				} = parsedRow;
 				return {
 					snapshotId: createdSnapshot.id,
 					cableId: cableIdByKey.get(resolveKey(parsedRow)) ?? null,

@@ -109,6 +109,7 @@ async function getActiveSnapshot(db: DbClient, snapshotKind: SnapshotKind) {
 			rowCount: importSnapshots.rowCount,
 			createdAt: importSnapshots.createdAt,
 			importedByLogin: users.login,
+			summary: importSnapshots.summary,
 		})
 		.from(importSnapshots)
 		.innerJoin(users, eq(users.id, importSnapshots.importedByUserId))
@@ -610,12 +611,18 @@ type LevelEntry = {
 
 function buildDashboardLevels(
 	groups: Map<string, GraphGroupView>,
-	manualRoomsByGroup: Map<string, GraphManualRoomView[]>
+	manualRoomsByGroup: Map<string, GraphManualRoomView[]>,
+	showDestinationRooms?: boolean
 ) {
 	const levelMap = new Map<string, LevelEntry>();
 	const allPrimaryRooms: GraphRoomView[] = [];
+	let destinationRoomCount = 0;
 
 	for (const group of groups.values()) {
+		if (showDestinationRooms) {
+			group.showDestinationRooms = true;
+			destinationRoomCount += group.secondaryRooms.length;
+		}
 		group.manualRooms =
 			manualRoomsByGroup
 				.get(`${group.sourceZone}:${group.level}`)
@@ -642,6 +649,7 @@ function buildDashboardLevels(
 	return {
 		levels: [...levelMap.values()].sort((left, right) => right.levelOrder - left.levelOrder),
 		allPrimaryRooms,
+		destinationRoomCount,
 	};
 }
 
@@ -649,7 +657,8 @@ function buildSnapshotSummary(
 	snapshot: DashboardSnapshotRow,
 	levels: LevelEntry[],
 	groupCount: number,
-	allPrimaryRooms: GraphRoomView[]
+	allPrimaryRooms: GraphRoomView[],
+	destinationRoomCount: number
 ): SnapshotSummaryView {
 	return {
 		id: snapshot.id,
@@ -661,7 +670,7 @@ function buildSnapshotSummary(
 		importedByLogin: snapshot.importedByLogin,
 		levelCount: levels.length,
 		groupCount,
-		roomCount: allPrimaryRooms.length,
+		roomCount: allPrimaryRooms.length + destinationRoomCount,
 		averageProgress: getAverageProgress(allPrimaryRooms),
 	};
 }
@@ -777,10 +786,14 @@ export async function getActiveDashboardData(
 	const groups = buildGroups(rows, copperMassByGroup, priorityAuthorsByRoom, kanbanMetaByRoom);
 	appendImportedCablesToGroups(groups, importedRows);
 	const manualRoomsByGroup = buildManualRoomsByGroup(manualRoomRows);
-	const { levels, allPrimaryRooms } = buildDashboardLevels(groups, manualRoomsByGroup);
+	const { levels, allPrimaryRooms, destinationRoomCount } = buildDashboardLevels(
+		groups,
+		manualRoomsByGroup,
+		snapshot.summary.showDestinationRooms
+	);
 
 	return {
-		snapshot: buildSnapshotSummary(snapshot, levels, groups.size, allPrimaryRooms),
+		snapshot: buildSnapshotSummary(snapshot, levels, groups.size, allPrimaryRooms, destinationRoomCount),
 		snapshotKind,
 		priorityLists: await buildPriorityListSummary(db, priorityLists),
 		priorityRoomCount: priorityAuthorsByRoom.size,
